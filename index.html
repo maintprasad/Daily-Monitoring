@@ -1,0 +1,3161 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Prasad Seeds — Daily Monitoring System</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg:#f4f7f4;--bg2:#ffffff;--bg3:#eef3ee;--border:#d4e0d4;
+  --navy:#1a3a6b;--green:#4a9e3f;--green2:#3a8a30;--green-light:#e8f5e8;
+  --accent:#4a9e3f;--red:#c0392b;--blue:#2b6cb8;--teal:#2a7a5a;
+  --purple:#b88ff7;--orange:#fb8c3a;--cyan:#0ea5e9;
+  --text:#1a2a1a;--text2:#3a5a3a;--text3:#7a9a7a;
+  --r:8px;--shadow:0 4px 16px rgba(26,58,107,.1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-serif;font-size:14px;min-height:100vh}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* TOPBAR */
+.topbar{position:sticky;top:0;z-index:200;background:var(--navy);border-bottom:1px solid rgba(74,158,63,.4);display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:56px;gap:12px}
+.brand-dot{width:8px;height:8px;background:var(--accent);border-radius:50%;animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.top-nav{display:flex;gap:2px}
+.nav-btn{background:none;border:none;color:rgba(255,255,255,.6);font-family:'IBM Plex Sans',sans-serif;font-size:12px;padding:5px 11px;border-radius:5px;cursor:pointer;transition:all .15s;white-space:nowrap}
+.nav-btn:hover{color:rgba(255,255,255,.9);background:rgba(255,255,255,.1)}
+.nav-btn.active{color:#fff;border-bottom:2px solid var(--green)}
+.top-right{display:flex;align-items:center;gap:8px}
+.api-pill{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:rgba(255,255,255,.5);white-space:nowrap}
+.api-pill.ok{border-color:rgba(74,158,63,.5);background:rgba(74,158,63,.2);color:#7ddf6e}
+.icon-btn{background:none;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.7);width:32px;height:32px;border-radius:5px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .15s}
+.icon-btn:hover{border-color:rgba(74,158,63,.6);color:#fff}
+.ham-btn{display:none;background:none;border:none;cursor:pointer;padding:6px;border-radius:6px;flex-direction:column;gap:4px;flex-shrink:0}
+.ham-btn span{display:block;width:20px;height:2px;background:rgba(255,255,255,.8);border-radius:2px;transition:all .25s}
+.ham-btn.open span:nth-child(1){transform:translateY(6px) rotate(45deg)}
+.ham-btn.open span:nth-child(2){opacity:0;transform:scaleX(0)}
+.ham-btn.open span:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
+
+/* LAYOUT */
+.layout{display:flex;min-height:calc(100vh - 56px)}
+.sidebar{width:210px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);padding:14px 0;overflow-y:auto;transition:transform .28s cubic-bezier(.4,0,.2,1);box-shadow:2px 0 8px rgba(26,58,107,.06)}
+.sb-section{padding:0 12px;margin-bottom:18px}
+.sb-label{font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px;padding:0 6px}
+.sb-item{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--text2);margin-bottom:1px;transition:all .12s;user-select:none}
+.sb-item:hover{background:var(--green-light);color:var(--green2)}
+.sb-item.active{color:var(--navy);background:var(--green-light);font-weight:600;border-left:2px solid var(--green)}
+.sb-icon{font-size:15px;width:20px;text-align:center;flex-shrink:0}
+.content{flex:1;padding:22px;overflow:auto;max-width:100%;background:var(--bg)}
+.sidebar-backdrop{display:none;position:fixed;inset:0;z-index:399;background:rgba(0,0,0,.55);backdrop-filter:blur(2px)}
+.sidebar-backdrop.open{display:block}
+
+/* PAGES */
+.page{display:none}
+.page.active{display:block}
+
+/* SECTION HEADER */
+.sec-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px;gap:12px;flex-wrap:wrap}
+.sec-title{font-size:19px;font-weight:700;color:var(--navy)}
+.sec-sub{font-size:12px;color:var(--text3);margin-top:3px}
+
+/* BUTTONS */
+.btn-primary{background:var(--green);color:#fff;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;border:none;padding:7px 14px;border-radius:5px;cursor:pointer;letter-spacing:.04em;transition:all .15s;white-space:nowrap}
+.btn-primary:hover{background:var(--green2);box-shadow:0 2px 8px rgba(74,158,63,.3)}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed}
+.btn-ghost{background:none;border:1px solid var(--border);color:var(--text2);font-family:'IBM Plex Mono',monospace;font-size:11px;padding:6px 12px;border-radius:5px;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn-ghost:hover{border-color:var(--green);color:var(--green2)}
+.btn-danger{background:none;border:1px solid rgba(192,57,43,.4);color:var(--red);font-family:'IBM Plex Mono',monospace;font-size:11px;padding:6px 12px;border-radius:5px;cursor:pointer;transition:all .15s}
+.btn-danger:hover{background:rgba(192,57,43,.08)}
+.btn-sm{padding:5px 10px;font-size:11px}
+.btn-cyan{background:var(--cyan);color:#fff;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;border:none;padding:7px 14px;border-radius:5px;cursor:pointer;letter-spacing:.04em;transition:all .15s;white-space:nowrap}
+.btn-cyan:hover{background:#0284c7}
+
+/* STAT CARDS */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:24px}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:18px 20px;position:relative;overflow:hidden;transition:border-color .2s,transform .15s;cursor:default}
+.stat-card:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.stat-card::after{content:'';position:absolute;top:0;left:0;width:3px;height:100%;border-radius:var(--r) 0 0 var(--r)}
+.stat-card.c-green::after{background:var(--green)}
+.stat-card.c-red::after{background:var(--red)}
+.stat-card.c-blue::after{background:var(--blue)}
+.stat-card.c-orange::after{background:var(--orange)}
+.stat-card.c-purple::after{background:var(--purple)}
+.stat-card.c-cyan::after{background:var(--cyan)}
+.stat-lbl{font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--text3);letter-spacing:.07em;text-transform:uppercase;margin-bottom:10px}
+.stat-val{font-size:26px;font-weight:700;line-height:1;color:var(--navy)}
+.stat-sub{font-size:11px;color:var(--text3);margin-top:5px}
+
+/* TOOLBAR */
+.toolbar{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.search-wrap{display:flex;align-items:center;gap:7px;background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:7px 11px;flex:1;min-width:180px;transition:border-color .15s}
+.search-wrap:focus-within{border-color:var(--green)}
+.search-wrap input{background:none;border:none;color:var(--text);font-family:'IBM Plex Sans',sans-serif;font-size:13px;outline:none;width:100%}
+.search-wrap input::placeholder{color:var(--text3)}
+.fsel{background:var(--bg2);border:1px solid var(--border);color:var(--text2);font-family:'IBM Plex Sans',sans-serif;font-size:13px;padding:7px 9px;border-radius:7px;outline:none;cursor:pointer;transition:border-color .15s}
+.fsel:focus,.fsel:hover{border-color:var(--green);color:var(--text)}
+
+/* TABLE */
+.tbl-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:0 2px 8px rgba(26,58,107,.05)}
+.tbl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.data-table{width:100%;border-collapse:collapse;min-width:900px}
+.data-table thead th{background:var(--navy);padding:10px 12px;text-align:left;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;color:rgba(255,255,255,.7);letter-spacing:.08em;text-transform:uppercase;border-bottom:2px solid var(--green);white-space:nowrap;user-select:none}
+.data-table tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+.data-table tbody tr:last-child{border-bottom:none}
+.data-table tbody tr:hover{background:var(--green-light)}
+.data-table tbody td{padding:10px 12px;font-size:13px;vertical-align:middle}
+
+/* MONITORING CHECKLIST TABLE */
+.chk-table{width:100%;border-collapse:collapse}
+.chk-table thead th{background:var(--navy);padding:9px 10px;text-align:left;font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(255,255,255,.8);letter-spacing:.06em;text-transform:uppercase;border-bottom:2px solid var(--green);white-space:nowrap}
+.chk-table tbody tr{border-bottom:1px solid var(--border)}
+.chk-table tbody tr:hover{background:rgba(74,158,63,.04)}
+.chk-table tbody td{padding:8px 10px;font-size:12px;vertical-align:middle}
+.chk-table .param-name{font-weight:500;color:var(--text)}
+.chk-table .param-unit{font-size:10px;color:var(--text3);font-family:'IBM Plex Mono',monospace}
+
+/* STATUS ROW COLORS */
+.row-ok{background:rgba(74,158,63,.04)}
+.row-warn{background:rgba(251,140,58,.07)}
+.row-alert{background:rgba(192,57,43,.07);animation:rowBlink 1.8s ease-in-out infinite}
+@keyframes rowBlink{0%,100%{opacity:1}50%{opacity:.7}}
+
+/* BADGES */
+.badge{display:inline-block;padding:3px 9px;border-radius:5px;font-size:10px;font-family:'IBM Plex Mono',monospace;font-weight:600;letter-spacing:.05em;white-space:nowrap}
+.badge-ok{background:rgba(74,158,63,.12);color:var(--green2);border:1px solid rgba(74,158,63,.3)}
+.badge-warn{background:rgba(251,140,58,.12);color:#d4600a;border:1px solid rgba(251,140,58,.35)}
+.badge-alert{background:rgba(192,57,43,.12);color:var(--red);border:1px solid rgba(192,57,43,.35);animation:badgePulse 1.5s infinite}
+.badge-done{background:rgba(43,108,184,.1);color:var(--blue);border:1px solid rgba(43,108,184,.2)}
+.badge-pending{background:rgba(184,143,247,.12);color:var(--purple);border:1px solid rgba(184,143,247,.2)}
+@keyframes badgePulse{0%,100%{box-shadow:0 0 0 0 rgba(192,57,43,.3)}70%{box-shadow:0 0 0 5px rgba(192,57,43,0)}}
+.b-unit1{background:rgba(91,156,246,.12);color:var(--blue)}
+.b-unit2{background:rgba(184,143,247,.12);color:var(--purple)}
+.b-cs{background:rgba(14,165,233,.1);color:var(--cyan);border:1px solid rgba(14,165,233,.25)}
+.b-lvmdp{background:rgba(251,140,58,.1);color:#c05c00;border:1px solid rgba(251,140,58,.25)}
+
+/* PAGINATION */
+.pagination{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-top:1px solid var(--border);flex-wrap:wrap;gap:8px}
+.page-info{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text3)}
+.page-btns{display:flex;gap:4px}
+.pnav{background:var(--bg3);border:1px solid var(--border);color:var(--text2);font-size:11px;padding:4px 10px;border-radius:5px;cursor:pointer;font-family:'IBM Plex Mono',monospace;transition:all .12s}
+.pnav:hover:not(:disabled){border-color:var(--green);color:var(--green2);background:var(--green-light)}
+.pnav:disabled{opacity:.3;cursor:not-allowed}
+
+/* OVERLAY / MODAL */
+.overlay{display:none;position:fixed;inset:0;background:rgba(26,58,107,.4);backdrop-filter:blur(4px);z-index:500;align-items:center;justify-content:center;padding:20px}
+.overlay.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:14px;width:100%;overflow-y:auto;box-shadow:var(--shadow);animation:modalUp .22s ease}
+.modal-xl{max-width:900px;max-height:92vh}
+.modal-lg{max-width:680px;max-height:92vh}
+.modal-sm{max-width:440px;max-height:90vh}
+@keyframes modalUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-hdr{display:flex;align-items:center;justify-content:space-between;padding:22px 24px 0}
+.modal-title{font-size:16px;font-weight:600;color:var(--navy)}
+.modal-close{background:none;border:none;color:var(--text3);font-size:22px;cursor:pointer;padding:2px 6px;border-radius:5px;line-height:1;transition:color .12s}
+.modal-close:hover{color:var(--text)}
+.modal-body{padding:18px 24px 24px}
+
+/* FORM */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.fg{display:flex;flex-direction:column;gap:5px}
+.fg.full{grid-column:1/-1}
+.fg.span2{grid-column:span 2}
+.flabel{font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--text3);letter-spacing:.07em;text-transform:uppercase}
+.flabel .req{color:var(--red)}
+.finput,.fsel2,.ftextarea{background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:'IBM Plex Sans',sans-serif;font-size:13px;padding:9px 12px;border-radius:7px;outline:none;transition:border-color .15s;width:100%}
+.finput:focus,.fsel2:focus,.ftextarea:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(74,158,63,.1)}
+.finput.err,.fsel2.err{border-color:var(--red)}
+.finput::placeholder{color:var(--text3)}
+.ftextarea{resize:vertical;min-height:70px}
+.ferr{font-size:11px;color:var(--red);min-height:16px}
+.fhint{font-size:11px;color:var(--text3)}
+.form-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
+
+/* VALUE INPUT */
+.val-input{background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;padding:6px 8px;border-radius:6px;outline:none;width:90px;text-align:center;transition:border-color .15s}
+.val-input:focus{border-color:var(--green)}
+.val-input.val-ok{border-color:rgba(74,158,63,.5);background:rgba(74,158,63,.06)}
+.val-input.val-warn{border-color:rgba(251,140,58,.5);background:rgba(251,140,58,.06)}
+.val-input.val-alert{border-color:rgba(192,57,43,.5);background:rgba(192,57,43,.06)}
+.status-sel{background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:11px;padding:5px 8px;border-radius:6px;outline:none;cursor:pointer;transition:border-color .15s}
+.status-sel:focus{border-color:var(--green)}
+.status-sel.s-ok{border-color:rgba(74,158,63,.5);background:rgba(74,158,63,.06);color:var(--green2)}
+.status-sel.s-warn{border-color:rgba(251,140,58,.5);background:rgba(251,140,58,.06);color:#d4600a}
+.status-sel.s-alert{border-color:rgba(192,57,43,.5);background:rgba(192,57,43,.06);color:var(--red)}
+
+/* CHECKBOX GRID */
+.chk-grid{display:flex;flex-wrap:wrap;gap:8px}
+.chk-item{display:flex;align-items:center;gap:6px;padding:5px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;cursor:pointer;transition:all .12px;user-select:none}
+.chk-item:hover{border-color:var(--green)}
+.chk-item input{accent-color:var(--green);width:14px;height:14px;cursor:pointer}
+.chk-item.checked{background:rgba(74,158,63,.08);border-color:rgba(74,158,63,.35)}
+.chk-item span{font-size:12px;color:var(--text2)}
+.chk-item.checked span{color:var(--green2)}
+
+/* PROGRESS BAR */
+.progress-wrap{background:var(--border);border-radius:4px;height:8px;overflow:hidden;flex:1}
+.progress-bar{height:100%;border-radius:4px;transition:width .4s ease}
+
+/* MONITORING CARD */
+.mon-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);margin-bottom:16px;overflow:hidden;box-shadow:0 2px 6px rgba(26,58,107,.05)}
+.mon-card-hdr{background:linear-gradient(135deg,var(--navy),#2a5298);color:#fff;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.mon-card-title{font-weight:700;font-size:14px}
+.mon-card-sub{font-size:11px;opacity:.7;margin-top:2px}
+.mon-card-body{padding:16px 18px}
+
+/* MACHINE STATUS GRID */
+.machine-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:16px}
+.machine-tile{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px 14px;cursor:pointer;transition:all .15s;position:relative}
+.machine-tile:hover{border-color:var(--green);transform:translateY(-1px);box-shadow:0 4px 12px rgba(74,158,63,.15)}
+.machine-tile.status-ok{border-left:3px solid var(--green)}
+.machine-tile.status-warn{border-left:3px solid var(--orange);background:rgba(251,140,58,.04)}
+.machine-tile.status-alert{border-left:3px solid var(--red);background:rgba(192,57,43,.04);animation:rowBlink 2s infinite}
+.machine-tile.status-pending{border-left:3px solid var(--purple);background:rgba(184,143,247,.04)}
+.machine-tile-name{font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px;line-height:1.3}
+.machine-tile-status{font-size:10px;font-family:'IBM Plex Mono',monospace}
+.machine-tile-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px}
+.dot-ok{background:var(--green)}
+.dot-warn{background:var(--orange)}
+.dot-alert{background:var(--red)}
+.dot-pending{background:var(--purple)}
+
+/* EMPTY / LOADING */
+.empty{text-align:center;padding:52px 20px;color:var(--text3)}
+.empty-ico{font-size:36px;margin-bottom:10px}
+.empty-msg{font-size:13px}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .65s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* TOAST */
+#toast{position:fixed;bottom:24px;right:24px;z-index:999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast-item{padding:12px 16px;border-radius:9px;font-size:13px;box-shadow:var(--shadow);animation:toastin .25s ease;pointer-events:auto;max-width:340px;display:flex;align-items:center;gap:8px}
+.toast-item.success{background:#e8f5e8;border:1px solid rgba(74,158,63,.4);color:var(--green2)}
+.toast-item.error{background:#fdecea;border:1px solid rgba(192,57,43,.3);color:var(--red)}
+.toast-item.info{background:var(--bg2);border:1px solid var(--border);color:var(--text2)}
+@keyframes toastin{from{transform:translateX(30px);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* DETAIL GRID */
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.detail-item{background:var(--bg3);border-radius:8px;padding:12px 14px}
+.detail-item.full{grid-column:1/-1}
+.dl{font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--text3);letter-spacing:.07em;text-transform:uppercase;margin-bottom:5px}
+.dv{font-size:13px;color:var(--text);line-height:1.5}
+
+/* MANAGE MACHINE */
+.machine-list{display:flex;flex-direction:column;gap:4px;max-height:300px;overflow-y:auto;margin:10px 0}
+.machine-row{display:flex;align-items:center;justify-content:space-between;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:8px 12px;gap:8px}
+.machine-name{font-size:13px;flex:1}
+.add-machine-row{display:flex;gap:8px;align-items:center;margin-top:10px}
+
+/* PIC MANAGE */
+.pic-manage-list{display:flex;flex-direction:column;gap:4px;margin:12px 0;max-height:280px;overflow-y:auto}
+.pic-manage-row{display:flex;align-items:center;justify-content:space-between;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:8px 12px;gap:8px}
+.pic-manage-name{font-weight:600;font-size:13px;flex:1}
+.add-pic-row{display:flex;gap:8px;align-items:center;margin-top:10px}
+
+/* DATE-TIME PILL */
+.time-pill{display:inline-flex;align-items:center;gap:5px;background:rgba(43,108,184,.08);border:1px solid rgba(43,108,184,.2);border-radius:20px;padding:4px 10px;font-size:11px;color:var(--blue);font-family:'IBM Plex Mono',monospace}
+
+/* SECTION DIVIDER */
+.sec-divider{border:none;border-top:1px solid var(--border);margin:16px 0}
+
+/* LVMDP PANEL CARD */
+.panel-section{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;margin-bottom:14px}
+.panel-section-title{font-size:12px;font-family:'IBM Plex Mono',monospace;color:var(--text2);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.lvmdp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.lvmdp-param{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px 14px}
+.lvmdp-param-name{font-size:11px;color:var(--text3);margin-bottom:4px}
+.lvmdp-param-val{font-size:20px;font-weight:700;color:var(--navy);font-family:'IBM Plex Mono',monospace}
+.lvmdp-param-unit{font-size:10px;color:var(--text3);margin-top:2px}
+.lvmdp-param.p-ok{border-left:3px solid var(--green)}
+.lvmdp-param.p-warn{border-left:3px solid var(--orange);background:rgba(251,140,58,.04)}
+.lvmdp-param.p-alert{border-left:3px solid var(--red);background:rgba(192,57,43,.04)}
+
+/* MOBILE NAV */
+.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:300;background:var(--navy);border-top:2px solid var(--green);padding:8px 0 max(8px,env(safe-area-inset-bottom))}
+.mobile-nav-inner{display:flex;justify-content:space-around;align-items:center}
+.mnav-btn{display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;cursor:pointer;padding:4px 8px;color:rgba(255,255,255,.5);font-family:'IBM Plex Sans',sans-serif;font-size:10px;border-radius:8px;transition:color .15s;min-width:52px}
+.mnav-btn .mnav-ico{font-size:20px;line-height:1}
+.mnav-btn.active{color:#fff}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  .topbar{padding:0 12px;height:50px}
+  .top-nav,.api-pill{display:none}
+  .ham-btn{display:flex}
+  .sidebar{position:fixed;top:50px;left:0;bottom:0;z-index:400;transform:translateX(-100%);width:240px;box-shadow:4px 0 24px rgba(0,0,0,.5)}
+  .sidebar.open{transform:translateX(0)}
+  .content{padding:12px;padding-bottom:80px;overflow-x:hidden}
+  .stat-grid{grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px}
+  .stat-val{font-size:22px}
+  .form-grid,.form-grid-3{grid-template-columns:1fr}
+  .fg.span2{grid-column:1}
+  .modal-xl,.modal-lg,.modal-sm{max-width:100%;max-height:95vh;border-radius:14px 14px 0 0}
+  .overlay{align-items:flex-end;padding:0}
+  .modal-hdr{padding:16px 16px 0}
+  .modal-body{padding:12px 16px 20px}
+  .detail-grid{grid-template-columns:1fr}
+  .machine-grid{grid-template-columns:repeat(2,1fr)}
+  .mobile-nav{display:block}
+  #toast{bottom:80px}
+}
+
+/* PRINT */
+@media print{
+  *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
+  body{background:#fff !important;color:#111 !important}
+  .topbar,.sidebar,.mobile-nav,.sidebar-backdrop,.ham-btn,.toolbar,.pagination,.form-actions,.overlay{display:none !important}
+  .content{padding:0}
+  .layout{display:block}
+  .data-table thead th{background:#1a3a6b !important;color:#ffffff !important;font-size:8pt;border-bottom:2pt solid #4a9e3f}
+  .data-table tbody td{font-size:9pt;border-bottom:1pt solid #ddd !important;color:#111 !important}
+}
+
+.tbl-btn{background:none;border:1px solid var(--border);color:var(--text2);font-size:11px;padding:4px 8px;border-radius:5px;cursor:pointer;font-family:'IBM Plex Mono',monospace;transition:all .12s;white-space:nowrap}
+.tbl-btn:hover{border-color:var(--accent);color:var(--accent)}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<nav class="topbar">
+  <button class="ham-btn" id="hamBtn" onclick="toggleSidebar()">
+    <span></span><span></span><span></span>
+  </button>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="brand-dot"></div>
+    <div>
+      <div style="font-size:13px;font-weight:700;color:#fff;letter-spacing:.02em">Prasad Seeds</div>
+      <div style="font-size:9px;color:rgba(255,255,255,.45);letter-spacing:.08em">DAILY MONITORING SYSTEM</div>
+    </div>
+  </div>
+  <div class="top-nav">
+    <button class="nav-btn active" data-page="dashboard">Dashboard</button>
+    <button class="nav-btn" data-page="cs-monitor">CS Monitor</button>
+    <button class="nav-btn" data-page="lvmdp-monitor">LVMDP Monitor</button>
+    <button class="nav-btn" data-page="history">Riwayat</button>
+    <button class="nav-btn" data-page="config">Config</button>
+  </div>
+  <div class="top-right">
+    <span class="api-pill" id="syncBadgeTopbar" onclick="syncAll()" title="Klik untuk sync ke Google Sheets" style="cursor:pointer">☁ Sync</span>
+    <span class="api-pill ok" id="apiPill">● LOCAL</span>
+    <button class="icon-btn" onclick="toggleDark()" title="Toggle Dark/Light">🌙</button>
+    <button class="btn-primary btn-sm" onclick="openNewMonitoringModal()">✚ Monitoring Baru</button>
+  </div>
+</nav>
+
+<div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeSidebar()"></div>
+
+<div class="layout">
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+  <div class="sb-section">
+    <div class="sb-label">Menu</div>
+    <div class="sb-item active" data-page="dashboard"><span class="sb-icon">◈</span>Dashboard</div>
+    <div class="sb-item" data-page="cs-monitor"><span class="sb-icon">❄</span>CS Monitor</div>
+    <div class="sb-item" data-page="lvmdp-monitor"><span class="sb-icon">⚡</span>LVMDP Monitor</div>
+    <div class="sb-item" data-page="history"><span class="sb-icon">▤</span>Riwayat</div>
+    <div class="sb-item" onclick="openNewMonitoringModal()"><span class="sb-icon">✚</span>Monitoring Baru</div>
+  </div>
+  <div class="sb-section">
+    <div class="sb-label">Filter Unit</div>
+    <div class="sb-item" onclick="quickFilter('unit','Unit 1')"><span class="sb-icon b-unit1" style="color:var(--blue)">◉</span>Unit 1</div>
+    <div class="sb-item" onclick="quickFilter('unit','Unit 2')"><span class="sb-icon" style="color:var(--purple)">◉</span>Unit 2</div>
+  </div>
+  <div class="sb-section">
+    <div class="sb-label">Filter Tipe</div>
+    <div class="sb-item" onclick="quickFilter('type','Cold Storage')"><span class="sb-icon" style="color:var(--cyan)">❄</span>Cold Storage</div>
+    <div class="sb-item" onclick="quickFilter('type','Chamber')"><span class="sb-icon" style="color:var(--blue)">🧊</span>Chamber</div>
+    <div class="sb-item" onclick="quickFilter('type','LVMDP')"><span class="sb-icon" style="color:var(--orange)">⚡</span>LVMDP</div>
+  </div>
+  <div class="sb-section">
+    <div class="sb-label">Actions</div>
+    <div class="sb-item" onclick="openManageMachineModal()"><span class="sb-icon">⚙</span>Kelola Mesin</div>
+    <div class="sb-item" onclick="openManagePICModal()"><span class="sb-icon">👤</span>Kelola PIC</div>
+    <div class="sb-item" onclick="openEditLVMDPParamsModal()"><span class="sb-icon">⚡</span>Edit Param LVMDP</div>
+    <div class="sb-item" onclick="exportCSV()"><span class="sb-icon">⬇</span>Export CSV</div>
+    <div class="sb-item" onclick="exportPDF()" style="color:#c0392b"><span class="sb-icon">📄</span>Export PDF</div>
+    <div class="sb-item" data-page="config"><span class="sb-icon">🔧</span>Config</div>
+  </div>
+  <div class="sb-section">
+    <div class="sb-label">Google Sheets Sync</div>
+    <div class="sb-item" onclick="syncAll()" style="color:#4a9e3f"><span class="sb-icon">☁</span>Push ke Sheets</div>
+    <div class="sb-item" onclick="pullFromSheets()" style="color:#0ea5e9"><span class="sb-icon">⬇</span>Pull dari Sheets</div>
+    <div class="sb-item" onclick="openWebhookSettingsModal()" style="color:#fb8c3a"><span class="sb-icon">🔗</span>Atur Webhook</div>
+    <div id="sbSyncStatus" style="padding:6px 14px;font-size:10px;color:var(--text3);font-family:'IBM Plex Mono',monospace">⬡ Belum terhubung</div>
+  </div>
+</aside>
+
+<!-- MAIN CONTENT -->
+<main class="content">
+
+<!-- ════════════ DASHBOARD ════════════ -->
+<div class="page active" id="page-dashboard">
+  <div class="sec-hdr">
+    <div>
+      <div class="sec-title">Dashboard Monitoring</div>
+      <div class="sec-sub" id="dashDate">—</div>
+    </div>
+    <button class="btn-primary" onclick="openNewMonitoringModal()">✚ Monitoring Baru</button>
+  </div>
+
+  <div class="stat-grid" id="statGrid">
+    <div class="stat-card c-blue"><div class="stat-lbl">Monitoring Hari Ini</div><div class="stat-val" id="sc-today">—</div><div class="stat-sub">sesi tercatat</div></div>
+    <div class="stat-card c-green"><div class="stat-lbl">Status Normal</div><div class="stat-val" id="sc-ok">—</div><div class="stat-sub">mesin OK</div></div>
+    <div class="stat-card c-orange"><div class="stat-lbl">Perlu Perhatian</div><div class="stat-val" id="sc-warn">—</div><div class="stat-sub">warning</div></div>
+    <div class="stat-card c-red"><div class="stat-lbl">Alert / Masalah</div><div class="stat-val" id="sc-alert">—</div><div class="stat-sub">perlu tindakan</div></div>
+    <div class="stat-card c-cyan"><div class="stat-lbl">Cold Storage</div><div class="stat-val" id="sc-cs">—</div><div class="stat-sub">sesi hari ini</div></div>
+    <div class="stat-card c-purple"><div class="stat-lbl">LVMDP</div><div class="stat-val" id="sc-lvmdp">—</div><div class="stat-sub">sesi hari ini</div></div>
+  </div>
+
+  <!-- Recent Sessions -->
+  <div style="font-size:13px;font-weight:600;margin-bottom:12px;color:var(--text2)">Sesi Monitoring Terbaru <span style="color:var(--text3);font-weight:400;font-size:12px">(10 terakhir)</span></div>
+  <div class="tbl-wrap">
+    <div class="tbl-scroll">
+      <table class="data-table">
+        <thead><tr>
+          <th>ID</th><th>Tanggal</th><th>Unit</th><th>Tipe</th><th>Equipment</th><th>PIC</th><th>Mulai</th><th>Selesai</th><th>Status</th><th>Catatan</th>
+        </tr></thead>
+        <tbody id="recentBody">
+          <tr><td colspan="10"><div class="empty"><div class="empty-ico">📊</div><div class="empty-msg">Belum ada data monitoring. Buat sesi monitoring pertama!</div></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ CS MONITOR ════════════ -->
+<div class="page" id="page-cs-monitor">
+  <div class="sec-hdr">
+    <div>
+      <div class="sec-title">Cold Storage / Chamber Monitor</div>
+      <div class="sec-sub">Pilih unit dan equipment untuk mulai monitoring</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <select class="fsel" id="csUnitFilter" onchange="renderCSPage()">
+        <option value="">Semua Unit</option>
+        <option value="Unit 1">Unit 1 — Chamber</option>
+        <option value="Unit 2">Unit 2 — Cold Storage</option>
+      </select>
+      <button class="btn-primary" onclick="openNewMonitoringModal('cs')">✚ Sesi Monitoring</button>
+    </div>
+  </div>
+  <div id="csPageContent"></div>
+</div>
+
+<!-- ════════════ LVMDP MONITOR ════════════ -->
+<div class="page" id="page-lvmdp-monitor">
+  <div class="sec-hdr">
+    <div>
+      <div class="sec-title">Panel LVMDP / Trafo Monitor</div>
+      <div class="sec-sub">Monitoring panel listrik, transformator, dan distribusi daya</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <select class="fsel" id="lvmdpUnitFilter" onchange="renderLVMDPPage()">
+        <option value="">Semua Unit</option>
+        <option value="Unit 1">Unit 1</option>
+        <option value="Unit 2">Unit 2</option>
+      </select>
+      <button class="btn-primary" onclick="openNewMonitoringModal('lvmdp')">✚ Sesi Monitoring</button>
+    </div>
+  </div>
+  <div id="lvmdpPageContent"></div>
+</div>
+
+<!-- ════════════ HISTORY ════════════ -->
+<div class="page" id="page-history">
+  <div class="sec-hdr">
+    <div>
+      <div class="sec-title">Riwayat Monitoring</div>
+      <div class="sec-sub" id="historyCountLbl">—</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-ghost" onclick="exportCSV()">⬇ Export CSV</button>
+      <button class="btn-ghost" onclick="exportPDF()" style="border-color:#c0392b;color:#c0392b">⬇ Export PDF</button>
+    </div>
+  </div>
+  <div class="toolbar">
+    <div class="search-wrap" style="min-width:200px">
+      <span style="color:var(--text3)">🔍</span>
+      <input type="text" id="hSearch" placeholder="Cari ID, equipment, PIC..." oninput="renderHistory()"/>
+    </div>
+    <input type="date" class="fsel" id="hDateFrom" onchange="renderHistory()" title="Dari tanggal"/>
+    <input type="date" class="fsel" id="hDateTo" onchange="renderHistory()" title="Sampai tanggal"/>
+    <select class="fsel" id="hUnit" onchange="renderHistory()">
+      <option value="">Semua Unit</option><option>Unit 1</option><option>Unit 2</option>
+    </select>
+    <select class="fsel" id="hType" onchange="renderHistory()">
+      <option value="">Semua Tipe</option>
+      <option value="cs">Cold Storage / Chamber</option>
+      <option value="lvmdp">LVMDP / Trafo</option>
+    </select>
+    <select class="fsel" id="hStatus" onchange="renderHistory()">
+      <option value="">Semua Status</option>
+      <option value="OK">Normal</option><option value="WARNING">Warning</option><option value="ALERT">Alert</option>
+    </select>
+    <button class="btn-ghost" onclick="resetHistoryFilters()">✕ Reset</button>
+  </div>
+  <div class="tbl-wrap">
+    <div class="tbl-scroll">
+      <table class="data-table">
+        <thead><tr>
+          <th>ID</th><th>Tanggal</th><th>Unit</th><th>Tipe</th><th>Equipment</th><th>Mesin</th><th>PIC</th>
+          <th>Mulai</th><th>Selesai</th><th>Status</th><th>Catatan</th><th>Aksi</th>
+        </tr></thead>
+        <tbody id="historyBody"></tbody>
+      </table>
+    </div>
+    <div class="pagination">
+      <span class="page-info" id="histPageInfo">—</span>
+      <div class="page-btns">
+        <button class="pnav" id="hPrevBtn" onclick="changeHistPage(-1)" disabled>← Prev</button>
+        <button class="pnav" id="hNextBtn" onclick="changeHistPage(1)">Next →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ CONFIG ════════════ -->
+<div class="page" id="page-config">
+  <div class="sec-hdr">
+    <div><div class="sec-title">Konfigurasi Sistem</div><div class="sec-sub">Kelola equipment, mesin, dan pengaturan monitoring</div></div>
+  </div>
+  <div class="mon-card">
+    <div class="mon-card-hdr">
+      <div>
+        <div class="mon-card-title">⚙ Manajemen Equipment & Mesin</div>
+        <div class="mon-card-sub">Tambah atau hapus mesin pada setiap equipment</div>
+      </div>
+      <button class="btn-cyan" onclick="openManageMachineModal()">⚙ Kelola Mesin</button>
+    </div>
+    <div class="mon-card-body">
+      <div id="configEquipSummary" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px"></div>
+    </div>
+  </div>
+  <div class="mon-card">
+    <div class="mon-card-hdr" style="background:linear-gradient(135deg,#2a7a5a,#1a5a3a)">
+      <div>
+        <div class="mon-card-title">👤 Manajemen PIC</div>
+        <div class="mon-card-sub">Tambah atau hapus teknisi/PIC</div>
+      </div>
+      <button class="btn-ghost" style="border-color:rgba(255,255,255,.3);color:#fff" onclick="openManagePICModal()">👤 Kelola PIC</button>
+    </div>
+    <div class="mon-card-body">
+      <div id="configPICSummary" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+    </div>
+  </div>
+  <div class="mon-card">
+    <div class="mon-card-hdr" style="background:linear-gradient(135deg,#1a4a8b,#0f3060)">
+      <div>
+        <div class="mon-card-title">📋 Parameter Monitoring CS</div>
+        <div class="mon-card-sub">Parameter yang dicek pada setiap mesin Cold Storage</div>
+      </div>
+    </div>
+    <div class="mon-card-body">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">
+        <div id="csParamList"></div>
+      </div>
+    </div>
+  </div>
+  <div class="mon-card">
+    <div class="mon-card-hdr" style="background:linear-gradient(135deg,#5a2a8a,#3a1a6a)">
+      <div>
+        <div class="mon-card-title">⚡ Parameter Monitoring LVMDP</div>
+        <div class="mon-card-sub">Power quality, kondisi panel, capacitor bank & trafo</div>
+      </div>
+      <button class="btn-ghost" style="border-color:rgba(255,255,255,.3);color:#fff" onclick="openEditLVMDPParamsModal()">✏ Edit Parameter</button>
+    </div>
+    <div class="mon-card-body">
+      <div id="lvmdpParamList"></div>
+    </div>
+  </div>
+</div>
+
+</main>
+</div>
+
+<!-- MOBILE NAV -->
+<nav class="mobile-nav">
+  <div class="mobile-nav-inner">
+    <button class="mnav-btn active" data-page="dashboard"><span class="mnav-ico">◈</span>Dash</button>
+    <button class="mnav-btn" data-page="cs-monitor"><span class="mnav-ico">❄</span>CS</button>
+    <button class="mnav-btn" onclick="openNewMonitoringModal()"><span class="mnav-ico">✚</span>Baru</button>
+    <button class="mnav-btn" data-page="lvmdp-monitor"><span class="mnav-ico">⚡</span>LVMDP</button>
+    <button class="mnav-btn" data-page="history"><span class="mnav-ico">▤</span>Riwayat</button>
+  </div>
+</nav>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- ═══ MODAL: NEW MONITORING SESSION ═══ -->
+<div class="overlay" id="newMonOverlay">
+  <div class="modal modal-lg">
+    <div class="modal-hdr">
+      <div class="modal-title" id="newMonTitle">✚ Sesi Monitoring Baru</div>
+      <button class="modal-close" onclick="closeOverlay('newMonOverlay')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="fg">
+          <label class="flabel">Tanggal <span class="req">*</span></label>
+          <input type="date" class="finput" id="nm-tanggal" required/>
+          <div class="ferr" id="ne-tanggal"></div>
+        </div>
+        <div class="fg">
+          <label class="flabel">Tipe Equipment <span class="req">*</span></label>
+          <select class="fsel2" id="nm-type" required onchange="onNMTypeChange()">
+            <option value="">— Pilih Tipe —</option>
+            <option value="cs">Cold Storage / Chamber</option>
+            <option value="lvmdp">LVMDP / Trafo</option>
+          </select>
+          <div class="ferr" id="ne-type"></div>
+        </div>
+        <div class="fg">
+          <label class="flabel">Unit <span class="req">*</span></label>
+          <select class="fsel2" id="nm-unit" required onchange="onNMUnitChange()">
+            <option value="">— Pilih Unit —</option>
+            <option>Unit 1</option>
+            <option>Unit 2</option>
+          </select>
+          <div class="ferr" id="ne-unit"></div>
+        </div>
+        <div class="fg" id="nm-equip-wrap">
+          <label class="flabel">Equipment <span class="req">*</span></label>
+          <select class="fsel2" id="nm-equipment" required onchange="onNMEquipChange()">
+            <option value="">— Pilih Equipment —</option>
+          </select>
+          <div class="ferr" id="ne-equipment"></div>
+        </div>
+        <div class="fg" id="nm-machine-wrap">
+          <label class="flabel">Mesin <span class="req">*</span></label>
+          <select class="fsel2" id="nm-machine" required>
+            <option value="">— Pilih Mesin —</option>
+          </select>
+          <div class="ferr" id="ne-machine"></div>
+        </div>
+        <div class="fg"></div>
+        <div class="fg">
+          <label class="flabel">Waktu Mulai Monitoring <span class="req">*</span></label>
+          <input type="time" class="finput" id="nm-startTime" required/>
+          <div class="ferr" id="ne-startTime"></div>
+        </div>
+        <div class="fg">
+          <label class="flabel">Waktu Selesai Monitoring</label>
+          <input type="time" class="finput" id="nm-endTime"/>
+          <div class="fhint">Bisa diisi setelah selesai</div>
+        </div>
+        <div class="fg full">
+          <label class="flabel">PIC <span class="req">*</span></label>
+          <div class="chk-grid" id="nmPicGrid"></div>
+          <div class="ferr" id="ne-pic"></div>
+        </div>
+        <div class="fg full">
+          <label class="flabel">Catatan / Temuan</label>
+          <textarea class="ftextarea" id="nm-catatan" placeholder="Catatan kondisi, temuan anomali, atau informasi tambahan..."></textarea>
+        </div>
+        <div class="fg full">
+          <label class="flabel">Tindakan yang Dilakukan</label>
+          <textarea class="ftextarea" id="nm-tindakan" placeholder="Tindakan perbaikan atau pencegahan yang dilakukan..."></textarea>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-ghost" onclick="closeOverlay('newMonOverlay')">Batal</button>
+        <button class="btn-primary" onclick="submitNewMonitoring()">✚ SIMPAN MONITORING</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: CS DETAIL MONITORING (Checklist per mesin) ═══ -->
+<div class="overlay" id="csDetailOverlay">
+  <div class="modal modal-xl">
+    <div class="modal-hdr">
+      <div>
+        <div class="modal-title" id="csDetailTitle">Monitoring Detail</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:3px" id="csDetailSub"></div>
+      </div>
+      <button class="modal-close" onclick="closeOverlay('csDetailOverlay')">×</button>
+    </div>
+    <div class="modal-body" id="csDetailBody"></div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: LVMDP DETAIL MONITORING ═══ -->
+<div class="overlay" id="lvmdpDetailOverlay">
+  <div class="modal modal-xl">
+    <div class="modal-hdr">
+      <div>
+        <div class="modal-title" id="lvmdpDetailTitle">Monitoring LVMDP Detail</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:3px" id="lvmdpDetailSub"></div>
+      </div>
+      <button class="modal-close" onclick="closeOverlay('lvmdpDetailOverlay')">×</button>
+    </div>
+    <div class="modal-body" id="lvmdpDetailBody"></div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: KELOLA MESIN ═══ -->
+<div class="overlay" id="manageMachineOverlay">
+  <div class="modal modal-lg">
+    <div class="modal-hdr">
+      <div class="modal-title">⚙ Kelola Mesin Equipment</div>
+      <button class="modal-close" onclick="closeOverlay('manageMachineOverlay')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid" style="margin-bottom:16px">
+        <div class="fg">
+          <label class="flabel">Unit</label>
+          <select class="fsel2" id="mm-unit" onchange="onMMUnitChange()">
+            <option value="">— Pilih Unit —</option>
+            <option>Unit 1</option><option>Unit 2</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label class="flabel">Equipment</label>
+          <select class="fsel2" id="mm-equip" onchange="renderMachineManageList()">
+            <option value="">— Pilih Equipment —</option>
+          </select>
+        </div>
+      </div>
+      <div id="mmContent" style="display:none">
+        <div style="font-size:12px;color:var(--text2);font-weight:600;margin-bottom:8px">Daftar Mesin:</div>
+        <div class="machine-list" id="machineManageList"></div>
+        <div class="add-machine-row">
+          <input type="text" class="finput" id="newMachineName" placeholder="Nama mesin baru..." maxlength="60"/>
+          <button class="btn-primary" onclick="addNewMachine()">+ Tambah</button>
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-top:8px;padding:8px;background:var(--bg3);border-radius:6px">
+          ℹ Mesin yang dihapus tidak akan mempengaruhi data monitoring yang sudah tersimpan.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: KELOLA PIC ═══ -->
+<div class="overlay" id="managePICOverlay">
+  <div class="modal modal-sm">
+    <div class="modal-hdr">
+      <div class="modal-title">👤 Kelola Daftar PIC</div>
+      <button class="modal-close" onclick="closeOverlay('managePICOverlay')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="add-pic-row">
+        <input type="text" class="finput" id="newPICName" placeholder="NAMA PIC BARU" style="text-transform:uppercase" onkeydown="if(event.key==='Enter')addNewPIC()" maxlength="30"/>
+        <button class="btn-primary" onclick="addNewPIC()">+ Tambah</button>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin:8px 0 4px">Daftar PIC saat ini:</div>
+      <div class="pic-manage-list" id="picManageList"></div>
+      <div style="font-size:11px;color:var(--text3);margin-top:8px;padding:8px;background:var(--bg3);border-radius:6px">
+        ℹ Perubahan tersimpan otomatis di browser.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: VIEW DETAIL SESSION ═══ -->
+<div class="overlay" id="viewSessionOverlay">
+  <div class="modal modal-xl">
+    <div class="modal-hdr">
+      <div class="modal-title" id="viewSessionTitle">Detail Sesi Monitoring</div>
+      <button class="modal-close" onclick="closeOverlay('viewSessionOverlay')">×</button>
+    </div>
+    <div class="modal-body" id="viewSessionBody"></div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: WEBHOOK SETTINGS ═══ -->
+<div class="overlay" id="webhookSettingsOverlay">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-hdr" style="background:linear-gradient(135deg,#1a5a3a,#0f3a20)">
+      <div class="modal-title">🔗 Pengaturan Google Sheets Webhook</div>
+      <button class="modal-close" onclick="closeOverlay('webhookSettingsOverlay')">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:var(--text2);line-height:1.6">
+        <strong>Cara Mendapatkan Webhook URL:</strong><br>
+        1. Buka <a href="https://script.google.com" target="_blank" style="color:var(--accent)">script.google.com</a> → Proyek Baru<br>
+        2. Paste kode dari file <code>Code.gs</code><br>
+        3. Jalankan fungsi <code>setupSheets()</code> sekali<br>
+        4. Deploy → New Deployment → Web App<br>
+        5. Execute as: <strong>Me</strong> | Who has access: <strong>Anyone</strong><br>
+        6. Copy URL Deployment → Paste di bawah ini
+      </div>
+      <div class="fg">
+        <label class="flabel">Deployment URL (Google Apps Script)</label>
+        <input type="text" class="finput" id="wh-url" placeholder="https://script.google.com/macros/s/AKfycbxGLFTmnjrz2ay4N0AHTNueGoRexAlbMyuWB2JtECUggtyMl6_zv5BSnrvaLE_KKZ1n/exec" style="font-size:12px;font-family:monospace"/>
+      </div>
+      <div class="fg" style="margin-top:10px">
+        <label class="flabel">Secret Key (harus sama dengan Code.gs)</label>
+        <input type="text" class="finput" id="wh-key" placeholder="prasad2024" style="font-size:12px;font-family:monospace"/>
+      </div>
+      <div class="fg" style="margin-top:10px">
+        <label class="flabel">Mode Sync Otomatis</label>
+        <select class="fsel2" id="wh-mode">
+          <option value="auto">Auto — sync tiap kali data berubah</option>
+          <option value="manual">Manual — hanya saat klik tombol Push</option>
+        </select>
+      </div>
+      <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-ghost" onclick="testWebhookConnection()" style="font-size:12px">🔍 Test Koneksi</button>
+        <button class="btn-ghost" onclick="pullFromSheets()" style="font-size:12px;color:var(--cyan)">⬇ Pull dari Sheets</button>
+        <div id="wh-test-result" style="font-size:12px;color:var(--text3);align-self:center;margin-left:4px"></div>
+      </div>
+      <div class="form-actions" style="margin-top:16px">
+        <button class="btn-ghost" onclick="closeOverlay('webhookSettingsOverlay')">Batal</button>
+        <button class="btn-primary" onclick="saveWebhookSettings()">💾 Simpan & Aktifkan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: EDIT LVMDP PARAMS ═══ -->
+<div class="overlay" id="editLVMDPParamsOverlay">
+  <div class="modal modal-xl">
+    <div class="modal-hdr" style="background:linear-gradient(135deg,#5a2a8a,#3a1a6a)">
+      <div class="modal-title">⚡ Edit Parameter LVMDP</div>
+      <button class="modal-close" onclick="closeOverlay('editLVMDPParamsOverlay')">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+        <div style="font-size:13px;color:var(--text2)">Edit label, satuan, dan batas nilai normal/warning untuk setiap parameter LVMDP.</div>
+        <div style="display:flex;gap:8px;margin-left:auto">
+          <button class="btn-ghost" onclick="resetLVMDPParamsDefault()" style="font-size:12px">↺ Reset Default</button>
+          <button class="btn-primary" onclick="addLVMDPParam()" style="font-size:12px">✚ Tambah Parameter</button>
+        </div>
+      </div>
+      <div id="lvmdpParamEditorList"></div>
+      <div class="form-actions" style="margin-top:16px">
+        <button class="btn-ghost" onclick="closeOverlay('editLVMDPParamsOverlay')">Tutup</button>
+        <button class="btn-primary" onclick="saveLVMDPParamsEdit()">💾 Simpan Perubahan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════
+// EQUIPMENT DATABASE
+// ═══════════════════════════════════════════════════
+const defaultEquipDB = {
+  "Unit 1": {
+    cs: {
+      "Chamber": {
+        machines: ["Compressor 1","Compressor 2","Evaporator","Control Panel","Thermo Control","Thermo Couple"]
+      }
+    },
+    lvmdp: {
+      "Panel LVMDP Unit 1": {
+        panels: ["Main Panel LVMDP","Transformer 1","Transformer 2","Capacitor Bank","MCCB Feeder CTP-1","MCCB Feeder CTP-2","MCCB Feeder PRAIRIE","MCCB Feeder PETKUS","MCCB Feeder PEANUT","MCCB Lighting","MCCB Utility"]
+      }
+    }
+  },
+  "Unit 2": {
+    cs: {
+      "Cold Storage 1": {
+        machines: ["Mesin 1 — Kompressor","Mesin 2 — Kompressor","Mesin 3 — Kompressor","Mesin 4 — Evaporator","Mesin 5 — Evaporator"]
+      },
+      "Cold Storage 2": {
+        machines: ["Mesin 1 — Kompressor","Mesin 2 — Kompressor","Mesin 3 — Kompressor","Mesin 4 — Evaporator"]
+      },
+      "Cold Storage 3": {
+        machines: ["Mesin 1 — Kompressor","Mesin 2 — Kompressor","Mesin 3 — Kompressor","Mesin 4 — Evaporator"]
+      },
+      "Cold Storage 4": {
+        machines: ["Mesin 1 — Kompressor","Mesin 2 — Kompressor","Mesin 3 — Kompressor","Mesin 4 — Evaporator","Mesin 5 — Kondenser"]
+      }
+    },
+    lvmdp: {
+      "Panel LVMDP Unit 2": {
+        panels: ["Main Panel LVMDP","Transformer 1","Transformer 2","Capacitor Bank","MCCB Feeder CS 1","MCCB Feeder CS 2","MCCB Feeder CS 3","MCCB Feeder CS 4","MCCB Feeder CTP-1","MCCB Feeder CTP-2","MCCB Feeder SPR DRIER","MCCB Feeder PS DRIER","MCCB Feeder PEANUT DRIER","MCCB Lighting","MCCB Utility","Genset"]
+      }
+    }
+  }
+};
+
+// CS Parameters per mesin
+const CS_PARAMS = [
+  {id:'suhu_ruang',     label:'Suhu Ruang',      unit:'°C',  normalMin:-5,  normalMax:10,  warnMax:15},
+  {id:'suhu_evap',      label:'Suhu Evaporator',  unit:'°C',  normalMin:-25, normalMax:-10, warnMax:-5},
+  {id:'tekanan_suction',label:'Tekanan Suction',  unit:'Bar', normalMin:1.5, normalMax:3.5, warnMax:4.5},
+  {id:'tekanan_discharge',label:'Tekanan Discharge',unit:'Bar',normalMin:10, normalMax:18,  warnMax:22},
+  {id:'tekanan_oli',    label:'Tekanan Oli',      unit:'Bar', normalMin:3,   normalMax:8,   warnMax:9},
+  {id:'arus_kompresor', label:'Arus Kompresor',   unit:'A',   normalMin:10,  normalMax:60,  warnMax:70},
+  {id:'kondisi_umum',   label:'Kondisi Umum',     unit:'status', type:'status'},
+  {id:'kebocoran',      label:'Kebocoran',        unit:'status', type:'status_leak'},
+  {id:'suara_getaran',  label:'Suara/Getaran',    unit:'status', type:'status_noise'},
+];
+
+// LVMDP Parameters
+const LVMDP_PARAMS_DEFAULT = [
+  // Transformer / Power Quality
+  {id:'tegangan_r',   label:'Tegangan R',        unit:'V',    section:'Power Quality',normalMin:370,normalMax:410,warnMin:360,warnMax:420},
+  {id:'tegangan_s',   label:'Tegangan S',        unit:'V',    section:'Power Quality',normalMin:370,normalMax:410,warnMin:360,warnMax:420},
+  {id:'tegangan_t',   label:'Tegangan T',        unit:'V',    section:'Power Quality',normalMin:370,normalMax:410,warnMin:360,warnMax:420},
+  {id:'arus_r',       label:'Arus R',            unit:'A',    section:'Power Quality',normalMin:0,normalMax:500,warnMax:550},
+  {id:'arus_s',       label:'Arus S',            unit:'A',    section:'Power Quality',normalMin:0,normalMax:500,warnMax:550},
+  {id:'arus_t',       label:'Arus T',            unit:'A',    section:'Power Quality',normalMin:0,normalMax:500,warnMax:550},
+  {id:'frekuensi',    label:'Frekuensi',         unit:'Hz',   section:'Power Quality',normalMin:49.5,normalMax:50.5,warnMin:49,warnMax:51},
+  {id:'pf',           label:'Cos φ / Power Factor',unit:'',  section:'Power Quality',normalMin:0.85,normalMax:1.0,warnMin:0.80},
+  {id:'daya_aktif',   label:'Daya Aktif (kW)',   unit:'kW',   section:'Power Quality',normalMin:0,normalMax:1000,warnMax:1100},
+  {id:'daya_reaktif', label:'Daya Reaktif (kVAR)',unit:'kVAR',section:'Power Quality',normalMin:0,normalMax:500,warnMax:600},
+  {id:'daya_semu',    label:'Daya Semu (kVA)',   unit:'kVA',  section:'Power Quality',normalMin:0,normalMax:1200,warnMax:1350},
+  {id:'imbalance_arus',label:'Imbalance Arus',   unit:'%',   section:'Power Quality',normalMin:0,normalMax:20,warnMax:25},
+  {id:'pf_before_cap',label:'Cos φ Sebelum Cap Bank',unit:'',section:'Power Quality',normalMin:0.75,normalMax:1.0,warnMin:0.70},
+  // Panel Condition
+  {id:'suhu_panel',   label:'Suhu Panel',        unit:'°C',   section:'Kondisi Panel',normalMin:20,normalMax:45,warnMax:55},
+  {id:'kondisi_mccb', label:'Kondisi MCCB',      unit:'status',section:'Kondisi Panel',type:'status'},
+  {id:'kondisi_busbar',label:'Kondisi Busbar',   unit:'status',section:'Kondisi Panel',type:'status'},
+  {id:'kebersihan_panel',label:'Kebersihan Panel',unit:'status',section:'Kondisi Panel',type:'status'},
+  {id:'grounding',    label:'Grounding',         unit:'status',section:'Kondisi Panel',type:'status'},
+  // Capacitor Bank
+  {id:'cap_bank_status',label:'Capacitor Bank',  unit:'status',section:'Capacitor Bank',type:'status'},
+  {id:'cap_bank_steps', label:'Step Aktif Cap',  unit:'step', section:'Capacitor Bank',normalMin:0,normalMax:12,warnMax:14},
+  {id:'pf_after_cap',   label:'Cos φ Setelah Cap Bank',unit:'',section:'Capacitor Bank',normalMin:0.92,normalMax:1.0,warnMin:0.85},
+  // Transformer Physical
+  {id:'suhu_trafo',   label:'Suhu Trafo',        unit:'°C',   section:'Kondisi Trafo',normalMin:20,normalMax:75,warnMax:85},
+  {id:'kondisi_trafo',label:'Kondisi Fisik Trafo',unit:'status',section:'Kondisi Trafo',type:'status'},
+  {id:'bunyi_trafo',  label:'Bunyi/Getaran Trafo',unit:'status',section:'Kondisi Trafo',type:'status_noise'},
+  {id:'oli_trafo',    label:'Oli Trafo',         unit:'status',section:'Kondisi Trafo',type:'status_oil'},
+];
+
+// Load customized LVMDP params from localStorage, fallback to default
+let LVMDP_PARAMS = JSON.parse(JSON.stringify(LVMDP_PARAMS_DEFAULT));
+try {
+  const saved = localStorage.getItem('prasad_lvmdp_params');
+  if (saved) LVMDP_PARAMS = JSON.parse(saved);
+} catch(e){}
+
+function saveLVMDPParams() {
+  try { localStorage.setItem('prasad_lvmdp_params', JSON.stringify(LVMDP_PARAMS)); } catch(e){}
+}
+
+// ═══════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════
+let equipDB = JSON.parse(JSON.stringify(defaultEquipDB));
+let PIC_LIST = ['KRISNA','BINTANG','IWAN','AYNUR','MACHFUD','VIKI','FIRMAN','YUSUF','TRI','DAYAT','SOFIUDIN'];
+let sessions = []; // All monitoring sessions
+let histPage = 1;
+const HIST_PAGE_SIZE = 20;
+const _overlayStackArr = [];
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  loadData();
+  initNav();
+  initPICGrid();
+  setTodayDate();
+  overlayDismiss();
+  renderAll();
+  renderConfigPage();
+});
+
+function loadData() {
+  try {
+    const savedDB = localStorage.getItem('prasad_equip_db');
+    if (savedDB) equipDB = JSON.parse(savedDB);
+    const savedPIC = localStorage.getItem('prasad_mon_pic');
+    if (savedPIC) PIC_LIST = JSON.parse(savedPIC);
+    const savedSessions = localStorage.getItem('prasad_mon_sessions');
+    if (savedSessions) sessions = JSON.parse(savedSessions);
+  } catch(e){}
+}
+function saveData() {
+  try {
+    localStorage.setItem('prasad_equip_db', JSON.stringify(equipDB));
+    localStorage.setItem('prasad_mon_pic', JSON.stringify(PIC_LIST));
+    localStorage.setItem('prasad_mon_sessions', JSON.stringify(sessions));
+  } catch(e){}
+  // Auto-sync to Google Sheets if configured
+  if (typeof SYNC_MODE !== 'undefined' && SYNC_MODE === 'auto' && typeof WEBHOOK_URL !== 'undefined' && WEBHOOK_URL) {
+    clearTimeout(_syncTimer);
+    _syncTimer = setTimeout(async () => {
+      setSyncStatus('syncing');
+      const res = await webhookPost('full_sync', {
+        sessions, picList: PIC_LIST, equipmentDB: equipDB, lvmdpParams: LVMDP_PARAMS
+      });
+      if (res?.status === 'ok') { _lastSyncAt = new Date(); setSyncStatus('ok'); }
+      else setSyncStatus('error');
+    }, 2000);
+  }
+}
+
+function setTodayDate() {
+  const today = new Date().toISOString().split('T')[0];
+  const el = document.getElementById('nm-tanggal');
+  if (el) el.value = today;
+  const nowTime = new Date().toTimeString().slice(0,5);
+  const st = document.getElementById('nm-startTime');
+  if (st) st.value = nowTime;
+  const dashDate = document.getElementById('dashDate');
+  if (dashDate) dashDate.textContent = 'Data per ' + new Date().toLocaleDateString('id-ID',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+}
+
+// ═══════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════
+function initNav() {
+  document.querySelectorAll('[data-page]').forEach(el => {
+    el.addEventListener('click', () => navigateTo(el.dataset.page));
+  });
+}
+function navigateTo(pageId) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const pg = document.getElementById('page-' + pageId);
+  if (pg) pg.classList.add('active');
+  document.querySelectorAll('.nav-btn[data-page]').forEach(b => b.classList.toggle('active', b.dataset.page === pageId));
+  document.querySelectorAll('.sb-item[data-page]').forEach(s => s.classList.toggle('active', s.dataset.page === pageId));
+  document.querySelectorAll('.mnav-btn[data-page]').forEach(b => b.classList.toggle('active', b.dataset.page === pageId));
+  if (pageId === 'cs-monitor') renderCSPage();
+  if (pageId === 'lvmdp-monitor') renderLVMDPPage();
+  if (pageId === 'history') renderHistory();
+  if (window.innerWidth <= 768) closeSidebar();
+}
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  const bd = document.getElementById('sidebarBackdrop');
+  const btn = document.getElementById('hamBtn');
+  if (sb.classList.contains('open')) closeSidebar();
+  else { sb.classList.add('open'); bd.classList.add('open'); btn.classList.add('open'); document.body.style.overflow='hidden'; }
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarBackdrop').classList.remove('open');
+  document.getElementById('hamBtn').classList.remove('open');
+  document.body.style.overflow='';
+}
+function toggleDark() {
+  document.body.classList.toggle('dark-mode');
+  const btn = document.querySelector('.icon-btn[onclick="toggleDark()"]');
+  if (btn) btn.textContent = document.body.classList.contains('dark-mode') ? '☀️' : '🌙';
+}
+function quickFilter(type, value) {
+  navigateTo('history');
+  resetHistoryFilters();
+  if (type === 'unit') { const el = document.getElementById('hUnit'); if(el) el.value = value; }
+  if (type === 'type') {
+    const el = document.getElementById('hType');
+    if (el) el.value = value === 'Cold Storage' || value === 'Chamber' ? 'cs' : 'lvmdp';
+  }
+  renderHistory();
+}
+
+// ═══════════════════════════════════════════════════
+// RENDER ALL
+// ═══════════════════════════════════════════════════
+function renderAll() {
+  renderDashboard();
+  renderHistory();
+  // Re-render halaman aktif agar data langsung terupdate setelah perubahan
+  const activePage = document.querySelector('.page.active');
+  if (activePage) {
+    if (activePage.id === 'page-cs-monitor')    renderCSPage();
+    if (activePage.id === 'page-lvmdp-monitor') renderLVMDPPage();
+    if (activePage.id === 'page-config')        renderConfigPage();
+  }
+}
+
+function renderDashboard() {
+  const today = new Date().toISOString().split('T')[0];
+  const todaySess = sessions.filter(s => (s.tanggal||'').startsWith(today));
+  const allItems = sessions.flatMap(s => s.items || []);
+  const todayItems = todaySess.flatMap(s => s.items || []);
+
+  const okCount = todayItems.filter(i => i.status === 'OK').length;
+  const warnCount = todayItems.filter(i => i.status === 'WARNING').length;
+  const alertCount = todayItems.filter(i => i.status === 'ALERT').length;
+  const csToday = todaySess.filter(s => s.type === 'cs').length;
+  const lvmdpToday = todaySess.filter(s => s.type === 'lvmdp').length;
+
+  setText('sc-today', todaySess.length);
+  setText('sc-ok', okCount);
+  setText('sc-warn', warnCount);
+  setText('sc-alert', alertCount);
+  setText('sc-cs', csToday);
+  setText('sc-lvmdp', lvmdpToday);
+
+  // Recent 10
+  const recent = [...sessions].sort((a,b) => new Date(b.createdAt||0) - new Date(a.createdAt||0)).slice(0,10);
+  const tbody = document.getElementById('recentBody');
+  if (!recent.length) {
+    tbody.innerHTML = `<tr><td colspan="10"><div class="empty"><div class="empty-ico">📊</div><div class="empty-msg">Belum ada sesi monitoring. Buat sesi pertama!</div></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = recent.map(s => sessionRowShort(s)).join('');
+}
+
+function sessionRowShort(s) {
+  const ovStatus = getSessionOverallStatus(s);
+  const badgeCls = ovStatus === 'OK' ? 'badge-ok' : ovStatus === 'WARNING' ? 'badge-warn' : ovStatus === 'ALERT' ? 'badge-alert' : 'badge-pending';
+  const typeBadge = s.type === 'cs' ? 'b-cs' : 'b-lvmdp';
+  const typeLabel = s.type === 'cs' ? '❄ CS' : '⚡ LVMDP';
+  return `<tr>
+    <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--accent)">${esc(s.id)}</td>
+    <td style="font-size:11px;color:var(--text3)">${fmtDate(s.tanggal)}</td>
+    <td><span class="badge ${s.unit==='Unit 1'?'b-unit1':'b-unit2'}">${esc(s.unit)}</span></td>
+    <td><span class="badge ${typeBadge}">${typeLabel}</span></td>
+    <td style="font-size:12px">${esc(s.equipment||'—')}</td>
+    <td style="font-size:12px">${esc(s.pic||'—')}</td>
+    <td style="font-size:12px;font-family:'IBM Plex Mono',monospace">${esc(s.startTime||'—')}</td>
+    <td style="font-size:12px;font-family:'IBM Plex Mono',monospace">${esc(s.endTime||'—')}</td>
+    <td><span class="badge ${badgeCls}">${ovStatus}</span></td>
+    <td style="font-size:11px;color:var(--text3);max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.catatan||'—')}</td>
+  </tr>`;
+}
+
+// ═══════════════════════════════════════════════════
+// CS PAGE
+// ═══════════════════════════════════════════════════
+function renderCSPage() {
+  const unitFilter = document.getElementById('csUnitFilter')?.value || '';
+  const units = unitFilter ? [unitFilter] : ['Unit 1','Unit 2'];
+  let html = '';
+  units.forEach(unit => {
+    const csData = equipDB[unit]?.cs || {};
+    const equipNames = Object.keys(csData);
+    if (!equipNames.length) return;
+    html += `<div style="margin-bottom:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:12px;display:flex;align-items:center;gap:8px">
+        <span class="badge ${unit==='Unit 1'?'b-unit1':'b-unit2'}">${unit}</span>
+        ${unit==='Unit 1'?'Chamber':'Cold Storage'} Equipment
+      </div>`;
+    equipNames.forEach(equipName => {
+      const equip = csData[equipName];
+      const machines = equip.machines || [];
+      // Get latest session for this equip
+      const latestSessions = machines.map(m => {
+        const sess = sessions.filter(s => s.type==='cs' && s.unit===unit && s.equipment===equipName && s.machine===m)
+          .sort((a,b) => new Date(b.createdAt||0) - new Date(a.createdAt||0));
+        return { machine: m, session: sess[0] || null };
+      });
+      html += `<div class="mon-card" style="margin-bottom:14px">
+        <div class="mon-card-hdr" style="${unit==='Unit 2'?'background:linear-gradient(135deg,#1a5a8a,#0f3a6a)':'background:linear-gradient(135deg,#1a6a4a,#0f4a2a)'}">
+          <div>
+            <div class="mon-card-title">❄ ${esc(equipName)}</div>
+            <div class="mon-card-sub">${machines.length} mesin terpantau · ${unit}</div>
+          </div>
+          <button class="btn-ghost" style="border-color:rgba(255,255,255,.3);color:#fff;font-size:11px" onclick="openNewMonitoringModal('cs','${esc(unit)}','${esc(equipName)}')">✚ Monitoring</button>
+        </div>
+        <div class="mon-card-body">
+          <div class="machine-grid">`;
+      latestSessions.forEach(({machine, session}) => {
+        const ovStatus = session ? getSessionOverallStatus(session) : 'PENDING';
+        const tileCls = { OK:'status-ok', WARNING:'status-warn', ALERT:'status-alert', PENDING:'status-pending' }[ovStatus] || 'status-pending';
+        const dotCls = { OK:'dot-ok', WARNING:'dot-warn', ALERT:'dot-alert', PENDING:'dot-pending' }[ovStatus] || 'dot-pending';
+        const lastTime = session ? (fmtDate(session.tanggal) + ' ' + (session.startTime||'')) : 'Belum pernah';
+        html += `<div class="machine-tile ${tileCls}" onclick="openCSDetailModal('${esc(unit)}','${esc(equipName)}','${esc(machine)}')">
+          <div class="machine-tile-name">${esc(machine)}</div>
+          <div class="machine-tile-status">
+            <span class="machine-tile-dot ${dotCls}"></span>${ovStatus}
+          </div>
+          <div style="font-size:10px;color:var(--text3);margin-top:4px">Terakhir: ${lastTime}</div>
+        </div>`;
+      });
+      html += `</div></div></div>`;
+    });
+    html += `</div>`;
+  });
+  if (!html) html = `<div class="empty"><div class="empty-ico">❄</div><div class="empty-msg">Tidak ada equipment tersedia</div></div>`;
+  document.getElementById('csPageContent').innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════
+// LVMDP PAGE
+// ═══════════════════════════════════════════════════
+function renderLVMDPPage() {
+  const unitFilter = document.getElementById('lvmdpUnitFilter')?.value || '';
+  const units = unitFilter ? [unitFilter] : ['Unit 1','Unit 2'];
+  let html = '';
+
+  // Build section groups once
+  const sectionGroups = {};
+  LVMDP_PARAMS.forEach(p => {
+    if (!sectionGroups[p.section]) sectionGroups[p.section] = [];
+    sectionGroups[p.section].push(p);
+  });
+  const sectionColors = {
+    'Power Quality': '#5a2a8a',
+    'Kondisi Panel': '#1a4a8b',
+    'Capacitor Bank': '#2a7a5a',
+    'Kondisi Trafo': '#8a3a1a'
+  };
+
+  units.forEach(unit => {
+    const lvData = equipDB[unit]?.lvmdp || {};
+    Object.entries(lvData).forEach(([panelName, panelData]) => {
+      const panels = panelData.panels || [];
+
+      // Latest session for this panel
+      const latestSess = sessions.filter(s => s.type==='lvmdp' && s.unit===unit && s.equipment===panelName)
+        .sort((a,b) => new Date(b.createdAt||0) - new Date(a.createdAt||0))[0];
+      const ovStatus = latestSess ? getSessionOverallStatus(latestSess) : 'PENDING';
+      const ovBadge = ovStatus==='OK'?'badge-ok':ovStatus==='WARNING'?'badge-warn':ovStatus==='ALERT'?'badge-alert':'badge-pending';
+
+      html += `<div class="mon-card" style="margin-bottom:18px">
+        <div class="mon-card-hdr" style="background:linear-gradient(135deg,#7a3800,#5a2800)">
+          <div>
+            <div class="mon-card-title">⚡ ${esc(panelName)}</div>
+            <div class="mon-card-sub">${unit} · ${panels.length} komponen · Terakhir: ${latestSess ? fmtDate(latestSess.tanggal)+' '+latestSess.startTime : 'Belum pernah'}</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span class="badge ${ovBadge}">${ovStatus}</span>
+            ${latestSess ? `<button class="btn-ghost" style="border-color:rgba(255,255,255,.3);color:#fff;font-size:11px" onclick="openLVMDPDetailModal('${esc(unit)}','${esc(panelName)}')">✏ Edit Data</button>` : ''}
+            <button class="btn-primary btn-sm" onclick="openNewMonitoringModal('lvmdp','${esc(unit)}','${esc(panelName)}')">✚ Monitoring Baru</button>
+          </div>
+        </div>
+        <div class="mon-card-body" style="padding:16px">`;
+
+      if (latestSess && latestSess.items && latestSess.items.length) {
+        // ── Tampilkan parameter per seksi ──
+        html += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+          <div style="font-size:11px;color:var(--text3)">📅 ${fmtDate(latestSess.tanggal)} ${latestSess.startTime}–${latestSess.endTime||'?'}</div>
+          <div style="font-size:11px;color:var(--text3)">👷 ${esc(latestSess.pic||'—')}</div>
+          ${latestSess.catatan ? `<div style="font-size:11px;color:var(--text3)">📝 ${esc(latestSess.catatan)}</div>` : ''}
+        </div>`;
+
+        Object.entries(sectionGroups).forEach(([section, params]) => {
+          const col = sectionColors[section] || '#555';
+          html += `<div style="margin-bottom:16px">
+            <div style="font-size:10px;font-weight:700;color:${col};text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;padding:4px 0;border-bottom:2px solid ${col}40">
+              📌 ${section}
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px">`;
+
+          params.forEach(p => {
+            const item = latestSess.items.find(i => i.paramId === p.id);
+            const val = item ? item.value : null;
+            const status = item ? item.status : '';
+            const note  = item ? item.note  : '';
+
+            const stBg  = status==='OK'?'#e8f5e8':status==='WARNING'?'#fff3e0':status==='ALERT'?'#ffebee':'#f5f5f5';
+            const stCol = status==='OK'?'#2e7d32':status==='WARNING'?'#e65100':status==='ALERT'?'#c62828':'#999';
+            const stBorder = status==='OK'?'#4a9e3f':status==='WARNING'?'#fb8c3a':status==='ALERT'?'#c0392b':'#ccc';
+
+            html += `<div style="background:${stBg};border:1px solid ${stBorder};border-left:3px solid ${stBorder};border-radius:8px;padding:10px 12px;cursor:pointer;transition:box-shadow .15s"
+              onclick="openLVMDPDetailModal('${esc(unit)}','${esc(panelName)}','${esc(latestSess.id)}')"
+              title="${note ? 'Catatan: '+esc(note) : 'Klik untuk edit'}">
+              <div style="font-size:10px;color:${stCol};font-weight:600;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.label)}</div>
+              <div style="font-size:18px;font-weight:700;color:${val!==null&&val!==''?stCol:'#bbb'};font-family:'IBM Plex Mono',monospace;line-height:1">${val!==null&&val!==''?esc(String(val)):'—'}</div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+                <span style="font-size:9px;color:${stCol};opacity:.7">${esc(p.unit||'')}</span>
+                ${status ? `<span style="font-size:8px;font-weight:700;color:${stCol};background:${stBorder}22;padding:1px 5px;border-radius:3px">${status}</span>` : ''}
+              </div>
+              ${note ? `<div style="font-size:9px;color:#888;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📝 ${esc(note)}</div>` : ''}
+            </div>`;
+          });
+
+          html += `</div></div>`;
+        });
+
+      } else {
+        // ── Belum ada data — tampilkan template parameter kosong ──
+        html += `<div style="margin-bottom:12px;padding:10px 14px;background:#fff8e1;border:1px solid #ffe082;border-radius:8px;font-size:12px;color:#795548">
+          ⚠ Belum ada data monitoring. Klik <strong>"✚ Monitoring Baru"</strong> untuk mulai mengisi parameter.
+        </div>`;
+
+        Object.entries(sectionGroups).forEach(([section, params]) => {
+          const col = sectionColors[section] || '#555';
+          html += `<div style="margin-bottom:16px">
+            <div style="font-size:10px;font-weight:700;color:${col};text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;padding:4px 0;border-bottom:2px solid ${col}40">
+              📌 ${section}
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px">`;
+          params.forEach(p => {
+            html += `<div style="background:#f9f9f9;border:1px solid #e0e0e0;border-left:3px solid ${col}40;border-radius:8px;padding:10px 12px;opacity:.6">
+              <div style="font-size:10px;color:#888;font-weight:600;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.label)}</div>
+              <div style="font-size:18px;font-weight:700;color:#ccc;font-family:'IBM Plex Mono',monospace;line-height:1">—</div>
+              <div style="font-size:9px;color:#bbb;margin-top:4px">${esc(p.unit||'status')}</div>
+            </div>`;
+          });
+          html += `</div></div>`;
+        });
+      }
+
+      // ── Komponen panel list (ringkas di bawah) ──
+      html += `<details style="margin-top:8px">
+        <summary style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;cursor:pointer;user-select:none;padding:6px 0">
+          ▸ Komponen Panel (${panels.length})
+        </summary>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;padding-top:6px">
+          ${panels.map(p => `<span class="badge badge-pending" style="font-size:10px">${esc(p)}</span>`).join('')}
+        </div>
+      </details>`;
+
+      html += `</div></div>`;
+    });
+  });
+
+  if (!html) html = `<div class="empty"><div class="empty-ico">⚡</div><div class="empty-msg">Tidak ada panel LVMDP tersedia</div></div>`;
+  document.getElementById('lvmdpPageContent').innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════
+// HISTORY TABLE
+// ═══════════════════════════════════════════════════
+function renderHistory() {
+  let data = [...sessions];
+  const q = (getVal('hSearch')||'').toLowerCase();
+  const dfrom = getVal('hDateFrom');
+  const dto = getVal('hDateTo');
+  const funit = getVal('hUnit');
+  const ftype = getVal('hType');
+  const fstatus = getVal('hStatus');
+
+  if (q) data = data.filter(s => [s.id,s.equipment,s.machine,s.pic,s.catatan,s.unit].some(v => (v||'').toLowerCase().includes(q)));
+  if (dfrom) data = data.filter(s => (s.tanggal||'') >= dfrom);
+  if (dto)   data = data.filter(s => (s.tanggal||'') <= dto);
+  if (funit) data = data.filter(s => s.unit === funit);
+  if (ftype) data = data.filter(s => s.type === ftype);
+  if (fstatus) data = data.filter(s => getSessionOverallStatus(s) === fstatus);
+
+  data.sort((a,b) => new Date(b.createdAt||0) - new Date(a.createdAt||0));
+
+  const total = data.length;
+  const pages = Math.max(1, Math.ceil(total / HIST_PAGE_SIZE));
+  if (histPage > pages) histPage = 1;
+  const start = (histPage - 1) * HIST_PAGE_SIZE;
+  const slice = data.slice(start, start + HIST_PAGE_SIZE);
+
+  setText('historyCountLbl', total + ' sesi ditemukan');
+  setText('histPageInfo', (start+1) + '–' + Math.min(start+HIST_PAGE_SIZE, total) + ' dari ' + total);
+  document.getElementById('hPrevBtn').disabled = histPage <= 1;
+  document.getElementById('hNextBtn').disabled = histPage >= pages;
+
+  const tbody = document.getElementById('historyBody');
+  if (!slice.length) {
+    tbody.innerHTML = `<tr><td colspan="12"><div class="empty"><div class="empty-ico">📋</div><div class="empty-msg">Tidak ada riwayat ditemukan</div></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = slice.map(s => historyRow(s)).join('');
+}
+
+function historyRow(s) {
+  const ovStatus = getSessionOverallStatus(s);
+  const badgeCls = ovStatus==='OK'?'badge-ok':ovStatus==='WARNING'?'badge-warn':ovStatus==='ALERT'?'badge-alert':'badge-pending';
+  const typeBadge = s.type==='cs'?'b-cs':'b-lvmdp';
+  const typeLabel = s.type==='cs'?'❄ CS':'⚡ LVMDP';
+  return `<tr>
+    <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--accent)">${esc(s.id)}</td>
+    <td style="font-size:11px;white-space:nowrap">${fmtDate(s.tanggal)}</td>
+    <td><span class="badge ${s.unit==='Unit 1'?'b-unit1':'b-unit2'}">${esc(s.unit)}</span></td>
+    <td><span class="badge ${typeBadge}">${typeLabel}</span></td>
+    <td style="font-size:12px">${esc(s.equipment||'—')}</td>
+    <td style="font-size:12px;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.machine||'—')}</td>
+    <td style="font-size:12px">${esc(s.pic||'—')}</td>
+    <td style="font-family:'IBM Plex Mono',monospace;font-size:11px">${esc(s.startTime||'—')}</td>
+    <td style="font-family:'IBM Plex Mono',monospace;font-size:11px">${esc(s.endTime||'—')}</td>
+    <td><span class="badge ${badgeCls}">${ovStatus}</span></td>
+    <td style="font-size:11px;color:var(--text3);max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(s.catatan||'')}">${esc(s.catatan||'—')}</td>
+    <td>
+      <div style="display:flex;gap:4px">
+        <button class="tbl-btn btn-sm" onclick="viewSession('${esc(s.id)}')">👁</button>
+        <button class="tbl-btn btn-sm" style="color:var(--red)" onclick="deleteSession('${esc(s.id)}')">🗑</button>
+      </div>
+    </td>
+  </tr>`;
+}
+
+function changeHistPage(dir) { histPage += dir; renderHistory(); }
+function resetHistoryFilters() {
+  ['hSearch','hDateFrom','hDateTo','hUnit','hType','hStatus'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  renderHistory();
+}
+
+// ═══════════════════════════════════════════════════
+// NEW MONITORING MODAL
+// ═══════════════════════════════════════════════════
+function openNewMonitoringModal(preType, preUnit, preEquip) {
+  // Reset semua field
+  ['nm-tanggal','nm-type','nm-unit','nm-equipment','nm-machine',
+   'nm-startTime','nm-endTime','nm-catatan','nm-tindakan'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  clearMonErrors();
+  clearEquipOptions();
+  clearMachineOptions();
+
+  // Reset semua PIC checkbox (initPICGrid() di bawah akan rebuild, tapi reset eksplisit juga)
+  PIC_LIST.forEach(p => {
+    const safeId = picSafeId(p);
+    const el  = document.querySelector(`#nmChk-${safeId} input`);
+    const lbl = document.getElementById(`nmChk-${safeId}`);
+    if (el)  el.checked = false;
+    if (lbl) lbl.classList.remove('checked');
+  });
+
+  setTodayDate();
+
+  // Pre-fill dengan urutan yang benar (type dulu → unit → equip)
+  if (preType) {
+    setVal2('nm-type', preType);
+    // Tampilkan/sembunyikan machine wrap berdasarkan tipe
+    const machWrap = document.getElementById('nm-machine-wrap');
+    if (machWrap) machWrap.style.display = preType === 'lvmdp' ? 'none' : '';
+  }
+  if (preUnit) {
+    setVal2('nm-unit', preUnit);
+    onNMUnitChange(); // populate equipment dropdown
+  }
+  if (preEquip) {
+    setVal2('nm-equipment', preEquip);
+    onNMEquipChange(); // populate machine dropdown (no-op for LVMDP)
+  }
+
+  // Refresh PIC grid agar selalu up-to-date (termasuk PIC yang baru ditambahkan)
+  // initPICGrid() akan rebuild grid dengan safeId yang benar
+  initPICGrid();
+  openOverlay('newMonOverlay');
+}
+
+function onNMTypeChange() {
+  const type = getVal('nm-type');
+  const unitEl = document.getElementById('nm-unit');
+  if (unitEl) unitEl.value = '';
+  clearEquipOptions();
+  clearMachineOptions();
+  // Sembunyikan field Mesin untuk LVMDP (tidak relevan)
+  const machWrap = document.getElementById('nm-machine-wrap');
+  if (machWrap) machWrap.style.display = type === 'lvmdp' ? 'none' : '';
+}
+
+function onNMUnitChange() {
+  const type = getVal('nm-type');
+  const unit = getVal('nm-unit');
+  const equipSel = document.getElementById('nm-equipment');
+  if (!equipSel) return;
+  equipSel.innerHTML = '<option value="">— Pilih Equipment —</option>';
+  document.getElementById('nm-machine').innerHTML = '<option value="">— Pilih Mesin —</option>';
+
+  if (!type || !unit) return;
+  const data = equipDB[unit]?.[type] || {};
+  Object.keys(data).forEach(name => {
+    const o = document.createElement('option'); o.value = name; o.textContent = name;
+    equipSel.appendChild(o);
+  });
+
+  // For LVMDP, hide machine selection (equipment IS the machine)
+  const machWrap = document.getElementById('nm-machine-wrap');
+  if (machWrap) machWrap.style.display = type === 'lvmdp' ? 'none' : '';
+}
+
+function onNMEquipChange() {
+  const type = getVal('nm-type');
+  const unit = getVal('nm-unit');
+  const equip = getVal('nm-equipment');
+  const machineSel = document.getElementById('nm-machine');
+  if (!machineSel) return;
+  machineSel.innerHTML = '<option value="">— Pilih Mesin —</option>';
+  if (!equip || type === 'lvmdp') return;
+  const machines = equipDB[unit]?.[type]?.[equip]?.machines || [];
+  machines.forEach(m => {
+    const o = document.createElement('option'); o.value = m; o.textContent = m;
+    machineSel.appendChild(o);
+  });
+}
+
+function clearEquipOptions() {
+  const el = document.getElementById('nm-equipment');
+  if (el) el.innerHTML = '<option value="">— Pilih Equipment —</option>';
+}
+function clearMachineOptions() {
+  const el = document.getElementById('nm-machine');
+  if (el) el.innerHTML = '<option value="">— Pilih Mesin —</option>';
+}
+
+function submitNewMonitoring() {
+  clearMonErrors();
+  let ok = true;
+  const type = getVal('nm-type');
+  const unit = getVal('nm-unit');
+  const equip = getVal('nm-equipment');
+  const machine = getVal('nm-machine');
+  const tanggal = getVal('nm-tanggal');
+  const startTime = getVal('nm-startTime');
+
+  if (!tanggal) { setErr('ne-tanggal','Tanggal wajib diisi'); ok=false; }
+  if (!type) { setErr('ne-type','Pilih tipe equipment'); ok=false; }
+  if (!unit) { setErr('ne-unit','Pilih unit'); ok=false; }
+  if (!equip) { setErr('ne-equipment','Pilih equipment'); ok=false; }
+  if (type !== 'lvmdp' && !machine) { setErr('ne-machine','Pilih mesin'); ok=false; }
+  if (!startTime) { setErr('ne-startTime','Jam mulai wajib diisi'); ok=false; }
+
+  const pics = getNMSelectedPICs();
+  if (!pics.length) { setErr('ne-pic','Pilih minimal satu PIC'); ok=false; }
+  if (!ok) return;
+
+  const id = genSessionId(type, unit);
+  const session = {
+    id, type, unit,
+    equipment: equip,
+    machine: type === 'lvmdp' ? equip : machine,
+    tanggal,
+    startTime,
+    endTime: getVal('nm-endTime'),
+    pic: pics.join(', '),
+    catatan: getVal('nm-catatan'),
+    tindakan: getVal('nm-tindakan'),
+    createdAt: new Date().toISOString(),
+    items: [] // Will be filled in detail modal
+  };
+
+  // For CS: open detail checklist
+  if (type === 'cs') {
+    sessions.unshift(session);
+    saveData();
+    renderAll();
+    closeOverlay('newMonOverlay');
+    toast('Sesi monitoring dibuat: ' + id + ' — Isi checklist parameter di bawah ↓', 'success');
+    openCSDetailModal(unit, equip, machine, session.id);
+  } else {
+    // LVMDP: open detail form
+    sessions.unshift(session);
+    saveData();
+    renderAll();
+    closeOverlay('newMonOverlay');
+    toast('Sesi LVMDP dibuat: ' + id + ' — Isi parameter di bawah ↓', 'success');
+    openLVMDPDetailModal(unit, equip, session.id);
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// CS DETAIL MODAL (Checklist per parameter)
+// ═══════════════════════════════════════════════════
+// CS DETAIL MODAL  (parameter input + temuan opsional)
+// ═══════════════════════════════════════════════════
+function openCSDetailModal(unit, equip, machine, sessionId) {
+  const sess = sessionId ? sessions.find(s => s.id === sessionId) :
+    sessions.filter(s => s.type==='cs' && s.unit===unit && s.equipment===equip && s.machine===machine)
+      .sort((a,b) => new Date(b.createdAt||0) - new Date(a.createdAt||0))[0];
+
+  document.getElementById('csDetailTitle').textContent = `❄ ${equip} — ${machine}`;
+  document.getElementById('csDetailSub').textContent =
+    `${unit} · ${sess ? fmtDate(sess.tanggal)+' '+sess.startTime : ''} · ${CS_PARAMS.length} parameter`;
+
+  const items = sess?.items || [];
+  const isNew = !items.length;
+
+  // ── Bagi parameter: numerik & status (ukur) vs catatan temuan
+  const ukurParams  = CS_PARAMS.filter(p => !p.type || p.type === 'numeric');
+  const statusParams = CS_PARAMS.filter(p => p.type && p.type !== 'numeric');
+
+  const buildRow = (p, prefix) => {
+    const existing = items.find(i => i.paramId === p.id) || {};
+    const val    = existing.value  || '';
+    const status = existing.status || '';
+    let inputHtml = '';
+    if (p.type === 'status' || p.type === 'status_leak' || p.type === 'status_noise' || p.type === 'status_oil') {
+      const opts = p.type==='status_leak'  ? ['TIDAK ADA','KECIL','BESAR'] :
+                   p.type==='status_noise' ? ['NORMAL','BERISIK','ABNORMAL'] :
+                   p.type==='status_oil'   ? ['NORMAL','BERKURANG','HABIS'] :
+                                             ['BAIK','PERLU PERHATIAN','RUSAK'];
+      inputHtml = `<select class="status-sel ${status==='OK'?'s-ok':status==='WARNING'?'s-warn':status==='ALERT'?'s-alert':''}"
+        id="${prefix}-${p.id}-val" onchange="onCSValChange('${p.id}',this.value,'${p.type}','${prefix}')">
+        <option value="">— Pilih —</option>
+        ${opts.map(o=>`<option ${val===o?'selected':''}>${o}</option>`).join('')}
+      </select>`;
+    } else {
+      const hint = p.normalMin!==undefined ? `Normal: ${p.normalMin}–${p.normalMax} ${p.unit}` : '';
+      inputHtml = `<div>
+        <input type="number" class="val-input ${val?'val-ok':''}" id="${prefix}-${p.id}-val"
+          value="${esc(val)}" placeholder="—" step="0.1"
+          oninput="onCSValChange('${p.id}',this.value,'numeric','${prefix}','${p.normalMin}','${p.normalMax}','${p.warnMax}')"/>
+        ${hint ? `<div style="font-size:9px;color:var(--text3);margin-top:2px">${hint}</div>` : ''}
+      </div>`;
+    }
+    const badgeCls = status==='OK'?'badge-ok':status==='WARNING'?'badge-warn':status==='ALERT'?'badge-alert':'';
+    return `<tr class="${status==='ALERT'?'row-alert':status==='WARNING'?'row-warn':status==='OK'?'row-ok':''}">
+      <td class="param-name" style="font-weight:600">${esc(p.label)}</td>
+      <td style="text-align:center;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3)">${esc(p.unit==='status'?'—':p.unit)}</td>
+      <td style="min-width:140px">${inputHtml}</td>
+      <td><span class="badge ${badgeCls}" id="${prefix}-${p.id}-badge">${status||'—'}</span></td>
+    </tr>`;
+  };
+
+  const allRows = CS_PARAMS.map(p => buildRow(p, 'cs')).join('');
+
+  document.getElementById('csDetailBody').innerHTML = `
+    ${sess ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;padding:8px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;align-items:center">
+      <div class="time-pill">🕐 Mulai: ${esc(sess.startTime||'—')}</div>
+      ${sess.endTime?`<div class="time-pill" style="background:rgba(74,158,63,.08);border-color:rgba(74,158,63,.2);color:var(--green2)">✓ Selesai: ${esc(sess.endTime)}</div>`:''}
+      <div class="time-pill" style="background:rgba(184,143,247,.08);border-color:rgba(184,143,247,.2);color:var(--purple)">👷 ${esc(sess.pic||'—')}</div>
+      <div style="margin-left:auto;font-size:10px;color:var(--text3);font-family:monospace">${esc(sess.id)}</div>
+    </div>` : ''}
+    ${isNew ? `<div style="background:#e8f5e9;border:1px solid #a5d6a7;border-left:4px solid #4a9e3f;border-radius:8px;padding:9px 14px;margin-bottom:12px;font-size:12px;color:#2e7d32">
+      ✅ <strong>Isi semua nilai parameter di bawah</strong>, lalu klik Simpan. Bagian Temuan di bawah bersifat opsional.
+    </div>` : ''}
+
+    <!-- ═══ PARAMETER PENGUKURAN ═══ -->
+    <div style="font-size:11px;font-weight:700;color:var(--cyan);text-transform:uppercase;letter-spacing:.08em;
+                margin-bottom:8px;padding:5px 10px;background:rgba(14,165,233,.08);border-left:3px solid var(--cyan);border-radius:0 5px 5px 0">
+      📊 Parameter Pengukuran
+    </div>
+    <div class="tbl-wrap"><div class="tbl-scroll">
+      <table class="chk-table">
+        <thead><tr>
+          <th style="min-width:170px">Parameter</th>
+          <th style="width:70px;text-align:center">Satuan</th>
+          <th style="min-width:160px">Nilai / Kondisi</th>
+          <th style="width:90px;text-align:center">Status</th>
+        </tr></thead>
+        <tbody>${allRows}</tbody>
+      </table>
+    </div></div>
+
+    <!-- ═══ WAKTU SELESAI ═══ -->
+    ${sess ? `
+    <div style="margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <div class="fg" style="flex:0 0 180px">
+        <label class="flabel">⏱ Waktu Selesai</label>
+        <input type="time" class="finput" id="csEndTime" value="${esc(sess.endTime||'')}"/>
+      </div>
+    </div>
+
+    <!-- ═══ TEMUAN & TINDAKAN (opsional) ═══ -->
+    <details style="margin-top:16px" ${(sess.catatan||sess.tindakan||(sess.items||[]).some(i=>i.note)) ? 'open' : ''}>
+      <summary style="cursor:pointer;font-size:11px;font-weight:700;color:var(--orange);text-transform:uppercase;
+                      letter-spacing:.08em;padding:6px 10px;background:rgba(251,140,58,.08);
+                      border-left:3px solid var(--orange);border-radius:0 5px 5px 0;user-select:none">
+        📋 Temuan & Tindakan Korektif <span style="font-weight:400;font-size:10px;color:var(--text3)">(opsional)</span>
+      </summary>
+      <div style="margin-top:12px;padding:12px;background:var(--bg3);border:1px solid var(--border);border-radius:0 0 8px 8px">
+        <div class="fg full" style="margin-bottom:10px">
+          <label class="flabel">Temuan / Catatan Umum</label>
+          <textarea class="ftextarea" id="csCatatan" placeholder="Deskripsikan kondisi abnormal, temuan saat pengecekan...">${esc(sess.catatan||'')}</textarea>
+        </div>
+        <div class="fg full">
+          <label class="flabel">Tindakan Korektif / Rekomendasi</label>
+          <textarea class="ftextarea" id="csTindakan" placeholder="Tindakan yang sudah diambil atau yang perlu dilakukan...">${esc(sess.tindakan||'')}</textarea>
+        </div>
+        <div style="margin-top:12px">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:600">Catatan per Parameter:</div>
+          ${CS_PARAMS.map(p => {
+            const ex = (sess.items||[]).find(i=>i.paramId===p.id)||{};
+            return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <div style="font-size:11px;color:var(--text2);min-width:160px;flex-shrink:0">${esc(p.label)}</div>
+              <input type="text" class="finput" id="cs-${p.id}-note" placeholder="Catatan untuk ${esc(p.label)}..."
+                value="${esc(ex.note||'')}" style="flex:1;padding:5px 10px;font-size:11px"/>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+    </details>
+
+    <div class="form-actions" style="margin-top:16px">
+      <button class="btn-ghost" onclick="closeOverlay('csDetailOverlay')">Tutup</button>
+      <button class="btn-primary" onclick="saveCSChecklist('${esc(sess.id)}')">💾 Simpan Checklist</button>
+    </div>` : `<div class="form-actions"><button class="btn-ghost" onclick="closeOverlay('csDetailOverlay')">Tutup</button></div>`}
+  `;
+
+  document.getElementById('csDetailOverlay').dataset.sessId = sess?.id || '';
+  openOverlay('csDetailOverlay');
+}
+
+function onCSValChange(paramId, value, type, prefixOrMin, normalMin, normalMax, warnMax) {
+  // Support both old signature (paramId,val,type,min,max,warn) and new (paramId,val,type,prefix,min,max,warn)
+  let prefix = 'cs', nMin = prefixOrMin, nMax = normalMin, wMax = normalMax;
+  if (typeof prefixOrMin === 'string' && isNaN(prefixOrMin)) {
+    prefix = prefixOrMin; nMin = normalMin; nMax = normalMax; wMax = warnMax;
+  }
+  const badge   = document.getElementById(prefix + '-' + paramId + '-badge');
+  const inputEl = document.getElementById(prefix + '-' + paramId + '-val');
+  let status = 'OK';
+
+  if (type === 'numeric') {
+    const v = parseFloat(value);
+    if (isNaN(v) || value === '') { status = ''; }
+    else if (wMax && v > parseFloat(wMax)) status = 'ALERT';
+    else if (nMax && (v > parseFloat(nMax) || v < parseFloat(nMin))) status = 'WARNING';
+    else status = 'OK';
+    if (inputEl) inputEl.className = 'val-input ' + (status==='OK'?'val-ok':status==='WARNING'?'val-warn':status==='ALERT'?'val-alert':'');
+  } else {
+    const goodVals = ['BAIK','TIDAK ADA','NORMAL'];
+    const warnVals = ['PERLU PERHATIAN','KECIL','BERISIK','BERKURANG'];
+    if (goodVals.includes(value)) status = 'OK';
+    else if (warnVals.includes(value)) status = 'WARNING';
+    else if (value) status = 'ALERT';
+    else status = '';
+    if (inputEl) inputEl.className = 'status-sel ' + (status==='OK'?'s-ok':status==='WARNING'?'s-warn':status==='ALERT'?'s-alert':'');
+  }
+  if (badge) {
+    badge.textContent = status || '—';
+    badge.className = 'badge ' + (status==='OK'?'badge-ok':status==='WARNING'?'badge-warn':status==='ALERT'?'badge-alert':'');
+  }
+}
+
+function saveCSChecklist(sessId) {
+  const sess = sessions.find(s => s.id === sessId);
+  if (!sess) return;
+
+  // Kumpulkan semua nilai parameter dari DOM
+  const items = CS_PARAMS.map(p => {
+    const valEl   = document.getElementById('cs-' + p.id + '-val');
+    const noteEl  = document.getElementById('cs-' + p.id + '-note');
+    const badgeEl = document.getElementById('cs-' + p.id + '-badge');
+    const rawStatus = (badgeEl?.textContent || '').trim();
+    return {
+      paramId: p.id, label: p.label, unit: p.unit,
+      value:  valEl?.value  || '',
+      status: rawStatus === '—' ? '' : rawStatus,
+      note:   noteEl?.value || ''
+    };
+  }).filter(i => i.value);
+
+  sess.items = items;
+
+  // endTime: simpan nilai field meskipun kosong (operator mungkin sengaja hapus)
+  const newEndTime = document.getElementById('csEndTime')?.value;
+  if (newEndTime !== undefined) sess.endTime = newEndTime;
+
+  // catatan/tindakan: ?? agar tidak override jika field tidak ada di DOM
+  sess.catatan  = document.getElementById('csCatatan')?.value  ?? sess.catatan;
+  sess.tindakan = document.getElementById('csTindakan')?.value ?? sess.tindakan;
+  sess.updatedAt = new Date().toISOString();
+
+  // Simpan dan render — tutup modal dulu agar render tidak konflik dengan DOM modal
+  saveData(); // saveData() sudah handle sync otomatis ke Sheets jika SYNC_MODE=auto
+  closeOverlay('csDetailOverlay');
+  renderAll();
+  renderCSPage();
+  showSaveSuccessWithPDF(sessId);
+}
+
+// ═══════════════════════════════════════════════════
+// LVMDP DETAIL MODAL  (parameter input + temuan opsional)
+// ═══════════════════════════════════════════════════
+function openLVMDPDetailModal(unit, panelName, sessionId) {
+  const sess = sessionId ? sessions.find(s => s.id === sessionId) :
+    sessions.filter(s => s.type==='lvmdp' && s.unit===unit && s.equipment===panelName)
+      .sort((a,b) => new Date(b.createdAt||0) - new Date(a.createdAt||0))[0];
+
+  document.getElementById('lvmdpDetailTitle').textContent = `⚡ ${panelName}`;
+  document.getElementById('lvmdpDetailSub').textContent = sess
+    ? `${unit} · ${fmtDate(sess.tanggal)} ${sess.startTime} · ${LVMDP_PARAMS.length} parameter`
+    : `${unit} · Belum ada sesi`;
+
+  const items = sess?.items || [];
+  const isNew = !items.length;
+  const sectionColors2 = {
+    'Power Quality':  '#5a2a8a',
+    'Kondisi Panel':  '#1a4a8b',
+    'Capacitor Bank': '#2a7a5a',
+    'Kondisi Trafo':  '#8a3a1a'
+  };
+  const sectionGroups = {};
+  LVMDP_PARAMS.forEach(p => {
+    if (!sectionGroups[p.section]) sectionGroups[p.section] = [];
+    sectionGroups[p.section].push(p);
+  });
+
+  let sectionsHtml = '';
+  Object.entries(sectionGroups).forEach(([section, params]) => {
+    const col = sectionColors2[section] || '#555';
+    let rows = '';
+    params.forEach(p => {
+      const existing = items.find(i => i.paramId === p.id) || {};
+      const val    = existing.value  || '';
+      const status = existing.status || '';
+      let inputHtml = '';
+      if (p.type === 'status' || p.type === 'status_noise' || p.type === 'status_oil') {
+        const opts = p.type==='status_noise' ? ['NORMAL','BERISIK','ABNORMAL'] :
+                     p.type==='status_oil'   ? ['NORMAL','BERKURANG','HABIS'] :
+                                               ['BAIK','PERLU PERHATIAN','RUSAK'];
+        inputHtml = `<select class="status-sel ${status==='OK'?'s-ok':status==='WARNING'?'s-warn':status==='ALERT'?'s-alert':''}"
+          id="lv-${p.id}-val" onchange="onLVValChange('${p.id}',this.value,'status')">
+          <option value="">— Pilih —</option>
+          ${opts.map(o=>`<option ${val===o?'selected':''}>${o}</option>`).join('')}
+        </select>`;
+      } else {
+        const step = (p.id.includes('pf')||p.id.includes('cos')) ? '0.01' : p.id.includes('frekuensi') ? '0.1' : '1';
+        const hint = p.normalMin!==undefined ? `Normal: ${p.normalMin}–${p.normalMax} ${p.unit}${p.warnMax?' | Max: '+p.warnMax:''}` : '';
+        inputHtml = `<div>
+          <input type="number" class="val-input ${val?'val-ok':''}" id="lv-${p.id}-val"
+            value="${esc(val)}" placeholder="—" step="${step}"
+            oninput="onLVValChange('${p.id}',this.value,'numeric','${p.normalMin??0}','${p.normalMax??9999}','${p.warnMax??9999}','${p.warnMin??0}')"/>
+          ${hint ? `<div style="font-size:9px;color:var(--text3);margin-top:2px;white-space:nowrap">${hint}</div>` : ''}
+        </div>`;
+      }
+      const badgeCls = status==='OK'?'badge-ok':status==='WARNING'?'badge-warn':status==='ALERT'?'badge-alert':'';
+      rows += `<tr class="${status==='ALERT'?'row-alert':status==='WARNING'?'row-warn':status==='OK'?'row-ok':''}">
+        <td class="param-name" style="font-weight:600">${esc(p.label)}</td>
+        <td style="text-align:center;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3)">${esc(p.unit==='status'?'—':p.unit)}</td>
+        <td style="min-width:180px">${inputHtml}</td>
+        <td><span class="badge ${badgeCls}" id="lv-${p.id}-badge">${status||'—'}</span></td>
+      </tr>`;
+    });
+    sectionsHtml += `<div style="margin-bottom:18px">
+      <div style="font-size:11px;font-family:'IBM Plex Mono',monospace;font-weight:700;color:${col};
+                  letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px;
+                  padding:6px 12px;background:${col}18;border-left:3px solid ${col};border-radius:0 5px 5px 0">
+        📌 ${section}
+      </div>
+      <div class="tbl-wrap"><div class="tbl-scroll">
+        <table class="chk-table">
+          <thead><tr>
+            <th style="min-width:180px">Parameter</th>
+            <th style="width:70px;text-align:center">Satuan</th>
+            <th style="min-width:200px">Nilai / Kondisi</th>
+            <th style="width:90px;text-align:center">Status</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div></div>
+    </div>`;
+  });
+
+  const temuanOpen = (sess?.catatan || sess?.tindakan || (sess?.items||[]).some(i=>i.note)) ? 'open' : '';
+  const notesPerParam = LVMDP_PARAMS.map(p => {
+    const ex = (sess?.items||[]).find(i=>i.paramId===p.id)||{};
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <div style="font-size:11px;color:var(--text2);min-width:210px;flex-shrink:0">${esc(p.label)}</div>
+      <input type="text" class="finput" id="lv-${p.id}-note"
+        placeholder="Catatan ${esc(p.label)}..."
+        value="${esc(ex.note||'')}" style="flex:1;padding:5px 10px;font-size:11px"/>
+    </div>`;
+  }).join('');
+
+  document.getElementById('lvmdpDetailBody').innerHTML = `
+    ${sess ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;padding:8px 14px;
+      background:var(--bg3);border:1px solid var(--border);border-radius:8px;align-items:center">
+      <div class="time-pill">🕐 Mulai: ${esc(sess.startTime||'—')}</div>
+      ${sess.endTime?`<div class="time-pill" style="background:rgba(74,158,63,.08);border-color:rgba(74,158,63,.2);color:var(--green2)">✓ Selesai: ${esc(sess.endTime)}</div>`:''}
+      <div class="time-pill" style="background:rgba(251,140,58,.08);border-color:rgba(251,140,58,.2);color:#c05c00">👷 ${esc(sess.pic||'—')}</div>
+      <div style="margin-left:auto;font-size:10px;color:var(--text3);font-family:monospace">${esc(sess.id)}</div>
+    </div>` : ''}
+    ${isNew ? `<div style="background:#e8f5e9;border:1px solid #a5d6a7;border-left:4px solid #4a9e3f;border-radius:8px;padding:9px 14px;margin-bottom:14px;font-size:12px;color:#2e7d32">
+      ✅ <strong>Isi semua nilai parameter di bawah.</strong> Status otomatis OK/WARNING/ALERT. Bagian Temuan di akhir bersifat opsional.
+    </div>` : ''}
+    ${sectionsHtml}
+    ${sess ? `
+    <div style="display:flex;gap:12px;align-items:center;margin-top:4px">
+      <div class="fg" style="flex:0 0 180px">
+        <label class="flabel">⏱ Waktu Selesai</label>
+        <input type="time" class="finput" id="lvEndTime" value="${esc(sess.endTime||'')}"/>
+      </div>
+    </div>
+    <details style="margin-top:16px" ${temuanOpen}>
+      <summary style="cursor:pointer;font-size:11px;font-weight:700;color:var(--orange);text-transform:uppercase;
+        letter-spacing:.08em;padding:6px 12px;background:rgba(251,140,58,.08);
+        border-left:3px solid var(--orange);border-radius:0 5px 5px 0;user-select:none;list-style:none">
+        ▸ 📋 Temuan & Tindakan Korektif <span style="font-weight:400;font-size:10px;color:var(--text3)">(opsional)</span>
+      </summary>
+      <div style="margin-top:10px;padding:14px;background:var(--bg3);border:1px solid var(--border);border-radius:0 0 8px 8px">
+        <div class="fg full" style="margin-bottom:10px">
+          <label class="flabel">Temuan / Catatan Umum</label>
+          <textarea class="ftextarea" id="lvCatatan" placeholder="Deskripsikan kondisi abnormal yang ditemukan saat pengecekan...">${esc(sess.catatan||'')}</textarea>
+        </div>
+        <div class="fg full" style="margin-bottom:14px">
+          <label class="flabel">Tindakan Korektif / Rekomendasi</label>
+          <textarea class="ftextarea" id="lvTindakan" placeholder="Tindakan yang sudah diambil atau yang perlu dilakukan...">${esc(sess.tindakan||'')}</textarea>
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:8px;font-weight:600">📝 Catatan per Parameter:</div>
+        ${notesPerParam}
+      </div>
+    </details>
+    <div class="form-actions" style="margin-top:16px">
+      <button class="btn-ghost" onclick="closeOverlay('lvmdpDetailOverlay')">Tutup</button>
+      <button class="btn-primary" style="background:var(--orange);border:none" onclick="saveLVMDPChecklist('${esc(sess.id)}')">💾 Simpan Data LVMDP</button>
+    </div>` : `<div class="form-actions"><button class="btn-ghost" onclick="closeOverlay('lvmdpDetailOverlay')">Tutup</button></div>`}
+  `;
+  openOverlay('lvmdpDetailOverlay');
+}
+
+function onLVValChange(paramId, value, type, normalMin, normalMax, warnMax, warnMin) {
+  const badge = document.getElementById('lv-' + paramId + '-badge');
+  const inputEl = document.getElementById('lv-' + paramId + '-val');
+  let status = 'OK';
+
+  if (type === 'numeric') {
+    const v = parseFloat(value);
+    if (isNaN(v) || value === '') { status = ''; }
+    else if ((warnMax && v > parseFloat(warnMax)) || (warnMin && v < parseFloat(warnMin))) status = 'ALERT';
+    else if ((normalMax && v > parseFloat(normalMax)) || (normalMin && v < parseFloat(normalMin))) status = 'WARNING';
+    else status = 'OK';
+    if (inputEl) inputEl.className = 'val-input ' + (status==='OK'?'val-ok':status==='WARNING'?'val-warn':status==='ALERT'?'val-alert':'');
+  } else {
+    const goodVals = ['BAIK','NORMAL'];
+    const warnVals = ['PERLU PERHATIAN','BERISIK','BERKURANG'];
+    if (goodVals.includes(value)) status = 'OK';
+    else if (warnVals.includes(value)) status = 'WARNING';
+    else if (value) status = 'ALERT';
+    else status = '';
+    if (inputEl) inputEl.className = 'status-sel ' + (status==='OK'?'s-ok':status==='WARNING'?'s-warn':status==='ALERT'?'s-alert':'');
+  }
+  if (badge) {
+    badge.textContent = status || '—';
+    badge.className = 'badge ' + (status==='OK'?'badge-ok':status==='WARNING'?'badge-warn':status==='ALERT'?'badge-alert':'');
+  }
+}
+
+function saveLVMDPChecklist(sessId) {
+  const sess = sessions.find(s => s.id === sessId);
+  if (!sess) return;
+
+  // Kumpulkan semua nilai parameter dari DOM
+  const items = LVMDP_PARAMS.map(p => {
+    const valEl   = document.getElementById('lv-' + p.id + '-val');
+    const noteEl  = document.getElementById('lv-' + p.id + '-note');
+    const badgeEl = document.getElementById('lv-' + p.id + '-badge');
+    const rawStatus = (badgeEl?.textContent || '').trim();
+    return {
+      paramId: p.id, label: p.label, unit: p.unit, section: p.section,
+      value:  valEl?.value  || '',
+      status: rawStatus === '—' ? '' : rawStatus,
+      note:   noteEl?.value || ''
+    };
+  }).filter(i => i.value);
+
+  sess.items = items;
+
+  // endTime: simpan nilai field meskipun kosong
+  const newEndTime = document.getElementById('lvEndTime')?.value;
+  if (newEndTime !== undefined) sess.endTime = newEndTime;
+
+  // catatan/tindakan: ?? agar tidak override jika field tidak ada di DOM
+  sess.catatan  = document.getElementById('lvCatatan')?.value  ?? sess.catatan;
+  sess.tindakan = document.getElementById('lvTindakan')?.value ?? sess.tindakan;
+  sess.updatedAt = new Date().toISOString();
+
+  // Tutup modal dulu, baru render — saveData() handle sync otomatis ke Sheets
+  saveData();
+  closeOverlay('lvmdpDetailOverlay');
+  renderAll();
+  renderLVMDPPage();
+  showSaveSuccessWithPDF(sessId);
+}
+
+// ═══════════════════════════════════════════════════
+// VIEW SESSION DETAIL
+// ═══════════════════════════════════════════════════
+function viewSession(sessId) {
+  const sess = sessions.find(s => s.id === sessId);
+  if (!sess) return;
+  const ovStatus = getSessionOverallStatus(sess);
+  const badgeCls = ovStatus==='OK'?'badge-ok':ovStatus==='WARNING'?'badge-warn':ovStatus==='ALERT'?'badge-alert':'badge-pending';
+
+  const okItems = (sess.items||[]).filter(i=>i.status==='OK').length;
+  const warnItems = (sess.items||[]).filter(i=>i.status==='WARNING').length;
+  const alertItems = (sess.items||[]).filter(i=>i.status==='ALERT').length;
+
+  let itemsHtml = '';
+  if (sess.items && sess.items.length) {
+    itemsHtml = `<div class="tbl-wrap"><div class="tbl-scroll"><table class="chk-table">
+      <thead><tr><th>Parameter</th><th>Nilai</th><th>Satuan</th><th>Status</th><th>Catatan</th></tr></thead>
+      <tbody>
+        ${sess.items.map(i => {
+          const cls = i.status==='OK'?'badge-ok':i.status==='WARNING'?'badge-warn':i.status==='ALERT'?'badge-alert':'';
+          return `<tr><td>${esc(i.label||i.paramId)}</td>
+            <td style="font-family:'IBM Plex Mono',monospace;font-weight:600">${esc(i.value)}</td>
+            <td style="color:var(--text3);font-size:11px">${esc(i.unit||'')}</td>
+            <td><span class="badge ${cls}">${esc(i.status||'—')}</span></td>
+            <td style="font-size:11px;color:var(--text3)">${esc(i.note||'—')}</td></tr>`;
+        }).join('')}
+      </tbody>
+    </table></div></div>`;
+  }
+
+  document.getElementById('viewSessionTitle').textContent = sess.id;
+  document.getElementById('viewSessionBody').innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+      <span class="badge ${badgeCls}" style="font-size:13px;padding:5px 14px">${ovStatus}</span>
+      <span class="badge ${sess.type==='cs'?'b-cs':'b-lvmdp'}">${sess.type==='cs'?'❄ Cold Storage':'⚡ LVMDP'}</span>
+      <span class="badge ${sess.unit==='Unit 1'?'b-unit1':'b-unit2'}">${sess.unit}</span>
+    </div>
+    <div class="detail-grid">
+      <div class="detail-item"><div class="dl">Tanggal</div><div class="dv">${fmtDate(sess.tanggal)}</div></div>
+      <div class="detail-item"><div class="dl">Equipment</div><div class="dv">${esc(sess.equipment||'—')}</div></div>
+      <div class="detail-item"><div class="dl">Mesin</div><div class="dv">${esc(sess.machine||'—')}</div></div>
+      <div class="detail-item"><div class="dl">PIC</div><div class="dv">${esc(sess.pic||'—')}</div></div>
+      <div class="detail-item"><div class="dl">Mulai Monitoring</div><div class="dv" style="font-family:'IBM Plex Mono',monospace">${esc(sess.startTime||'—')}</div></div>
+      <div class="detail-item"><div class="dl">Selesai Monitoring</div><div class="dv" style="font-family:'IBM Plex Mono',monospace">${esc(sess.endTime||'—')}</div></div>
+      <div class="detail-item"><div class="dl">Hasil Checklist</div><div class="dv">
+        <span class="badge badge-ok">✓ OK: ${okItems}</span>&nbsp;
+        <span class="badge badge-warn">⚠ WARN: ${warnItems}</span>&nbsp;
+        <span class="badge badge-alert">✗ ALERT: ${alertItems}</span>
+      </div></div>
+      <div class="detail-item"><div class="dl">Dibuat</div><div class="dv" style="font-size:11px">${esc(sess.createdAt||'—')}</div></div>
+      <div class="detail-item full"><div class="dl">Catatan / Temuan</div><div class="dv" style="white-space:pre-wrap">${esc(sess.catatan||'—')}</div></div>
+      <div class="detail-item full"><div class="dl">Tindakan</div><div class="dv" style="white-space:pre-wrap">${esc(sess.tindakan||'—')}</div></div>
+    </div>
+    ${itemsHtml}
+    <div class="form-actions">
+      <button class="btn-ghost" onclick="closeOverlay('viewSessionOverlay')">Tutup</button>
+      <button class="btn-ghost" style="border-color:rgba(26,58,107,.4);color:#1a3a6b" onclick="exportSessionPDF('${esc(sess.id)}')">🖨 Cetak PDF</button>
+      ${sess.type==='cs' ? `<button class="btn-primary" onclick="closeOverlay('viewSessionOverlay');openCSDetailModal('${esc(sess.unit)}','${esc(sess.equipment)}','${esc(sess.machine)}','${esc(sess.id)}')">📋 Buka Checklist</button>` :
+        `<button class="btn-primary" style="background:var(--orange);border:none" onclick="closeOverlay('viewSessionOverlay');openLVMDPDetailModal('${esc(sess.unit)}','${esc(sess.equipment)}','${esc(sess.id)}')">📋 Buka Detail LVMDP</button>`}
+    </div>
+  `;
+  openOverlay('viewSessionOverlay');
+}
+
+function deleteSession(sessId) {
+  if (!confirm('Hapus sesi monitoring ' + sessId + '?\nTindakan ini tidak bisa dibatalkan.')) return;
+  sessions = sessions.filter(s => s.id !== sessId);
+  saveData();
+  if (typeof autoDeleteSession === 'function') autoDeleteSession(sessId);
+  renderAll();
+  renderCSPage();
+  renderLVMDPPage();
+  toast('Sesi ' + sessId + ' dihapus', 'info');
+}
+
+// ═══════════════════════════════════════════════════
+// MANAGE MACHINES
+// ═══════════════════════════════════════════════════
+function openManageMachineModal() {
+  const el = document.getElementById('mm-unit');
+  if (el) el.value = '';
+  const el2 = document.getElementById('mm-equip');
+  if (el2) { el2.innerHTML = '<option value="">— Pilih Equipment —</option>'; }
+  document.getElementById('mmContent').style.display = 'none';
+  openOverlay('manageMachineOverlay');
+}
+
+// Buka modal Kelola Mesin dengan unit & equipment sudah terpilih
+function openManageMachineModalFor(unit, equipName) {
+  const unitEl = document.getElementById('mm-unit');
+  if (unitEl) {
+    unitEl.value = unit;
+    onMMUnitChange(); // populate equipment dropdown
+  }
+  const equipEl = document.getElementById('mm-equip');
+  if (equipEl) {
+    // Satu setTimeout cukup — tunggu dropdown terisi baru set value dan render
+    setTimeout(() => {
+      equipEl.value = equipName;
+      renderMachineManageList();
+    }, 60);
+  }
+  openOverlay('manageMachineOverlay');
+}
+
+function onMMUnitChange() {
+  const unit = document.getElementById('mm-unit')?.value;
+  const equipSel = document.getElementById('mm-equip');
+  if (!equipSel) return;
+  equipSel.innerHTML = '<option value="">— Pilih Equipment —</option>';
+  document.getElementById('mmContent').style.display = 'none';
+  if (!unit) return;
+  const allEquip = {
+    ...Object.fromEntries(Object.entries(equipDB[unit]?.cs||{}).map(([k,v]) => [k, {type:'cs',...v}])),
+    ...Object.fromEntries(Object.entries(equipDB[unit]?.lvmdp||{}).map(([k,v]) => [k, {type:'lvmdp',...v}]))
+  };
+  Object.keys(allEquip).forEach(name => {
+    const o = document.createElement('option'); o.value = name; o.textContent = name;
+    equipSel.appendChild(o);
+  });
+}
+
+function renderMachineManageList() {
+  const unit = document.getElementById('mm-unit')?.value;
+  const equip = document.getElementById('mm-equip')?.value;
+  if (!unit || !equip) { document.getElementById('mmContent').style.display='none'; return; }
+
+  // Find which type
+  const type = equipDB[unit]?.cs?.[equip] ? 'cs' : 'lvmdp';
+  const listKey = type === 'cs' ? 'machines' : 'panels';
+  const machines = equipDB[unit]?.[type]?.[equip]?.[listKey] || [];
+
+  document.getElementById('mmContent').style.display = 'block';
+  document.getElementById('newMachineName').value = '';
+  const listEl = document.getElementById('machineManageList');
+  listEl.innerHTML = machines.map((m,i) => `
+    <div class="machine-row">
+      <span class="machine-name">${esc(m)}</span>
+      <button class="tbl-btn btn-sm" style="color:var(--red);border-color:rgba(192,57,43,.3)" onclick="removeMachine('${esc(unit)}','${esc(equip)}','${esc(type)}','${esc(listKey)}',${i})">✕ Hapus</button>
+    </div>`).join('') || '<div style="color:var(--text3);font-size:12px;padding:8px">Belum ada mesin. Tambahkan di bawah.</div>';
+  // Store context
+  document.getElementById('mmContent').dataset.unit = unit;
+  document.getElementById('mmContent').dataset.equip = equip;
+  document.getElementById('mmContent').dataset.type = type;
+  document.getElementById('mmContent').dataset.listKey = listKey;
+}
+
+function addNewMachine() {
+  const ctx = document.getElementById('mmContent').dataset;
+  const name = document.getElementById('newMachineName')?.value.trim();
+  if (!name) { toast('Masukkan nama mesin','error'); return; }
+  const machines = equipDB[ctx.unit]?.[ctx.type]?.[ctx.equip]?.[ctx.listKey];
+  if (!machines) { toast('Data equipment tidak ditemukan','error'); return; }
+  if (machines.includes(name)) { toast('Mesin sudah ada dalam daftar','error'); return; }
+  machines.push(name);
+  saveData();
+  renderMachineManageList();
+  renderConfigPage();
+  toast(name + ' berhasil ditambahkan ✓', 'success');
+}
+
+function removeMachine(unit, equip, type, listKey, idx) {
+  const machines = equipDB[unit]?.[type]?.[equip]?.[listKey];
+  if (!machines) return;
+  const name = machines[idx];
+  if (!confirm('Hapus mesin "' + name + '"?')) return;
+  machines.splice(idx, 1);
+  saveData();
+  renderMachineManageList();
+  renderConfigPage();
+  toast(name + ' dihapus dari daftar', 'info');
+}
+
+// ═══════════════════════════════════════════════════
+// PIC MANAGEMENT
+// ═══════════════════════════════════════════════════
+function picSafeId(name) {
+  // Sanitize nama PIC untuk dipakai sebagai CSS ID (spasi dan karakter khusus jadi _)
+  return name.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+function initPICGrid() {
+  const grid = document.getElementById('nmPicGrid');
+  if (!grid) return;
+  grid.innerHTML = PIC_LIST.map(p => {
+    const safeId = picSafeId(p);
+    return `<label class="chk-item" id="nmChk-${safeId}">
+      <input type="checkbox" value="${esc(p)}" onchange="updateNMChkStyle('${esc(p)}')"/>
+      <span>${esc(p)}</span>
+    </label>`;
+  }).join('');
+}
+
+function updateNMChkStyle(name) {
+  const safeId = picSafeId(name);
+  const lbl = document.getElementById('nmChk-' + safeId);
+  const inp = lbl?.querySelector('input');
+  if (lbl && inp) lbl.classList.toggle('checked', inp.checked);
+}
+
+function getNMSelectedPICs() {
+  return PIC_LIST.filter(p => {
+    const safeId = picSafeId(p);
+    const el = document.querySelector(`#nmChk-${safeId} input`);
+    return el && el.checked;
+  });
+}
+
+function openManagePICModal() {
+  renderPICManageList();
+  setVal2('newPICName','');
+  openOverlay('managePICOverlay');
+}
+
+function renderPICManageList() {
+  const el = document.getElementById('picManageList');
+  if (!el) return;
+  el.innerHTML = PIC_LIST.map(p => `
+    <div class="pic-manage-row">
+      <span class="pic-manage-name">${p}</span>
+      <button class="tbl-btn btn-sm" style="color:var(--red);border-color:rgba(192,57,43,.3)" onclick="removePIC('${p}')">✕ Hapus</button>
+    </div>`).join('');
+}
+
+function addNewPIC() {
+  const inp = document.getElementById('newPICName');
+  const name = (inp?.value||'').trim().toUpperCase();
+  if (!name || name.length < 2) { toast('Masukkan nama PIC yang valid','error'); return; }
+  if (PIC_LIST.includes(name)) { toast(name + ' sudah ada dalam daftar','error'); return; }
+  PIC_LIST.push(name);
+  saveData();
+  initPICGrid();
+  renderPICManageList();
+  renderConfigPage();
+  inp.value = '';
+  toast(name + ' ditambahkan sebagai PIC ✓', 'success');
+}
+
+function removePIC(name) {
+  if (!confirm('Hapus ' + name + ' dari daftar PIC?')) return;
+  PIC_LIST = PIC_LIST.filter(p => p !== name);
+  saveData();
+  initPICGrid();
+  renderPICManageList();
+  renderConfigPage();
+  toast(name + ' dihapus dari daftar PIC', 'info');
+}
+
+// ═══════════════════════════════════════════════════
+// CONFIG PAGE
+// ═══════════════════════════════════════════════════
+function renderConfigPage() {
+  // ── Equipment cards ──────────────────────────────
+  const equipSumEl = document.getElementById('configEquipSummary');
+  if (equipSumEl) {
+    let html = '';
+    ['Unit 1','Unit 2'].forEach(unit => {
+      const cs    = equipDB[unit]?.cs    || {};
+      const lvmdp = equipDB[unit]?.lvmdp || {};
+
+      Object.entries(cs).forEach(([name, data]) => {
+        const count = (data.machines||[]).length;
+        html += `<div onclick="openManageMachineModalFor('${esc(unit)}','${esc(name)}')"
+          style="background:var(--bg3);border:1px solid var(--border);border-left:3px solid var(--cyan);
+                 border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s;user-select:none"
+          onmouseover="this.style.boxShadow='0 2px 10px rgba(14,165,233,.25)';this.style.borderColor='var(--cyan)'"
+          onmouseout="this.style.boxShadow='';this.style.borderColor='var(--border)';this.style.borderLeftColor='var(--cyan)'">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div style="font-size:12px;font-weight:600;color:var(--text)">${esc(name)}</div>
+            <span style="font-size:9px;background:#e0f7fa;color:#006064;padding:2px 6px;border-radius:4px;font-weight:600">CS</span>
+          </div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">${unit} · ${count} mesin</div>
+          <div style="font-size:10px;color:var(--cyan);margin-top:6px;font-weight:500">⚙ Klik untuk kelola mesin →</div>
+        </div>`;
+      });
+
+      Object.entries(lvmdp).forEach(([name, data]) => {
+        const count = (data.panels||[]).length;
+        html += `<div onclick="openManageMachineModalFor('${esc(unit)}','${esc(name)}')"
+          style="background:var(--bg3);border:1px solid var(--border);border-left:3px solid var(--orange);
+                 border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s;user-select:none"
+          onmouseover="this.style.boxShadow='0 2px 10px rgba(251,140,58,.25)';this.style.borderColor='var(--orange)'"
+          onmouseout="this.style.boxShadow='';this.style.borderColor='var(--border)';this.style.borderLeftColor='var(--orange)'">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div style="font-size:12px;font-weight:600;color:var(--text)">${esc(name)}</div>
+            <span style="font-size:9px;background:#fff3e0;color:#e65100;padding:2px 6px;border-radius:4px;font-weight:600">LVMDP</span>
+          </div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">${unit} · ${count} komponen</div>
+          <div style="font-size:10px;color:var(--orange);margin-top:6px;font-weight:500">⚙ Klik untuk kelola komponen →</div>
+        </div>`;
+      });
+    });
+    equipSumEl.innerHTML = html;
+  }
+
+  // ── PIC badges ────────────────────────────────────
+  const picSumEl = document.getElementById('configPICSummary');
+  if (picSumEl) {
+    picSumEl.innerHTML = PIC_LIST.map(p =>
+      `<span onclick="openManagePICModal()"
+        style="display:inline-flex;align-items:center;gap:5px;background:var(--bg3);border:1px solid var(--border);
+               color:var(--text2);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;
+               cursor:pointer;transition:all .15s;user-select:none"
+        onmouseover="this.style.background='#ede7f6';this.style.borderColor='#b88ff7';this.style.color='#6a1b9a'"
+        onmouseout="this.style.background='var(--bg3)';this.style.borderColor='var(--border)';this.style.color='var(--text2)'">
+        👤 ${esc(p)}
+      </span>`
+    ).join('') +
+    `<span onclick="openManagePICModal()"
+      style="display:inline-flex;align-items:center;gap:5px;background:transparent;border:2px dashed var(--border);
+             color:var(--text3);padding:6px 14px;border-radius:20px;font-size:12px;cursor:pointer;transition:all .15s"
+      onmouseover="this.style.borderColor='#b88ff7';this.style.color='#6a1b9a'"
+      onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text3)'">
+      ✚ Tambah PIC
+    </span>`;
+  }
+
+  // ── CS Params (klik → navigasi ke CS Monitor) ────
+  const csParamEl = document.getElementById('csParamList');
+  if (csParamEl) {
+    csParamEl.innerHTML = `<div style="display:flex;flex-direction:column;gap:5px">` +
+      CS_PARAMS.map(p => {
+        const isStatus = !p.normalMin && p.normalMin !== 0;
+        const rangeStr = isStatus ? 'Pilihan status' : `Normal: ${p.normalMin} – ${p.normalMax} ${p.unit}`;
+        const warnStr  = p.warnMax ? ` | Warn: >${p.warnMax}` : '';
+        return `<div style="background:var(--bg3);border:1px solid var(--border);border-left:3px solid var(--cyan);
+                     border-radius:6px;padding:9px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--text)">${esc(p.label)}</div>
+            <div style="font-size:10px;color:var(--text3);font-family:'IBM Plex Mono',monospace;margin-top:2px">${rangeStr}${warnStr}</div>
+          </div>
+          <span style="font-size:10px;font-weight:600;background:#e0f7fa;color:#006064;padding:3px 8px;border-radius:4px;white-space:nowrap">${esc(p.unit||'status')}</span>
+        </div>`;
+      }).join('') + `</div>`;
+  }
+
+  // ── LVMDP Params (klik tiap param → buka edit modal) ──
+  const lvParamEl = document.getElementById('lvmdpParamList');
+  if (lvParamEl) {
+    const sections = {};
+    LVMDP_PARAMS.forEach((p,i) => {
+      if (!sections[p.section]) sections[p.section] = [];
+      sections[p.section].push({...p, _i: i});
+    });
+    const sectionColors = {
+      'Power Quality':'#5a2a8a','Kondisi Panel':'#1a4a8b',
+      'Capacitor Bank':'#2a7a5a','Kondisi Trafo':'#8a3a1a'
+    };
+    let html = '<div style="display:flex;flex-direction:column;gap:14px">';
+    Object.entries(sections).forEach(([sec, params]) => {
+      const col = sectionColors[sec] || '#444';
+      html += `<div>
+        <div style="font-size:11px;font-weight:700;color:${col};text-transform:uppercase;letter-spacing:.08em;
+                    margin-bottom:8px;padding:5px 10px;background:${col}15;border-left:3px solid ${col};border-radius:0 5px 5px 0">
+          📌 ${esc(sec)}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:6px">
+          ${params.map(p => {
+            const isStatus = !!p.type;
+            const rangeStr = isStatus
+              ? `Status: ${p.type}`
+              : (p.normalMin!==undefined ? `Normal: ${p.normalMin}–${p.normalMax} ${p.unit||''}${p.warnMax?' | Warn: '+p.warnMax:''}` : '');
+            const stBg  = isStatus ? '#f3e5f5' : '#e8f5e8';
+            const stCol = isStatus ? '#6a1b9a' : '#2e7d32';
+            return `<div onclick="openEditLVMDPParamsModal()"
+              style="background:var(--bg3);border:1px solid var(--border);border-left:3px solid ${col};
+                     border-radius:6px;padding:9px 14px;cursor:pointer;transition:all .15s"
+              onmouseover="this.style.background='${col}0d';this.style.borderColor='${col}'"
+              onmouseout="this.style.background='var(--bg3)';this.style.borderColor='var(--border)';this.style.borderLeftColor='${col}'">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+                <span style="font-size:12px;font-weight:600;color:var(--text)">${esc(p.label)}</span>
+                <span style="font-size:9px;font-weight:600;background:${stBg};color:${stCol};padding:2px 7px;border-radius:4px;white-space:nowrap">${esc(p.unit||'—')}</span>
+              </div>
+              <div style="font-size:10px;color:var(--text3);margin-top:3px;font-family:'IBM Plex Mono',monospace">${esc(rangeStr)}</div>
+              <div style="font-size:9px;color:${col};margin-top:4px;opacity:.7">✏ Klik untuk edit parameter →</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    });
+    html += `<div onclick="openEditLVMDPParamsModal()"
+      style="border:2px dashed var(--border);border-radius:8px;padding:12px;text-align:center;
+             cursor:pointer;color:var(--text3);font-size:12px;transition:all .15s"
+      onmouseover="this.style.borderColor='#5a2a8a';this.style.color='#5a2a8a'"
+      onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text3)'">
+      ✚ Tambah / Edit Parameter LVMDP
+    </div>`;
+    html += '</div>';
+    lvParamEl.innerHTML = html;
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// EDIT LVMDP PARAMS
+// ═══════════════════════════════════════════════════
+function openEditLVMDPParamsModal() {
+  renderLVMDPParamEditor();
+  openOverlay('editLVMDPParamsOverlay');
+}
+
+function renderLVMDPParamEditor() {
+  const el = document.getElementById('lvmdpParamEditorList');
+  if (!el) return;
+  const sections = ['Power Quality','Kondisi Panel','Capacitor Bank','Kondisi Trafo'];
+  const sectionColors = {'Power Quality':'#5a2a8a','Kondisi Panel':'#1a4a8b','Capacitor Bank':'#2a7a5a','Kondisi Trafo':'#8a3a1a'};
+
+  // Group by section
+  const grouped = {};
+  sections.forEach(s => grouped[s] = []);
+  LVMDP_PARAMS.forEach((p,i) => {
+    const s = p.section && grouped[p.section] !== undefined ? p.section : sections[0];
+    if (!grouped[s]) grouped[s] = [];
+    grouped[s].push({...p, _idx: i});
+  });
+  // Also handle custom sections
+  LVMDP_PARAMS.forEach((p,i) => {
+    if (!sections.includes(p.section)) {
+      if (!grouped[p.section]) grouped[p.section] = [];
+      // Avoid duplicate
+      if (!grouped[p.section].find(x => x._idx === i)) grouped[p.section].push({...p, _idx: i});
+    }
+  });
+
+  let html = '';
+  Object.entries(grouped).forEach(([sec, params]) => {
+    if (!params.length) return;
+    const col = sectionColors[sec] || '#444';
+    html += `<div style="margin-bottom:18px">
+      <div style="font-size:11px;font-weight:700;color:${col};text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid ${col}60">📌 ${sec}</div>
+      <div style="display:flex;flex-direction:column;gap:6px">`;
+    params.forEach(p => {
+      const i = p._idx;
+      const isStatus = !!p.type;
+      html += `<div style="background:var(--bg3);border:1px solid var(--border);border-left:3px solid ${col};border-radius:8px;padding:10px 14px">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 80px 80px 36px;gap:8px;align-items:center;flex-wrap:wrap">
+          <div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Label</div>
+            <input class="finput" style="font-size:12px;padding:5px 8px" value="${esc(p.label)}" oninput="LVMDP_PARAMS[${i}].label=this.value" placeholder="Label parameter"/>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Satuan</div>
+            <input class="finput" style="font-size:12px;padding:5px 8px" value="${esc(p.unit)}" oninput="LVMDP_PARAMS[${i}].unit=this.value" placeholder="Satuan"/>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Seksi</div>
+            <select class="fsel2" style="font-size:12px;padding:5px 8px" onchange="LVMDP_PARAMS[${i}].section=this.value;renderLVMDPParamEditor()">
+              ${[...sections,'Custom'].map(s => `<option value="${s}" ${p.section===s?'selected':''}>${s}</option>`).join('')}
+            </select>
+          </div>
+          ${isStatus ? `
+          <div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Tipe Status</div>
+            <input class="finput" style="font-size:12px;padding:5px 8px" value="${esc(p.type)}" oninput="LVMDP_PARAMS[${i}].type=this.value" placeholder="status/status_noise/..."/>
+          </div>
+          <div></div><div></div>
+          ` : `
+          <div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Min Normal</div>
+            <input type="number" class="finput" style="font-size:12px;padding:5px 8px" value="${p.normalMin??''}" oninput="LVMDP_PARAMS[${i}].normalMin=parseFloat(this.value)||0" placeholder="Min Normal"/>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Max Normal</div>
+            <input type="number" class="finput" style="font-size:12px;padding:5px 8px" value="${p.normalMax??''}" oninput="LVMDP_PARAMS[${i}].normalMax=parseFloat(this.value)||0" placeholder="Max Normal"/>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Batas Warn</div>
+            <input type="number" class="finput" style="font-size:12px;padding:5px 8px" value="${p.warnMax??p.warnMin??''}" oninput="LVMDP_PARAMS[${i}].warnMax=parseFloat(this.value)" placeholder="Warn Max"/>
+          </div>
+          `}
+          <div style="text-align:center">
+            <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Hapus</div>
+            <button onclick="deleteLVMDPParam(${i})" style="background:#c0392b;color:#fff;border:none;border-radius:6px;width:32px;height:32px;cursor:pointer;font-size:15px" title="Hapus parameter">✕</button>
+          </div>
+        </div>
+      </div>`;
+    });
+    html += `</div></div>`;
+  });
+
+  el.innerHTML = html;
+}
+
+function addLVMDPParam() {
+  const newId = 'custom_' + Date.now();
+  LVMDP_PARAMS.push({id:newId, label:'Parameter Baru', unit:'', section:'Power Quality', normalMin:0, normalMax:100, warnMax:120});
+  renderLVMDPParamEditor();
+  // scroll to bottom
+  const el = document.getElementById('lvmdpParamEditorList');
+  if (el) setTimeout(() => el.scrollTop = el.scrollHeight, 100);
+}
+
+function deleteLVMDPParam(idx) {
+  if (!confirm('Hapus parameter ini? Data monitoring yang sudah tersimpan tidak berubah.')) return;
+  LVMDP_PARAMS.splice(idx, 1);
+  renderLVMDPParamEditor();
+}
+
+function saveLVMDPParamsEdit() {
+  saveLVMDPParams();
+  renderConfigPage();
+  closeOverlay('editLVMDPParamsOverlay');
+  toast('Parameter LVMDP berhasil disimpan ✓', 'success');
+}
+
+function resetLVMDPParamsDefault() {
+  if (!confirm('Reset semua parameter ke default? Perubahan Anda akan hilang.')) return;
+  LVMDP_PARAMS = JSON.parse(JSON.stringify(LVMDP_PARAMS_DEFAULT));
+  saveLVMDPParams();
+  renderLVMDPParamEditor();
+  renderConfigPage();
+  toast('Parameter direset ke default ✓', 'success');
+}
+
+// ═══════════════════════════════════════════════════
+// EXPORT
+// ═══════════════════════════════════════════════════
+function exportCSV() {
+  const data = sessions;
+  if (!data.length) { toast('Tidak ada data untuk diekspor','error'); return; }
+  const cols = ['id','tanggal','unit','type','equipment','machine','pic','startTime','endTime','catatan','tindakan','createdAt'];
+  const header = cols.join(',');
+  const rows = data.map(s => cols.map(c => '"' + String(s[c]||'').replace(/"/g,'""') + '"').join(','));
+  const csv = '\uFEFF' + [header,...rows].join('\n');
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'Monitoring_' + new Date().toISOString().split('T')[0] + '.csv';
+  a.click(); URL.revokeObjectURL(url);
+  toast('CSV berhasil diekspor ✓', 'success');
+}
+
+// ═══════════════════════════════════════════════════
+// AFTER-SAVE: Toast + opsi cetak PDF
+// ═══════════════════════════════════════════════════
+function showSaveSuccessWithPDF(sessId) {
+  const c = document.getElementById('toast');
+  const el = document.createElement('div');
+  el.className = 'toast-item success';
+  el.style.cssText = 'min-width:280px;padding:12px 16px;cursor:default';
+  el.innerHTML = `
+    <div style="font-weight:600;margin-bottom:6px">✓ Data monitoring berhasil disimpan</div>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <button onclick="exportSessionPDF('${sessId}');this.closest('.toast-item').remove()"
+        style="background:#1a3a6b;color:#fff;border:none;padding:5px 12px;border-radius:5px;font-size:11px;cursor:pointer;font-weight:600">
+        🖨 Buat PDF Laporan
+      </button>
+      <button onclick="this.closest('.toast-item').remove()"
+        style="background:rgba(255,255,255,.2);color:#fff;border:none;padding:5px 10px;border-radius:5px;font-size:11px;cursor:pointer">
+        Lewati
+      </button>
+    </div>`;
+  c.appendChild(el);
+  setTimeout(() => { if(el.parentNode) { el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(),300); } }, 8000);
+}
+
+// ═══════════════════════════════════════════════════
+// PDF PER SESI — format laporan profesional
+// ═══════════════════════════════════════════════════
+function exportSessionPDF(sessId) {
+  const sess = sessions.find(s => s.id === sessId);
+  if (!sess) { toast('Sesi tidak ditemukan','error'); return; }
+
+  const isLVMDP = sess.type === 'lvmdp';
+  const overallStatus = getSessionOverallStatus(sess);
+  const statusColor = {OK:'#2e7d32',WARNING:'#e65100',ALERT:'#c62828',PENDING:'#6a1b9a'}[overallStatus]||'#555';
+  const statusBg    = {OK:'#e8f5e9',WARNING:'#fff3e0',ALERT:'#ffebee',PENDING:'#f3e5f5'}[overallStatus]||'#f5f5f5';
+  const now = new Date();
+  const tglCetak = now.toLocaleDateString('id-ID',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const jamCetak = now.toLocaleTimeString('id-ID');
+
+  // Hitung ringkasan parameter
+  const items = sess.items || [];
+  const okCount   = items.filter(i=>i.status==='OK').length;
+  const warnCount = items.filter(i=>i.status==='WARNING').length;
+  const alertCount = items.filter(i=>i.status==='ALERT').length;
+  const pendCount = items.filter(i=>!i.status||i.status==='PENDING').length;
+
+  // ── Buat tabel parameter berdasarkan tipe ──────────
+  let paramsHtml = '';
+
+  if (isLVMDP) {
+    // Group by section
+    const sectionColors = {
+      'Power Quality':  {bg:'#f3e5f5',border:'#5a2a8a',header:'#5a2a8a'},
+      'Kondisi Panel':  {bg:'#e3f2fd',border:'#1a4a8b',header:'#1a4a8b'},
+      'Capacitor Bank': {bg:'#e8f5e9',border:'#2a7a5a',header:'#2a7a5a'},
+      'Kondisi Trafo':  {bg:'#fff3e0',border:'#8a3a1a',header:'#8a3a1a'},
+    };
+    const groups = {};
+    LVMDP_PARAMS.forEach(p => { if(!groups[p.section]) groups[p.section]=[]; groups[p.section].push(p); });
+
+    Object.entries(groups).forEach(([section, params]) => {
+      const sc = sectionColors[section] || {bg:'#f5f5f5',border:'#555',header:'#555'};
+      let rows = '';
+      params.forEach(p => {
+        const item = items.find(i=>i.paramId===p.id);
+        const val    = item?.value  || '—';
+        const status = item?.status || '—';
+        const note   = item?.note   || '';
+        const sBg    = {OK:'#e8f5e9',WARNING:'#fff3e0',ALERT:'#ffebee'}[status]||'#fafafa';
+        const sCol   = {OK:'#2e7d32',WARNING:'#e65100',ALERT:'#c62828'}[status]||'#888';
+        const normalRange = (p.normalMin!==undefined) ? `${p.normalMin} – ${p.normalMax}` : '—';
+        rows += `<tr>
+          <td style="padding:5px 8px;font-size:8.5pt;border-bottom:1px solid #e8e8e8">${p.label}</td>
+          <td style="padding:5px 8px;font-size:8.5pt;text-align:center;border-bottom:1px solid #e8e8e8;color:#666">${p.unit||'—'}</td>
+          <td style="padding:5px 8px;font-size:9pt;text-align:center;font-weight:700;border-bottom:1px solid #e8e8e8">${val}</td>
+          <td style="padding:5px 8px;font-size:8pt;text-align:center;border-bottom:1px solid #e8e8e8;color:#555">${normalRange}</td>
+          <td style="padding:5px 8px;font-size:8.5pt;text-align:center;border-bottom:1px solid #e8e8e8;background:${sBg}">
+            <span style="color:${sCol};font-weight:700">${status}</span>
+          </td>
+          <td style="padding:5px 8px;font-size:8pt;border-bottom:1px solid #e8e8e8;color:#555">${note||'—'}</td>
+        </tr>`;
+      });
+      paramsHtml += `
+        <div style="margin-bottom:18px">
+          <div style="background:${sc.header};color:#fff;padding:6px 12px;font-size:9pt;font-weight:700;
+                      border-radius:4px 4px 0 0;letter-spacing:.05em;text-transform:uppercase">
+            📌 ${section}
+          </div>
+          <table style="width:100%;border-collapse:collapse;border:1px solid ${sc.border};border-top:none">
+            <thead>
+              <tr style="background:${sc.bg}">
+                <th style="padding:5px 8px;font-size:8pt;text-align:left;border-bottom:2px solid ${sc.border}">Parameter</th>
+                <th style="padding:5px 8px;font-size:8pt;text-align:center;border-bottom:2px solid ${sc.border};width:60px">Satuan</th>
+                <th style="padding:5px 8px;font-size:8pt;text-align:center;border-bottom:2px solid ${sc.border};width:90px">Nilai</th>
+                <th style="padding:5px 8px;font-size:8pt;text-align:center;border-bottom:2px solid ${sc.border};width:120px">Range Normal</th>
+                <th style="padding:5px 8px;font-size:8pt;text-align:center;border-bottom:2px solid ${sc.border};width:80px">Status</th>
+                <th style="padding:5px 8px;font-size:8pt;text-align:left;border-bottom:2px solid ${sc.border}">Catatan</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+    });
+  } else {
+    // CS — single table grouped by tipe parameter
+    let rows = '';
+    CS_PARAMS.forEach(p => {
+      const item = items.find(i=>i.paramId===p.id);
+      const val    = item?.value  || '—';
+      const status = item?.status || '—';
+      const note   = item?.note   || '';
+      const sBg    = {OK:'#e8f5e9',WARNING:'#fff3e0',ALERT:'#ffebee'}[status]||'#fafafa';
+      const sCol   = {OK:'#2e7d32',WARNING:'#e65100',ALERT:'#c62828'}[status]||'#888';
+      const normalRange = (p.normalMin!==undefined) ? `${p.normalMin} – ${p.normalMax} ${p.unit}` : '—';
+      rows += `<tr>
+        <td style="padding:5px 8px;font-size:8.5pt;border-bottom:1px solid #e8e8e8">${p.label}</td>
+        <td style="padding:5px 8px;font-size:8.5pt;text-align:center;border-bottom:1px solid #e8e8e8;color:#666">${p.unit||'—'}</td>
+        <td style="padding:5px 8px;font-size:9pt;text-align:center;font-weight:700;border-bottom:1px solid #e8e8e8">${val}</td>
+        <td style="padding:5px 8px;font-size:8pt;text-align:center;border-bottom:1px solid #e8e8e8;color:#555">${normalRange}</td>
+        <td style="padding:5px 8px;font-size:8.5pt;text-align:center;border-bottom:1px solid #e8e8e8;background:${sBg}">
+          <span style="color:${sCol};font-weight:700">${status}</span>
+        </td>
+        <td style="padding:5px 8px;font-size:8pt;border-bottom:1px solid #e8e8e8;color:#555">${note||'—'}</td>
+      </tr>`;
+    });
+    paramsHtml = `
+      <table style="width:100%;border-collapse:collapse;border:1px solid #0e7490;border-top:none">
+        <thead>
+          <tr style="background:#e0f7fa">
+            <th style="padding:5px 8px;font-size:8pt;text-align:left;border-bottom:2px solid #0e7490">Parameter</th>
+            <th style="padding:5px 8px;font-size:8pt;text-align:center;border-bottom:2px solid #0e7490;width:60px">Satuan</th>
+            <th style="padding:5px 8px;font-size:8pt;text-align:center;border-bottom:2px solid #0e7490;width:90px">Nilai</th>
+            <th style="padding:5px 8px;font-size:8pt;text-align:center;border-bottom:2px solid #0e7490;width:130px">Range Normal</th>
+            <th style="padding:5px 8px;font-size:8pt;text-align:center;border-bottom:2px solid #0e7490;width:80px">Status</th>
+            <th style="padding:5px 8px;font-size:8pt;text-align:left;border-bottom:2px solid #0e7490">Catatan</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  // ── Temuan & tindakan ──────────────────────────────
+  const temuanHtml = (sess.catatan || sess.tindakan) ? `
+    <div style="margin-top:18px;border:1px solid #fb8c3a;border-radius:6px;overflow:hidden">
+      <div style="background:#fb8c3a;color:#fff;padding:6px 12px;font-size:9pt;font-weight:700">
+        📋 Temuan & Tindakan Korektif
+      </div>
+      <div style="padding:12px 14px;background:#fff8f0">
+        ${sess.catatan ? `<div style="margin-bottom:8px"><strong style="font-size:8.5pt;color:#555">Temuan:</strong><div style="font-size:8.5pt;margin-top:3px;color:#333">${sess.catatan}</div></div>` : ''}
+        ${sess.tindakan ? `<div><strong style="font-size:8.5pt;color:#555">Tindakan:</strong><div style="font-size:8.5pt;margin-top:3px;color:#333">${sess.tindakan}</div></div>` : ''}
+      </div>
+    </div>` : '';
+
+  const html = `<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8">
+<title>Laporan Monitoring — ${sess.equipment||''} ${sess.tanggal||''}</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color:#1a1a1a; background:#fff; font-size:9pt; }
+  .page { max-width:800px; margin:0 auto; padding:0; }
+  @media print {
+    * { -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important; }
+    .no-print { display:none!important; }
+    @page { size:A4 portrait; margin:12mm 10mm; }
+    body { font-size:8.5pt; }
+  }
+</style>
+</head><body><div class="page">
+
+  <!-- HEADER -->
+  <div style="background:#1a3a6b;color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:flex-start">
+    <div>
+      <div style="font-size:14pt;font-weight:700;letter-spacing:-.01em">🌱 Prasad Seeds</div>
+      <div style="font-size:10pt;font-weight:600;margin-top:2px;opacity:.9">Laporan Monitoring Harian</div>
+      <div style="font-size:8pt;opacity:.7;margin-top:4px">${isLVMDP ? '⚡ Panel LVMDP / Trafo' : '❄ Cold Storage'}</div>
+    </div>
+    <div style="text-align:right;font-size:8pt;opacity:.8">
+      <div>Dicetak: ${tglCetak}</div>
+      <div>Pukul: ${jamCetak}</div>
+    </div>
+  </div>
+
+  <!-- INFO SESI -->
+  <div style="background:#f0f4f8;border-bottom:3px solid #1a3a6b;padding:10px 20px">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+      <div><div style="font-size:7.5pt;color:#666;text-transform:uppercase;letter-spacing:.05em">ID Sesi</div>
+           <div style="font-size:9pt;font-weight:700;font-family:monospace;color:#1a3a6b">${sess.id||'—'}</div></div>
+      <div><div style="font-size:7.5pt;color:#666;text-transform:uppercase;letter-spacing:.05em">Tanggal</div>
+           <div style="font-size:9pt;font-weight:700">${sess.tanggal||'—'}</div></div>
+      <div><div style="font-size:7.5pt;color:#666;text-transform:uppercase;letter-spacing:.05em">Waktu</div>
+           <div style="font-size:9pt;font-weight:700">${sess.startTime||'—'} – ${sess.endTime||'?'}</div></div>
+      <div><div style="font-size:7.5pt;color:#666;text-transform:uppercase;letter-spacing:.05em">Unit</div>
+           <div style="font-size:9pt;font-weight:700">${sess.unit||'—'}</div></div>
+      <div><div style="font-size:7.5pt;color:#666;text-transform:uppercase;letter-spacing:.05em">${isLVMDP?'Panel':'Equipment'}</div>
+           <div style="font-size:9pt;font-weight:700">${sess.equipment||'—'}</div></div>
+      <div><div style="font-size:7.5pt;color:#666;text-transform:uppercase;letter-spacing:.05em">${isLVMDP?'—':'Mesin'}</div>
+           <div style="font-size:9pt;font-weight:700">${isLVMDP?'—':sess.machine||'—'}</div></div>
+    </div>
+    <div style="margin-top:8px;display:flex;gap:12px;align-items:center">
+      <div><span style="font-size:7.5pt;color:#666">PIC:</span> <strong style="font-size:9pt">${sess.pic||'—'}</strong></div>
+      <div style="margin-left:auto">
+        <span style="background:${statusBg};color:${statusColor};border:1px solid ${statusColor};padding:3px 12px;border-radius:12px;font-size:9pt;font-weight:700">
+          ${overallStatus}
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- RINGKASAN STATUS -->
+  <div style="display:flex;gap:0;border-bottom:1px solid #e0e0e0">
+    ${[
+      {lbl:'✓ Normal',  val:okCount,    bg:'#e8f5e9',col:'#2e7d32'},
+      {lbl:'⚠ Warning', val:warnCount,  bg:'#fff3e0',col:'#e65100'},
+      {lbl:'✗ Alert',   val:alertCount, bg:'#ffebee',col:'#c62828'},
+      {lbl:'— Pending', val:pendCount,  bg:'#f5f5f5',col:'#888'},
+      {lbl:'Total',     val:items.length,bg:'#e8edf5',col:'#1a3a6b'},
+    ].map(x=>`<div style="flex:1;padding:8px;text-align:center;background:${x.bg};border-right:1px solid #e0e0e0">
+      <div style="font-size:15pt;font-weight:700;color:${x.col}">${x.val}</div>
+      <div style="font-size:7.5pt;color:${x.col}">${x.lbl}</div>
+    </div>`).join('')}
+  </div>
+
+  <!-- PARAMETER -->
+  <div style="padding:14px 20px">
+    <div style="font-size:10pt;font-weight:700;color:#1a3a6b;margin-bottom:12px;padding-bottom:4px;border-bottom:2px solid #4a9e3f">
+      📊 Data Hasil Monitoring
+    </div>
+    ${paramsHtml}
+    ${temuanHtml}
+  </div>
+
+  <!-- TANDA TANGAN -->
+  <div style="margin:0 20px 20px;border:1px solid #e0e0e0;border-radius:6px;padding:14px">
+    <div style="font-size:9pt;font-weight:700;color:#1a3a6b;margin-bottom:12px">✍ Tanda Tangan</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px">
+      ${(sess.pic||'').split(',').map(p=>p.trim()).slice(0,3).map(p=>`
+        <div>
+          <div style="height:50px;border-bottom:1px solid #555;margin-bottom:4px"></div>
+          <div style="font-size:8pt;text-align:center;color:#333">${p}</div>
+          <div style="font-size:7.5pt;text-align:center;color:#888">Teknisi / PIC</div>
+        </div>`).join('')}
+      <div>
+        <div style="height:50px;border-bottom:1px solid #555;margin-bottom:4px"></div>
+        <div style="font-size:8pt;text-align:center;color:#333">Supervisor</div>
+        <div style="font-size:7.5pt;text-align:center;color:#888">Mengetahui</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div style="background:#f5f5f5;padding:8px 20px;border-top:1px solid #e0e0e0;display:flex;justify-content:space-between">
+    <div style="font-size:7.5pt;color:#888">Prasad Seeds — Sistem Monitoring Harian v2.0</div>
+    <div style="font-size:7.5pt;color:#888">${sess.id||''} · ${tglCetak}</div>
+  </div>
+
+  <!-- PRINT BUTTON -->
+  <div class="no-print" style="text-align:center;padding:16px;background:#f9fafb;border-top:1px solid #e0e0e0;display:flex;gap:10px;justify-content:center">
+    <button onclick="window.print()"
+      style="background:#1a3a6b;color:#fff;border:none;padding:10px 28px;border-radius:6px;font-size:11pt;cursor:pointer;font-weight:600">
+      🖨 Print / Simpan PDF
+    </button>
+    <button onclick="window.close()"
+      style="background:#eee;color:#333;border:1px solid #ccc;padding:10px 20px;border-radius:6px;font-size:11pt;cursor:pointer">
+      ✕ Tutup
+    </button>
+  </div>
+
+</div></body></html>`;
+
+  const w = window.open('','_blank','width=860,height=900');
+  w.document.write(html);
+  w.document.close();
+  setTimeout(() => w.focus(), 200);
+}
+
+function exportPDF() {
+  // Get filtered sessions same as history view
+  const search = (document.getElementById('hSearch')||{value:''}).value.toLowerCase();
+  const dateFrom = (document.getElementById('hDateFrom')||{value:''}).value;
+  const dateTo = (document.getElementById('hDateTo')||{value:''}).value;
+  const fUnit = (document.getElementById('hUnit')||{value:''}).value;
+  const fType = (document.getElementById('hType')||{value:''}).value;
+  const fStatus = (document.getElementById('hStatus')||{value:''}).value;
+
+  let filtered = sessions.filter(s => {
+    if (search && !JSON.stringify(s).toLowerCase().includes(search)) return false;
+    if (dateFrom && s.tanggal < dateFrom) return false;
+    if (dateTo && s.tanggal > dateTo) return false;
+    if (fUnit && s.unit !== fUnit) return false;
+    if (fType && s.type !== fType) return false;
+    if (fStatus) { const st = getSessionOverallStatus(s); if (st !== fStatus) return false; }
+    return true;
+  });
+
+  if (!filtered.length) { toast('Tidak ada data untuk diekspor','error'); return; }
+
+  const statusBadge = (st) => {
+    const colors = { OK:'#4a9e3f', WARNING:'#fb8c3a', ALERT:'#c0392b', PENDING:'#b88ff7' };
+    const c = colors[st] || '#888';
+    return `<span style="background:${c};color:#fff;padding:2px 8px;border-radius:10px;font-size:9pt;font-weight:600">${st}</span>`;
+  };
+
+  const rows = filtered.map((s,i) => {
+    const st = getSessionOverallStatus(s);
+    const items = s.items && s.items.length ? s.items : [];
+    const itemsHtml = items.length ? `
+      <tr><td colspan="9" style="padding:0">
+        <table style="width:100%;border-collapse:collapse;background:#f8fafc">
+          <thead><tr style="background:#e8edf5">
+            <th style="padding:4px 8px;text-align:left;font-size:8pt;color:#555">Parameter</th>
+            <th style="padding:4px 8px;text-align:center;font-size:8pt;color:#555">Nilai</th>
+            <th style="padding:4px 8px;text-align:center;font-size:8pt;color:#555">Satuan</th>
+            <th style="padding:4px 8px;text-align:center;font-size:8pt;color:#555">Status</th>
+            <th style="padding:4px 8px;text-align:left;font-size:8pt;color:#555">Catatan</th>
+          </tr></thead>
+          <tbody>
+            ${items.map(it => {
+              const ic = {OK:'#e8f5e9',WARNING:'#fff3e0',ALERT:'#ffebee',PENDING:'#f3e5f5'}[it.status]||'#fff';
+              return `<tr style="background:${ic}">
+                <td style="padding:3px 8px;font-size:8pt">${it.label||''}</td>
+                <td style="padding:3px 8px;font-size:8pt;text-align:center;font-weight:600">${it.value||'-'}</td>
+                <td style="padding:3px 8px;font-size:8pt;text-align:center;color:#666">${it.unit||''}</td>
+                <td style="padding:3px 8px;font-size:8pt;text-align:center">${statusBadge(it.status)}</td>
+                <td style="padding:3px 8px;font-size:8pt;color:#555">${it.note||'-'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </td></tr>
+    ` : '';
+    const rowBg = i % 2 === 0 ? '#fff' : '#f9fafb';
+    return `
+      <tr style="background:${rowBg};border-bottom:1px solid #e0e0e0">
+        <td style="padding:6px 8px;font-size:8pt;font-family:monospace;white-space:nowrap">${s.id||''}</td>
+        <td style="padding:6px 8px;font-size:8pt;white-space:nowrap">${s.tanggal||''}</td>
+        <td style="padding:6px 8px;font-size:8pt">${s.unit||''}</td>
+        <td style="padding:6px 8px;font-size:8pt"><span style="background:${s.type==='cs'?'#e3f2fd':'#f3e5f5'};color:${s.type==='cs'?'#1565c0':'#6a1b9a'};padding:2px 6px;border-radius:4px;font-size:8pt">${s.type==='cs'?'Cold Storage':'LVMDP'}</span></td>
+        <td style="padding:6px 8px;font-size:8pt">${s.equipment||''}</td>
+        <td style="padding:6px 8px;font-size:8pt">${s.machine||'-'}</td>
+        <td style="padding:6px 8px;font-size:8pt">${s.pic||''}</td>
+        <td style="padding:6px 8px;font-size:8pt;white-space:nowrap">${s.startTime||''} – ${s.endTime||'?'}</td>
+        <td style="padding:6px 8px;font-size:8pt;text-align:center">${statusBadge(st)}</td>
+      </tr>
+      ${items.length ? itemsHtml : ''}
+      ${(s.catatan || s.tindakan) ? `<tr style="background:#fffde7"><td colspan="9" style="padding:4px 8px;font-size:8pt;color:#555"><strong>Catatan:</strong> ${s.catatan||'-'} &nbsp;|&nbsp; <strong>Tindakan:</strong> ${s.tindakan||'-'}</td></tr>` : ''}
+    `;
+  }).join('');
+
+  const now = new Date();
+  const tgl = now.toLocaleDateString('id-ID',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const jam = now.toLocaleTimeString('id-ID');
+  const filterInfo = [
+    fUnit ? `Unit: ${fUnit}` : '',
+    fType ? `Tipe: ${fType==='cs'?'Cold Storage':'LVMDP'}` : '',
+    fStatus ? `Status: ${fStatus}` : '',
+    dateFrom ? `Dari: ${dateFrom}` : '',
+    dateTo ? `Sampai: ${dateTo}` : '',
+    search ? `Cari: "${search}"` : ''
+  ].filter(Boolean).join(' | ');
+
+  const html = `<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8">
+<title>Laporan Monitoring – Prasad Seeds</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; color: #111; background: #fff; }
+  .header { background: #1a3a6b; color: #fff; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+  .header-title { font-size: 16pt; font-weight: 700; }
+  .header-sub { font-size: 9pt; opacity: 0.8; margin-top: 2px; }
+  .header-logo { font-size: 28pt; }
+  .meta { background: #f0f4f8; padding: 8px 24px; border-bottom: 2px solid #1a3a6b; display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
+  .meta-item { font-size: 8.5pt; color: #333; }
+  .meta-item strong { color: #1a3a6b; }
+  .summary { display: flex; gap: 12px; padding: 12px 24px; background: #fff; border-bottom: 1px solid #ddd; }
+  .sum-box { border: 1px solid #ddd; border-radius: 6px; padding: 8px 14px; text-align: center; min-width: 80px; }
+  .sum-val { font-size: 18pt; font-weight: 700; color: #1a3a6b; }
+  .sum-lbl { font-size: 7.5pt; color: #666; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { background: #1a3a6b !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; color: #fff !important; padding: 7px 8px; font-size: 8.5pt; text-align: left; border: 1px solid #0f2a56; }
+  .content { padding: 0 24px 24px; }
+  .section-title { font-size: 11pt; font-weight: 700; color: #1a3a6b; margin: 16px 0 8px; padding-bottom: 4px; border-bottom: 2px solid #4a9e3f; }
+  .footer { margin-top: 20px; border-top: 1px solid #ddd; padding-top: 10px; font-size: 7.5pt; color: #888; text-align: center; }
+  @media print {
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    thead th { background: #1a3a6b !important; color: #fff !important; }
+    .no-print { display: none !important; }
+    .sum-box { border: 1px solid #ddd !important; }
+    @page { size: A4 landscape; margin: 10mm; }
+  }
+</style>
+</head><body>
+<div class="header">
+  <div>
+    <div class="header-title">🌱 Prasad Seeds — Laporan Monitoring Harian</div>
+    <div class="header-sub">Cold Storage & Panel LVMDP/Trafo</div>
+  </div>
+  <div style="text-align:right;font-size:9pt;opacity:0.85">
+    <div>Dicetak: ${tgl}</div>
+    <div>Pukul: ${jam}</div>
+  </div>
+</div>
+<div class="meta">
+  <div class="meta-item"><strong>Total Sesi:</strong> ${filtered.length}</div>
+  ${filterInfo ? `<div class="meta-item"><strong>Filter:</strong> ${filterInfo}</div>` : '<div class="meta-item"><strong>Filter:</strong> Semua data</div>'}
+</div>
+<div class="summary">
+  ${['OK','WARNING','ALERT','PENDING'].map(st => {
+    const count = filtered.filter(s => getSessionOverallStatus(s) === st).length;
+    const colors = {OK:'#4a9e3f',WARNING:'#fb8c3a',ALERT:'#c0392b',PENDING:'#b88ff7'};
+    return `<div class="sum-box"><div class="sum-val" style="color:${colors[st]}">${count}</div><div class="sum-lbl">${st}</div></div>`;
+  }).join('')}
+  <div class="sum-box"><div class="sum-val" style="color:#1a3a6b">${filtered.filter(s=>s.type==='cs').length}</div><div class="sum-lbl">Cold Storage</div></div>
+  <div class="sum-box"><div class="sum-val" style="color:#6a1b9a">${filtered.filter(s=>s.type==='lvmdp').length}</div><div class="sum-lbl">LVMDP</div></div>
+</div>
+<div class="content">
+  <div class="no-print" style="text-align:right;margin:12px 0">
+    <button onclick="window.print()" style="background:#1a3a6b;color:#fff;border:none;padding:8px 20px;border-radius:6px;font-size:10pt;cursor:pointer">🖨 Print / Simpan PDF</button>
+    <button onclick="window.close()" style="background:#eee;color:#333;border:1px solid #ccc;padding:8px 20px;border-radius:6px;font-size:10pt;cursor:pointer;margin-left:8px">✕ Tutup</button>
+  </div>
+  <div class="section-title">Detail Sesi Monitoring (${filtered.length} sesi)</div>
+  <table>
+    <thead><tr>
+      <th style="width:110px">ID Sesi</th>
+      <th style="width:80px">Tanggal</th>
+      <th style="width:55px">Unit</th>
+      <th style="width:70px">Tipe</th>
+      <th>Equipment</th>
+      <th>Mesin</th>
+      <th>PIC</th>
+      <th style="width:80px">Waktu</th>
+      <th style="width:70px">Status</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="footer">
+    Laporan ini dibuat secara otomatis oleh Sistem Monitoring Prasad Seeds &nbsp;•&nbsp; ${tgl} pukul ${jam}
+    &nbsp;•&nbsp; Total ${filtered.length} sesi ditampilkan
+  </div>
+</div>
+</body></html>`;
+
+  const win = window.open('','_blank','width=1100,height=800');
+  win.document.write(html);
+  win.document.close();
+  toast('Membuka preview PDF...', 'success');
+}
+
+// ═══════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════
+function getSessionOverallStatus(sess) {
+  if (!sess || !sess.items || !sess.items.length) return 'PENDING';
+  if (sess.items.some(i => i.status === 'ALERT')) return 'ALERT';
+  if (sess.items.some(i => i.status === 'WARNING')) return 'WARNING';
+  if (sess.items.some(i => i.status === 'OK')) return 'OK';
+  return 'PENDING';
+}
+
+function genSessionId(type, unit) {
+  const prefix = type === 'cs' ? 'MON-CS' : 'MON-LV';
+  const unitPfx = unit === 'Unit 1' ? '-U1' : '-U2';
+  const existing = sessions.filter(s => s.type === type && s.unit === unit);
+  let n = existing.length + 1;
+  let id = prefix + unitPfx + '-' + String(n).padStart(4,'0');
+  while (sessions.find(s => s.id === id)) { n++; id = prefix + unitPfx + '-' + String(n).padStart(4,'0'); }
+  return id;
+}
+
+function clearMonErrors() {
+  ['ne-tanggal','ne-type','ne-unit','ne-equipment','ne-machine','ne-startTime','ne-pic'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.textContent = '';
+  });
+}
+
+// _overlayStackArr already declared at top of script (line ~948) — duplicate removed
+function openOverlay(id) {
+  const el = document.getElementById(id); if(!el) return;
+  el.classList.add('open');
+  if ('history' in window) history.pushState({overlay:id},'',window.location.href);
+  _overlayStackArr.push(id);
+}
+function closeOverlay(id) {
+  const el = document.getElementById(id); if(!el) return;
+  el.classList.remove('open');
+  const idx = _overlayStackArr.lastIndexOf(id);
+  if (idx > -1) _overlayStackArr.splice(idx, 1);
+}
+function overlayDismiss() {
+  document.querySelectorAll('.overlay').forEach(el => {
+    el.addEventListener('click', e => {
+      if (e.target === el) { el.classList.remove('open'); const idx = _overlayStackArr.lastIndexOf(el.id); if(idx>-1) _overlayStackArr.splice(idx,1); }
+    });
+  });
+}
+window.addEventListener('popstate', () => {
+  if (_overlayStackArr.length) { const top = _overlayStackArr[_overlayStackArr.length-1]; closeOverlay(top); }
+});
+
+function getVal(id) { const el=document.getElementById(id); return el?el.value:''; }
+function setVal2(id,v) { const el=document.getElementById(id); if(el) el.value=v||''; }
+function setText(id,t) { const el=document.getElementById(id); if(el) el.textContent=t; }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function setErr(id,msg) { const el=document.getElementById(id); if(el) el.textContent=msg; }
+function fmtDate(d) {
+  if (!d) return '—';
+  try {
+    // Tambah T00:00 agar tidak diparse sebagai UTC (bisa geser 1 hari di timezone lokal)
+    const parsed = /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(d + 'T00:00:00') : new Date(d);
+    return parsed.toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric'});
+  } catch(e) { return d; }
+}
+
+function toast(msg, type) {
+  const c = document.getElementById('toast');
+  const el = document.createElement('div');
+  el.className = 'toast-item ' + (type||'info');
+  el.innerHTML = (type==='success'?'✓ ':type==='error'?'✗ ':'ℹ ') + msg;
+  c.appendChild(el);
+  setTimeout(()=>{ el.style.opacity='0';el.style.transition='opacity .3s';setTimeout(()=>el.remove(),300); }, 3500);
+}
+
+// ═══════════════════════════════════════════════════
+// GOOGLE SHEETS WEBHOOK SYNC
+// ═══════════════════════════════════════════════════
+
+// Config — tersimpan di localStorage
+let WEBHOOK_URL  = localStorage.getItem('prasad_webhook_url') || '';
+let WEBHOOK_KEY  = localStorage.getItem('prasad_webhook_key') || 'prasad2024';
+let SYNC_MODE    = localStorage.getItem('prasad_sync_mode')   || 'auto';
+
+let _syncStatus   = 'idle';
+let _lastSyncAt   = null;
+let _syncTimer    = null;
+
+// ── Core POST ──────────────────────────────────────
+async function webhookPost(action, payload) {
+  if (!WEBHOOK_URL) return null;
+  try {
+    const res = await fetch(WEBHOOK_URL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action, key: WEBHOOK_KEY, payload })
+    });
+    return await res.json();
+  } catch(err) {
+    console.warn('Webhook error:', err.message);
+    return { status:'error', message: err.message };
+  }
+}
+
+// ── Status badge ───────────────────────────────────
+function setSyncStatus(s) {
+  _syncStatus = s;
+  const badge = document.getElementById('syncBadgeTopbar');
+  const sbSide = document.getElementById('sbSyncStatus');
+  const configs = {
+    idle:    { text:'☁ Sync', cls:'',   side:'⬡ Belum sync' },
+    syncing: { text:'↻ Syncing...', cls:'', side:'↻ Menyinkron...' },
+    ok:      { text:'✓ Synced', cls:'ok', side:`✓ ${_lastSyncAt ? _lastSyncAt.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}) : ''}` },
+    error:   { text:'✗ Gagal', cls:'',   side:'✗ Sync gagal' },
+    nourl:   { text:'☁ Sync', cls:'',   side:'⬡ Webhook belum diset' },
+  };
+  const cfg = configs[s] || configs.idle;
+  if (badge) { badge.textContent = cfg.text; badge.className = 'api-pill ' + cfg.cls; }
+  if (sbSide) sbSide.textContent = cfg.side;
+}
+
+// ── Full sync ──────────────────────────────────────
+async function syncAll() {
+  if (!WEBHOOK_URL) { openWebhookSettingsModal(); return; }
+  setSyncStatus('syncing');
+  try {
+    const res = await webhookPost('full_sync', {
+      sessions, picList: PIC_LIST, equipmentDB: equipDB, lvmdpParams: LVMDP_PARAMS
+    });
+    if (res && res.status === 'ok') {
+      _lastSyncAt = new Date();
+      setSyncStatus('ok');
+      toast('✓ Semua data berhasil di-push ke Google Sheets', 'success');
+    } else {
+      setSyncStatus('error');
+      toast(`✗ Sync gagal: ${res?.message || 'Error'}`, 'error');
+    }
+  } catch(e) { setSyncStatus('error'); toast('✗ Koneksi webhook gagal', 'error'); }
+}
+
+// ── Upsert session (auto) ──────────────────────────
+function autoSyncSession(session) {
+  if (SYNC_MODE !== 'auto' || !WEBHOOK_URL) return;
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(async () => {
+    const res = await webhookPost('upsert_session', session);
+    if (res?.status === 'ok') { _lastSyncAt = new Date(); setSyncStatus('ok'); }
+    else setSyncStatus('error');
+  }, 1500);
+}
+
+// ── Delete session (auto) ─────────────────────────
+async function autoDeleteSession(id) {
+  if (!WEBHOOK_URL) return;
+  await webhookPost('delete_session', { id });
+}
+
+// ── Pull dari Sheets ───────────────────────────────
+async function pullFromSheets() {
+  if (!WEBHOOK_URL) { openWebhookSettingsModal(); return; }
+  setSyncStatus('syncing');
+  closeOverlay('webhookSettingsOverlay');
+  toast('Mengambil data dari Google Sheets...', 'info');
+  try {
+    const res = await webhookPost('pull', {});
+    if (res && res.status === 'ok' && res.data) {
+      const d = res.data;
+      let changed = false;
+      if (d.sessions?.length)     { sessions = d.sessions; changed = true; }
+      if (d.picList?.length)      { PIC_LIST = d.picList; changed = true; }
+      if (d.equipmentDB)          { equipDB = d.equipmentDB; changed = true; }
+      if (d.lvmdpParams?.length)  { LVMDP_PARAMS = d.lvmdpParams; changed = true; }
+      if (changed) {
+        saveData(); saveLVMDPParams();
+        renderAll(); renderConfigPage(); initPICGrid();
+      }
+      _lastSyncAt = new Date();
+      setSyncStatus('ok');
+      toast(`✓ Pull selesai — ${(d.sessions||[]).length} sesi diambil`, 'success');
+    } else {
+      setSyncStatus('error');
+      toast('Tidak ada data dari Sheets atau gagal', 'error');
+    }
+  } catch(e) { setSyncStatus('error'); toast('✗ Pull gagal: ' + e.message, 'error'); }
+}
+
+// ── Webhook settings modal ─────────────────────────
+function openWebhookSettingsModal() {
+  const urlEl = document.getElementById('wh-url');
+  const keyEl = document.getElementById('wh-key');
+  const modeEl = document.getElementById('wh-mode');
+  if (urlEl)  urlEl.value  = WEBHOOK_URL;
+  if (keyEl)  keyEl.value  = WEBHOOK_KEY;
+  if (modeEl) modeEl.value = SYNC_MODE;
+  document.getElementById('wh-test-result').textContent = '';
+  openOverlay('webhookSettingsOverlay');
+}
+
+function saveWebhookSettings() {
+  const url  = (document.getElementById('wh-url')?.value || '').trim();
+  const key  = (document.getElementById('wh-key')?.value || '').trim();
+  const mode = document.getElementById('wh-mode')?.value || 'auto';
+  if (!url) { toast('Masukkan Deployment URL terlebih dahulu', 'error'); return; }
+  WEBHOOK_URL = url; WEBHOOK_KEY = key || 'prasad2024'; SYNC_MODE = mode;
+  localStorage.setItem('prasad_webhook_url', WEBHOOK_URL);
+  localStorage.setItem('prasad_webhook_key', WEBHOOK_KEY);
+  localStorage.setItem('prasad_sync_mode',   SYNC_MODE);
+  closeOverlay('webhookSettingsOverlay');
+  setSyncStatus('idle');
+  toast('✓ Webhook disimpan! Klik "Push ke Sheets" untuk sync pertama.', 'success');
+}
+
+async function testWebhookConnection() {
+  const url = (document.getElementById('wh-url')?.value || '').trim();
+  const key = (document.getElementById('wh-key')?.value || '').trim();
+  const resEl = document.getElementById('wh-test-result');
+  if (!url) { resEl.textContent = '✗ URL kosong'; resEl.style.color='#c0392b'; return; }
+  resEl.textContent = '↻ Testing...'; resEl.style.color = 'var(--text3)';
+  try {
+    const res = await fetch(url + '?action=ping');
+    const json = await res.json();
+    if (json.status === 'ok') {
+      resEl.textContent = '✓ Koneksi berhasil!'; resEl.style.color = '#4a9e3f';
+    } else {
+      resEl.textContent = '✗ ' + (json.message || 'Gagal'); resEl.style.color = '#c0392b';
+    }
+  } catch(e) {
+    resEl.textContent = '✗ Tidak bisa terhubung: ' + e.message; resEl.style.color = '#c0392b';
+  }
+}
+
+// ── Auto-sync hook is now inlined directly inside saveData() above ─────────
+
+// Patch delete session untuk juga hapus dari Sheets
+const _origDeleteSession = typeof deleteSessionById === 'function' ? deleteSessionById : null;
+
+// Init status badge on load
+document.addEventListener('DOMContentLoaded', () => {
+  setSyncStatus(WEBHOOK_URL ? 'idle' : 'nourl');
+});
+
+</script>
+</body>
+</html>
