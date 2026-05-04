@@ -1942,13 +1942,14 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function loadAll() {
-  try { const d = sessionStorage.getItem('ps_hierarchy'); if (d) hierarchy = JSON.parse(d); } catch(e){}
-  try { const d = sessionStorage.getItem('ps_sessions');  if (d) sessions  = JSON.parse(d); } catch(e){}
-  try { const d = sessionStorage.getItem('ps_pic_list');  if (d) PIC_LIST  = JSON.parse(d); } catch(e){}
-  // Webhook config — tetap dari hardcoded, bisa di-override via UI
-  WEBHOOK_URL = HARDCODED_WEBHOOK_URL;
-  WEBHOOK_KEY = HARDCODED_WEBHOOK_KEY;
-  SYNC_MODE   = 'auto';
+  try { const d=sessionStorage.getItem('ps_hierarchy'); if(d) hierarchy=JSON.parse(d); } catch(e){}
+  try { const d=sessionStorage.getItem('ps_sessions');  if(d) sessions=JSON.parse(d);  } catch(e){}
+  try { const d=sessionStorage.getItem('ps_pic_list');  if(d) PIC_LIST=JSON.parse(d);  } catch(e){}
+  migrateHierarchyRemoveSubAreas();
+  const savedUrl = (() => { try { return sessionStorage.getItem('ps_webhook_url'); } catch(e) { return null; } })();
+  const savedKey = (() => { try { return sessionStorage.getItem('ps_webhook_key'); } catch(e) { return null; } })();
+  WEBHOOK_URL = savedUrl || HARDCODED_WEBHOOK_URL;
+  WEBHOOK_KEY = savedKey || HARDCODED_WEBHOOK_KEY;
 }
 
 function saveAll() {
@@ -3149,7 +3150,13 @@ function saveChecklist(sessId) {
       status:  st,
       note:    noteEl?.value || '',
     };
-  }).filter(i => i.value !== '' || i.status !== '' || i.note !== '');
+  }).filter(i => {
+    if (i.type === 'text') return i.value !== '' || i.note !== '';
+    const hasValue = i.value !== '' && i.value !== null && i.value !== undefined;
+    const hasStatus = i.status !== '' && i.status !== null;
+    const hasNote = i.note !== '';
+    return hasValue || hasStatus || hasNote;
+  });
 
   const et = document.getElementById('chkEndTime')?.value;
   if (et !== undefined) sess.endTime = et;
@@ -3319,16 +3326,19 @@ function openWebhookModal() {
 }
 
 function saveWebhookSettings() {
-  const url  = (document.getElementById('wh-url')?.value||'').trim();
-  const key  = (document.getElementById('wh-key')?.value||'').trim();
-  const mode = document.getElementById('wh-mode')?.value || 'manual';
-  if (!url) { toast('Masukkan URL webhook terlebih dahulu','error'); return; }
-  WEBHOOK_URL = url; WEBHOOK_KEY = key||'prasad2024'; SYNC_MODE = mode;
-  // Webhook config disimpan di memori saja (hardcoded di kode)
-  // storage tidak digunakan — tidak perlu persist
-  closeOverlay('webhookOverlay'); setSyncStatus('idle');
+  const url=(document.getElementById('wh-url')?.value||'').trim();
+  const key=(document.getElementById('wh-key')?.value||'').trim();
+  if(!url){toast('Masukkan URL webhook','error');return;}
+  WEBHOOK_URL=url;
+  WEBHOOK_KEY=key||'prasad2024';
+  try {
+    sessionStorage.setItem('ps_webhook_url', WEBHOOK_URL);
+    sessionStorage.setItem('ps_webhook_key', WEBHOOK_KEY);
+  } catch(e){}
+  closeOverlay('webhookOverlay');
   renderConfigPage();
-  toast('Webhook disimpan ✓. Klik "Push ke Sheets" untuk sync pertama.', 'success');
+  startAutoSync();
+  toast('Webhook disimpan ✓. Auto-sync aktif tiap 5 detik.','success');
 }
 
 async function testWebhook() {
@@ -3338,8 +3348,11 @@ async function testWebhook() {
   if (!url) { res.textContent = '✗ URL kosong'; res.style.color = 'var(--red)'; return; }
   res.textContent = '↻ Testing...'; res.style.color = 'var(--text3)';
   try {
-    // GAS v4: doGet?action=ping (tidak perlu key)
-    const r    = await fetch(url + '?action=ping', { redirect: 'follow' });
+    const r = await fetch(url, {
+      method: 'POST', redirect: 'follow',
+      headers: {'Content-Type': 'text/plain;charset=utf-8'},
+      body: JSON.stringify({action: 'ping', key}),
+    });
     const text = await r.text();
     let j;
     try { j = JSON.parse(text); } catch(e) {
@@ -3886,12 +3899,15 @@ function toast(msg, type='info', duration=3500) {
  * Called after saveAll() and on DOMContentLoaded.
  */
 function regenerateFindings() {
+  const prevWOState = {};
+  findings.forEach(f => { if(f.hasWO || f.woId) prevWOState[f.id] = {hasWO: f.hasWO, woId: f.woId}; });
   findings = [];
   sessions.forEach(sess => {
     (sess.items || []).forEach(item => {
       if (item.status === 'WARNING' || item.status === 'ALERT') {
+        const fId = sess.id + '_' + item.paramId;
         findings.push({
-          id:        sess.id + '_' + item.paramId,
+          id:        fId,
           tanggal:   sess.tanggal,
           unit:      sess.unitName  || '',
           unitId:    sess.unitId    || '',
@@ -3905,6 +3921,8 @@ function regenerateFindings() {
           note:      item.note      || '',
           sessId:    sess.id,
           status:    item.status,
+          hasWO: prevWOState[fId]?.hasWO || false,
+          woId:  prevWOState[fId]?.woId  || '',
         });
       }
     });
