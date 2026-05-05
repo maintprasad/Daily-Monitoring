@@ -993,11 +993,19 @@ body {
   </div>
 
   <!-- QUICK SEED UNIT 1 BANNER -->
-  <div id="seedUnit1Banner" style="background:rgba(74,158,63,.08);border:1px solid rgba(74,158,63,.3);border-radius:var(--r);padding:12px 16px;margin-bottom:20px;font-size:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+  <div id="seedUnit1Banner" style="background:rgba(74,158,63,.08);border:1px solid rgba(74,158,63,.3);border-radius:var(--r);padding:12px 16px;margin-bottom:12px;font-size:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
     <div style="flex:1;min-width:200px">
       🏭 <strong>Quick Setup Unit 1:</strong> Auto-generate seluruh hierarki Unit 1 beserta semua equipment (Transformer, LVMDP, Capacitor Bank, MCC Panel ×15, Air Compressor ×5, Hydrant, Mini Chamber) lengkap dengan parameter monitoring.
     </div>
     <button class="btn btn-primary btn-sm" onclick="seedUnit1()">⚡ Generate Unit 1 Otomatis</button>
+  </div>
+
+  <!-- QUICK SEED UNIT 2 BANNER -->
+  <div id="seedUnit2Banner" style="background:rgba(30,136,229,.08);border:1px solid rgba(30,136,229,.3);border-radius:var(--r);padding:12px 16px;margin-bottom:20px;font-size:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <div style="flex:1;min-width:200px">
+      🏭 <strong>Quick Setup Unit 2:</strong> Auto-generate seluruh hierarki Unit 2 — Transformer, LVMDP, Capacitor Bank, MCC Panel ×23, Air Compressor ×3, Hydrant, Cold Storage (4 unit × mesin) lengkap dengan parameter monitoring.
+    </div>
+    <button class="btn btn-blue btn-sm" onclick="seedUnit2()">⚡ Generate Unit 2 Otomatis</button>
   </div>
 
   <div class="hier-tree" id="hierTree">
@@ -1151,8 +1159,9 @@ body {
         <div class="fg">
           <label class="flabel">Shift <span class="req">*</span></label>
           <select class="fsel2" id="wo-shift" onchange="refreshWOPreviewNo()">
-            <option value="1">Shift 1 (08:00 – 17:00)</option>
-            <option value="2">Shift 2 (20:00 – 05:00)</option>
+            <option value="1">Shift 1 (06:00 – 14:00)</option>
+            <option value="2">Shift 2 (14:00 – 22:00)</option>
+            <option value="3">Shift 3 (22:00 – 06:00)</option>
           </select>
         </div>
         <div class="fg">
@@ -1655,6 +1664,7 @@ const EQUIP_TYPE_LABELS = {
   AIR_COMPRESSOR: '💨 AIR COMPRESSOR',
   HYDRANT:        '🚒 HYDRANT',
   MINI_CHAMBER:   '🔧 MINI CHAMBER',
+  COLD_STORAGE:   '❄ COLD STORAGE',
   OTHER:          '📦 LAINNYA',
 };
 
@@ -1767,12 +1777,15 @@ const EQUIP_PARAM_TEMPLATES = {
   // ── MENU 6: HYDRANT ─────────────────────────────────────────────────────────
   // Ref: Tekanan standby 6–8 bar | Level tank ≥80% | System standby 24 jam (tidak boleh trip)
   HYDRANT: [
-    { id:'hp1',  label:'Tekanan Line',    unit:'bar', section:'Tekanan',       type:'numeric', normalMin:6, normalMax:8, warnMin:4, warnMax:10 },
-    { id:'hp2',  label:'Status Jockey Pump',  unit:'', section:'Status Pompa', type:'status',  options:['AUTO/NORMAL','MANUAL','TRIP'] },
-    { id:'hp3',  label:'Status Main Pump',    unit:'', section:'Status Pompa', type:'status',  options:['STANDBY/NORMAL','RUNNING','TRIP'] },
-    { id:'hp4',  label:'Status Diesel Pump',  unit:'', section:'Status Pompa', type:'status',  options:['STANDBY/NORMAL','RUNNING','TRIP'] },
-    { id:'hp5',  label:'Level Air Tank',  unit:'%',   section:'Level',         type:'numeric', normalMin:80, normalMax:100, warnMin:60 },
-    { id:'hp6',  label:'Alarm System',    unit:'',    section:'Alarm',         type:'status',  options:['NORMAL/STANDBY','AKTIF/ALARM'] },
+    { id:'hp1',  label:'Tekanan Line',         unit:'bar', section:'Tekanan',       type:'numeric', normalMin:5, normalMax:7, warnMin:4, warnMax:10 },
+    { id:'hp2',  label:'Status Jockey Pump',   unit:'',    section:'Status Pompa',  type:'status',  options:['AUTO/NORMAL','MANUAL','TRIP'] },
+    { id:'hp3',  label:'Status Main Pump',     unit:'',    section:'Status Pompa',  type:'status',  options:['STANDBY/NORMAL','RUNNING','TRIP'] },
+    { id:'hp4',  label:'Status Diesel Pump',   unit:'',    section:'Status Pompa',  type:'status',  options:['STANDBY/NORMAL','RUNNING','TRIP'] },
+    { id:'hp7',  label:'Status Motor Pump',    unit:'',    section:'Status Pompa',  type:'status',  options:['STANDBY/NORMAL','RUNNING','TRIP'] },
+    { id:'hp5',  label:'Level Air Tank',       unit:'%',   section:'Level',         type:'numeric', normalMin:80, normalMax:100, warnMin:60 },
+    { id:'hp6',  label:'Alarm System',         unit:'',    section:'Alarm',         type:'status',  options:['NORMAL/STANDBY','AKTIF/ALARM'] },
+    { id:'hp8',  label:'Kebersihan',           unit:'',    section:'Kondisi Fisik', type:'status',  options:['BERSIH','KOTOR RINGAN','KOTOR BERAT'] },
+    { id:'hp9',  label:'Temuan',               unit:'',    section:'Kondisi Fisik', type:'status',  options:['NORMAL','PERLU PERHATIAN','KRITIS'] },
   ],
 
   // ── MENU 7: MINI CHAMBER ────────────────────────────────────────────────────
@@ -1782,6 +1795,20 @@ const EQUIP_PARAM_TEMPLATES = {
     { id:'mc3',  label:'Kondisi Kabel',   unit:'',    section:'Kondisi Fisik', type:'status',  options:['BAIK','PERLU PERHATIAN','RUSAK'] },
     { id:'mc4',  label:'Kondisi Busbar',  unit:'',    section:'Kondisi Fisik', type:'status',  options:['BAIK','PERLU PERHATIAN','RUSAK'] },
     { id:'mc5',  label:'Temuan',          unit:'',    section:'Kondisi Fisik', type:'status',  options:['NORMAL','PERLU PERHATIAN','KRITIS'] },
+  ],
+  // ── MENU 8: COLD STORAGE ────────────────────────────────────────────────────
+  COLD_STORAGE: [
+    { id:'cs1',  label:'Suhu Storage',                     unit:'°C',  section:'Kondisi Ruang',       type:'numeric', normalMin:-25, normalMax:5,   warnMax:8 },
+    { id:'cs2',  label:'Humidity Storage',                  unit:'%RH', section:'Kondisi Ruang',       type:'numeric', normalMin:70,  normalMax:90,  warnMax:95 },
+    { id:'cs3',  label:'Ampere Compressor',                 unit:'A',   section:'Kompressor',          type:'numeric', normalMin:0,   normalMax:60,  warnMax:75 },
+    { id:'cs4',  label:'Ampere Fan Evaporator',             unit:'A',   section:'Fan Evaporator',      type:'numeric', normalMin:0,   normalMax:20,  warnMax:25 },
+    { id:'cs5',  label:'Sight Glass Liquid',                unit:'',    section:'Refrigerant',         type:'status',  options:['PENUH/NORMAL','GELEMBUNG','KOSONG'] },
+    { id:'cs6',  label:'Tekanan LP (Low Pressure)',         unit:'bar', section:'Tekanan Refrigerant', type:'numeric', normalMin:1.5, normalMax:4.0, warnMin:1.0, warnMax:5.0 },
+    { id:'cs7',  label:'Tekanan HP (High Pressure)',        unit:'bar', section:'Tekanan Refrigerant', type:'numeric', normalMin:10,  normalMax:18,  warnMin:8,   warnMax:22 },
+    { id:'cs8',  label:'Sight Glass Level Oli Compressor', unit:'',    section:'Kondisi Oli',         type:'status',  options:['NORMAL','RENDAH','KRITIS'] },
+    { id:'cs9',  label:'Sight Glass Pelampung Refrigerant',unit:'',    section:'Refrigerant',         type:'status',  options:['NORMAL','RENDAH','KRITIS'] },
+    { id:'cs10', label:'Kebersihan',                        unit:'',    section:'Kondisi Fisik',       type:'status',  options:['BERSIH','KOTOR RINGAN','KOTOR BERAT'] },
+    { id:'cs11', label:'Temuan',                            unit:'',    section:'Kondisi Fisik',       type:'status',  options:['NORMAL','PERLU PERHATIAN','KRITIS'] },
   ],
   OTHER: [],
 };
@@ -1827,6 +1854,15 @@ const EQUIP_REFERENSI = {
   MINI_CHAMBER: [
     '🌡 Suhu chamber: &lt;60°C (warn &gt;75°C)',
   ],
+  COLD_STORAGE: [
+    '🌡 Suhu storage: sesuai setpoint produk (umumnya -18°C s/d +4°C)',
+    '💧 Humidity: 70–90%RH',
+    '❄ Tekanan LP: 1.5–4.0 bar (refrigerant R404A/R22)',
+    '❄ Tekanan HP: 10–18 bar',
+    '🔍 Sight glass liquid: harus penuh/tidak ada gelembung',
+    '🛢 Sight glass oli: level normal, tidak rendah',
+    '⚡ Ampere compressor: sesuai nameplate, max +25% dari normal',
+  ],
 };
 
 // ADD END
@@ -1834,6 +1870,15 @@ const EQUIP_REFERENSI = {
 // Param editor temp
 let _editingEquipPath = null; // { unitId, areaId, subAreaId, equipId }
 let _editingParams    = [];
+let _ctx = {
+  editingUnit : null,
+  addAreaUnit : null,
+  addSAUnit   : null,
+  addSAArea   : null,
+  addEqUnit   : null,
+  addEqArea   : null,
+  addEqSA     : null,
+};
 
 // Webhook — hardcoded configuration
 // gantien ndek kene
@@ -1917,6 +1962,113 @@ function initApp() {
   if (WEBHOOK_URL) {
     setTimeout(() => pullFromSheets({ silent: true }), 800);
   }
+  // Sinkronisasi ID hierarchy (unitId, areaId, equipId) dari MaintWare API
+  // agar WO yang dibuat bisa di-tracking dengan benar di MaintWare
+  if (WO_API_URL) {
+    setTimeout(() => fetchAndSyncHierarchyIds({ silent: true }), 1500);
+  }
+}
+
+/**
+ * fetchAndSyncHierarchyIds — ambil unitId, areaId, equipId dari WO_API_URL
+ * GET ?fn=getHierarchy&key=...
+ * Response: { ok:true, units:[{ id, name, areas:[{ id, name, subAreas:[...], equipments:[...] }] }] }
+ *
+ * Fungsi ini HANYA memperbarui ID yang sudah ada di hierarki lokal (match by name),
+ * tidak menghapus atau mengubah struktur. Jika API tidak tersedia, hierarki lokal tetap dipakai.
+ */
+async function fetchAndSyncHierarchyIds(opts) {
+  const silent = opts && opts.silent;
+  try {
+    const resp = await fetch(
+      WO_API_URL + '?fn=getHierarchy&key=' + encodeURIComponent(WEBHOOK_KEY),
+      { redirect: 'follow' }
+    ).then(r => r.text());
+
+    let parsed;
+    try { parsed = JSON.parse(resp); } catch(e) { return; }
+
+    if (!(parsed.ok || parsed.status === 'ok') || !Array.isArray(parsed.units)) return;
+
+    let idsSynced = 0;
+    parsed.units.forEach(remoteUnit => {
+      const localUnit = hierarchy.units.find(u =>
+        u.name.toLowerCase() === remoteUnit.name.toLowerCase()
+      );
+      if (!localUnit) return;
+
+      // Sync unit ID
+      if (remoteUnit.id && localUnit.id !== remoteUnit.id) {
+        // Update semua sesi yang pakai unitId lama
+        sessions.forEach(s => { if (s.unitId === localUnit.id) s.unitId = remoteUnit.id; });
+        localUnit.id = remoteUnit.id;
+        idsSynced++;
+      }
+
+      (remoteUnit.areas || []).forEach(remoteArea => {
+        const localArea = (localUnit.areas || []).find(a =>
+          a.name.toLowerCase() === remoteArea.name.toLowerCase()
+        );
+        if (!localArea) return;
+
+        if (remoteArea.id && localArea.id !== remoteArea.id) {
+          sessions.forEach(s => { if (s.areaId === localArea.id) s.areaId = remoteArea.id; });
+          localArea.id = remoteArea.id;
+          idsSynced++;
+        }
+
+        // Sub areas
+        (remoteArea.subAreas || []).forEach(remoteSA => {
+          const localSA = (localArea.subAreas || []).find(s =>
+            s.name.toLowerCase() === remoteSA.name.toLowerCase()
+          );
+          if (!localSA) return;
+          if (remoteSA.id && localSA.id !== remoteSA.id) {
+            sessions.forEach(s => { if (s.subAreaId === localSA.id) s.subAreaId = remoteSA.id; });
+            localSA.id = remoteSA.id;
+            idsSynced++;
+          }
+
+          // Equip di sub area
+          (remoteSA.equipments || []).forEach(remoteEq => {
+            const localEq = (localSA.equipments || []).find(e =>
+              e.name.toLowerCase() === remoteEq.name.toLowerCase() ||
+              (e.tag && remoteEq.tag && e.tag.toLowerCase() === remoteEq.tag.toLowerCase())
+            );
+            if (!localEq) return;
+            if (remoteEq.id && localEq.id !== remoteEq.id) {
+              sessions.forEach(s => { if (s.equipId === localEq.id) s.equipId = remoteEq.id; });
+              localEq.id = remoteEq.id;
+              idsSynced++;
+            }
+          });
+        });
+
+        // Equip langsung di area
+        (remoteArea.equipments || []).forEach(remoteEq => {
+          const localEq = (localArea.equipments || []).find(e =>
+            e.name.toLowerCase() === remoteEq.name.toLowerCase() ||
+            (e.tag && remoteEq.tag && e.tag.toLowerCase() === remoteEq.tag.toLowerCase())
+          );
+          if (!localEq) return;
+          if (remoteEq.id && localEq.id !== remoteEq.id) {
+            sessions.forEach(s => { if (s.equipId === localEq.id) s.equipId = remoteEq.id; });
+            localEq.id = remoteEq.id;
+            idsSynced++;
+          }
+        });
+      });
+    });
+
+    if (idsSynced > 0) {
+      saveAll();
+      renderHierTree();
+      if (!silent) toast(`🔄 ${idsSynced} ID hierarki diperbarui dari MaintWare`, 'info');
+      console.log(`[HierSync] ${idsSynced} ID diperbarui dari API MaintWare`);
+    }
+  } catch(e) {
+    console.warn('[HierSync] Tidak bisa sync ID dari API:', e.message);
+  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1942,9 +2094,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function loadAll() {
-  try { const d = sessionStorage.getItem('ps_hierarchy'); if (d) hierarchy = JSON.parse(d); } catch(e){}
-  try { const d = sessionStorage.getItem('ps_sessions');  if (d) sessions  = JSON.parse(d); } catch(e){}
-  try { const d = sessionStorage.getItem('ps_pic_list');  if (d) PIC_LIST  = JSON.parse(d); } catch(e){}
+  try { const d = localStorage.getItem('ps_hierarchy'); if (d) hierarchy = JSON.parse(d); } catch(e){}
+  try { const d = localStorage.getItem('ps_sessions');  if (d) sessions  = JSON.parse(d); } catch(e){}
+  try { const d = localStorage.getItem('ps_pic_list');  if (d) PIC_LIST  = JSON.parse(d); } catch(e){}
   // Webhook config — tetap dari hardcoded, bisa di-override via UI
   WEBHOOK_URL = HARDCODED_WEBHOOK_URL;
   WEBHOOK_KEY = HARDCODED_WEBHOOK_KEY;
@@ -1952,9 +2104,9 @@ function loadAll() {
 }
 
 function saveAll() {
-  try { sessionStorage.setItem('ps_hierarchy', JSON.stringify(hierarchy)); } catch(e){}
-  try { sessionStorage.setItem('ps_sessions',  JSON.stringify(sessions));  } catch(e){}
-  try { sessionStorage.setItem('ps_pic_list',  JSON.stringify(PIC_LIST));  } catch(e){}
+  try { localStorage.setItem('ps_hierarchy', JSON.stringify(hierarchy)); } catch(e){}
+  try { localStorage.setItem('ps_sessions',  JSON.stringify(sessions));  } catch(e){}
+  try { localStorage.setItem('ps_pic_list',  JSON.stringify(PIC_LIST));  } catch(e){}
   // Auto-sync ke Sheets hanya dipanggil eksplisit via autoSyncSession() setelah checklist disimpan
   // Tidak trigger di sini agar tidak spam request ke GAS
 }
@@ -2113,7 +2265,10 @@ function renderMonitorPage() {
             const st = lastSess ? sessStatus(lastSess) : 'PENDING';
             const tileCls = {OK:'t-ok',WARNING:'t-warn',ALERT:'t-alert',PENDING:'t-pend'}[st]||'t-pend';
             const lastTime = lastSess ? fmtDate(lastSess.tanggal) + ' ' + (lastSess.startTime||'') : 'Belum pernah';
-            return `<div class="equip-tile ${tileCls}" onclick="openChecklistModal('${lastSess?.id||''}','${unit.id}','${area.id}','${saId}','${eq.id}')">
+            const tileClick = lastSess
+              ? `openChecklistModal('${lastSess.id}','${unit.id}','${area.id}','${saId}','${eq.id}')`
+              : `openNewSessionModal('${unit.id}','${area.id}','${saId}','${eq.id}')`;
+            return `<div class="equip-tile ${tileCls}" onclick="${tileClick}">
               <div class="equip-tile-name">${esc(eq.name)}${eq.tag?` <span style="font-size:9px;color:var(--text3)">(${esc(eq.tag)})</span>`:''}
               </div>
               <div class="equip-tile-meta">${eq.params?.length||0} param · ${st}</div>
@@ -2272,7 +2427,11 @@ function renderHierTree() {
 
 function renderUnitNode(unit) {
   const areas = unit.areas || [];
-  const totalEquip = areas.flatMap(a => a.subAreas.flatMap(sa => sa.equipments||[])).length;
+  const totalEquip = areas.reduce((sum, a) => {
+    const directEq = (a.equipments || []).length;
+    const subEq    = (a.subAreas  || []).reduce((s, sa) => s + (sa.equipments||[]).length, 0);
+    return sum + directEq + subEq;
+  }, 0);
   return `<div class="hier-unit">
     <div class="hier-unit-hdr" onclick="toggleNode(this)" data-node-id="${unit.id}">
       <span class="chevron">▶</span>
@@ -2414,11 +2573,18 @@ function submitAddUnit() {
   const name = document.getElementById('unitNameInput').value.trim();
   const desc = document.getElementById('unitDescInput').value.trim();
   if (!name) { document.getElementById('unitNameErr').textContent = 'Nama unit wajib diisi'; return; }
-  const id = genUId();
-  hierarchy.units.push({ id, name, desc, areas: [] });
+  if (_ctx.editingUnit) {
+    // Edit mode
+    const unit = findUnit(_ctx.editingUnit);
+    if (unit) { unit.name = name; unit.desc = desc; }
+  } else {
+    // Add mode
+    const id = genUId();
+    hierarchy.units.push({ id, name, desc, areas: [] });
+  }
   saveAll(); renderHierTree(); populateUnitFilters();
   closeOverlay('addUnitOverlay');
-  toast('Unit "' + name + '" ditambahkan ✓', 'success');
+  toast('Unit "' + name + '" ' + (_ctx.editingUnit ? 'diperbarui' : 'ditambahkan') + ' ✓', 'success');
 }
 
 function deleteUnit(unitId) {
@@ -2444,7 +2610,7 @@ function submitAddArea() {
   if (!name) { document.getElementById('areaNameErr').textContent = 'Nama area wajib diisi'; return; }
   const unit = findUnit(_ctx.addAreaUnit);
   if (!unit) return;
-  unit.areas.push({ id: genAId(), name, subAreas: [] });
+  unit.areas.push({ id: genAId(), name, subAreas: [], equipments: [] });
   saveAll(); renderHierTree(); populateUnitFilters();
   closeOverlay('addAreaOverlay');
   toast('Area "' + name + '" ditambahkan ✓', 'success');
@@ -2482,9 +2648,9 @@ function submitAddSubArea() {
 
 function deleteSubArea(unitId, areaId, saId) {
   const area = findArea(unitId, areaId);
-  const sa   = area?.subAreas.find(s => s.id === saId);
+  const sa   = (area?.subAreas||[]).find(s => s.id === saId);
   if (!sa || !confirm(`Hapus Sub Area "${sa.name}"?`)) return;
-  area.subAreas = area.subAreas.filter(s => s.id !== saId);
+  area.subAreas = (area.subAreas||[]).filter(s => s.id !== saId);
   saveAll(); renderHierTree();
   toast('Sub Area dihapus', 'info');
 }
@@ -3594,8 +3760,10 @@ function gasV4EquipToLocal(eq) {
 
 async function autoSyncSession(sess) {
   if (!WEBHOOK_URL) return;
-  clearTimeout(_syncTimer);
-  _syncTimer = setTimeout(async () => {
+  // Tiap sesi punya timer sendiri agar tidak saling cancel
+  const timerKey = '_syncTimer_' + sess.id;
+  clearTimeout(window[timerKey]);
+  window[timerKey] = setTimeout(async () => {
     try {
       // GAS v4: doPost body { action:'upsert_session', key:..., payload: session }
       const res = await fetch(WEBHOOK_URL, {
@@ -3760,8 +3928,135 @@ function seedUnit1() {
 }
 
 // ═══════════════════════════════════════════════════════
-// HELPERS / FINDERS
+// SEED UNIT 2 — Auto-generate hierarki Unit 2
 // ═══════════════════════════════════════════════════════
+function seedUnit2() {
+  const existing = hierarchy.units.find(u => u.name === 'Unit 2');
+  if (existing) {
+    if (!confirm('Unit 2 sudah ada. Generate ulang akan menambahkan equipment baru (tidak hapus yang ada). Lanjutkan?')) return;
+  }
+
+  const u2Id = existing ? existing.id : genUId();
+  if (!existing) hierarchy.units.push({ id: u2Id, name: 'Unit 2', desc: 'Unit Produksi 2', areas: [] });
+  const u2 = hierarchy.units.find(u => u.id === u2Id);
+
+  function getOrCreateArea(name) {
+    let a = u2.areas.find(x => x.name === name);
+    if (!a) { a = { id: genAId(), name, subAreas: [], equipments: [] }; u2.areas.push(a); }
+    if (!a.subAreas)   a.subAreas   = [];
+    if (!a.equipments) a.equipments = [];
+    return a;
+  }
+
+  function makeParams(type) {
+    return (EQUIP_PARAM_TEMPLATES[type] || []).map(p => ({ ...p, id: genPId() }));
+  }
+
+  // ── 1. TRANSFORMER & CUBICLE ──────────────────────────
+  const aTrafo = getOrCreateArea('Transformer & Cubicle');
+  if (!aTrafo.equipments.find(e => e.name === 'Transformer & Cubicle')) {
+    aTrafo.equipments.push({ id: genEId(), name: 'Transformer & Cubicle', tag: 'TRF-U2-01', type: 'TRANSFORMER', params: makeParams('TRANSFORMER') });
+  }
+
+  // ── 2. LVMDP ──────────────────────────────────────────
+  const aLvmdp = getOrCreateArea('LVMDP');
+  if (!aLvmdp.equipments.find(e => e.name === 'LVMDP')) {
+    aLvmdp.equipments.push({ id: genEId(), name: 'LVMDP', tag: 'LVMDP-U2-01', type: 'LVMDP', params: makeParams('LVMDP') });
+  }
+
+  // ── 3. CAPACITOR BANK ─────────────────────────────────
+  const aCap = getOrCreateArea('Capacitor Bank');
+  if (!aCap.equipments.find(e => e.name === 'Capacitor Bank')) {
+    aCap.equipments.push({ id: genEId(), name: 'Capacitor Bank', tag: 'CAP-U2-01', type: 'CAPACITOR_BANK', params: makeParams('CAPACITOR_BANK') });
+  }
+
+  // ── 4. MCC PANEL — 23 panel sebagai sub area ──────────
+  const aMcc = getOrCreateArea('MCC Panel');
+  const mccList = [
+    'MCC Cold Storage (CS 1 & CS 2)',
+    'Panel Antiroom CS1',
+    'Panel Antiroom CS2',
+    'MCB BOX Office Bayer',
+    'MCB BOX Prasad',
+    'MCB BOX Shigenta',
+    'Panel Security',
+    'MCC Cold Storage (CS 3 & CS 4)',
+    'Panel Antiroom CS3',
+    'Panel Antiroom CS4',
+    'MCC Office Bioseed',
+    'MCC Distribusi Blower 1 (SPR)',
+    'MCC Distribusi Blower 2 (SPR)',
+    'MCC Distribusi Blower 3 (SPR)',
+    'MCC Receiving (SPR)',
+    'MCC Sheller (SPR)',
+    'MCC Blower (PS Drier)',
+    'MCC Receiving (PS Drier)',
+    'MCC Sheller (PS Drier)',
+    'MCC Blower (Peanut)',
+    'MCC Receiving (Peanut)',
+    'MCC Sheller (Peanut)',
+    'MCC 1 (CTP 1)',
+    'MCC 1 (CTP 2)',
+  ];
+  mccList.forEach((mccName, i) => {
+    let sa = aMcc.subAreas.find(s => s.name === mccName);
+    if (!sa) { sa = { id: genSId(), name: mccName, equipments: [] }; aMcc.subAreas.push(sa); }
+    if (!sa.equipments) sa.equipments = [];
+    if (!sa.equipments.find(e => e.name === mccName)) {
+      sa.equipments.push({ id: genEId(), name: mccName, tag: `MCC-U2-${String(i+1).padStart(2,'0')}`, type: 'MCC', params: makeParams('MCC') });
+    }
+  });
+
+  // ── 5. AIR COMPRESSOR — 3 lokasi ──────────────────────
+  const aComp = getOrCreateArea('Air Compressor');
+  const compList = [
+    { name: 'AIR Compressor CTP',              tag: 'AC-U2-01' },
+    { name: 'AIR Compressor SPR',              tag: 'AC-U2-02' },
+    { name: 'AIR Compressor Packing Bioseed',  tag: 'AC-U2-03' },
+  ];
+  compList.forEach(({ name, tag }) => {
+    let sa = aComp.subAreas.find(s => s.name === name);
+    if (!sa) { sa = { id: genSId(), name, equipments: [] }; aComp.subAreas.push(sa); }
+    if (!sa.equipments) sa.equipments = [];
+    if (!sa.equipments.find(e => e.name === name)) {
+      sa.equipments.push({ id: genEId(), name, tag, type: 'AIR_COMPRESSOR', params: makeParams('AIR_COMPRESSOR') });
+    }
+  });
+
+  // ── 6. HYDRANT ────────────────────────────────────────
+  const aHydrant = getOrCreateArea('Hydrant');
+  if (!aHydrant.equipments.find(e => e.name === 'Hydrant System')) {
+    aHydrant.equipments.push({ id: genEId(), name: 'Hydrant System', tag: 'HYD-U2-01', type: 'HYDRANT', params: makeParams('HYDRANT') });
+  }
+
+  // ── 7. COLD STORAGE — 4 unit, masing-masing punya mesin ─
+  const aCs = getOrCreateArea('Cold Storage');
+  const coldStorageConfig = [
+    { unit: 'Cold Storage 1', mesin: 6 },
+    { unit: 'Cold Storage 2', mesin: 5 },
+    { unit: 'Cold Storage 3', mesin: 4 },
+    { unit: 'Cold Storage 4', mesin: 5 },
+  ];
+  coldStorageConfig.forEach(({ unit, mesin }) => {
+    let sa = aCs.subAreas.find(s => s.name === unit);
+    if (!sa) { sa = { id: genSId(), name: unit, equipments: [] }; aCs.subAreas.push(sa); }
+    if (!sa.equipments) sa.equipments = [];
+    for (let m = 1; m <= mesin; m++) {
+      const eName = `${unit} - Mesin ${m}`;
+      const csIdx = coldStorageConfig.findIndex(c => c.unit === unit) + 1;
+      if (!sa.equipments.find(e => e.name === eName)) {
+        sa.equipments.push({ id: genEId(), name: eName, tag: `CS${csIdx}-M${m}`, type: 'COLD_STORAGE', params: makeParams('COLD_STORAGE') });
+      }
+    }
+  });
+
+  saveAll(); renderHierTree(); populateUnitFilters();
+  renderDashboard();
+  const banner = document.getElementById('seedUnit2Banner');
+  if (banner) banner.style.display = 'none';
+  const totalEquip = 1+1+1+mccList.length+compList.length+1+coldStorageConfig.reduce((s,c)=>s+c.mesin,0);
+  toast(`✅ Unit 2 berhasil di-generate! 7 area, ${totalEquip} equipment, parameter lengkap.`, 'success');
+}
 function findUnit(uid)                           { return hierarchy.units.find(u => u.id === uid); }
 function findArea(uid, aid)                      { return findUnit(uid)?.areas.find(a => a.id === aid); }
 function findSubArea(uid, aid, sid)              { return findArea(uid, aid)?.subAreas.find(s => s.id === sid); }
@@ -3791,7 +4086,7 @@ function getLastSession(uid, aid, sid, eid) {
 
 function countEquipments() {
   return hierarchy.units.flatMap(u => u.areas.flatMap(a => {
-    const fromSubs   = a.subAreas.flatMap(sa => sa.equipments||[]);
+    const fromSubs   = (a.subAreas||[]).flatMap(sa => sa.equipments||[]);
     const fromDirect = a.equipments || [];
     return [...fromDirect, ...fromSubs];
   })).length;
@@ -4008,44 +4303,69 @@ function renderFindingsPage() {
 
 const WO_API_URL = 'https://script.google.com/macros/s/AKfycbxWC3esNUKacXKDx1cGqzrtaaH0vKW4pbsVV6_zmUj5jSXBTP2aZLJ73X6M9vW9W3ro/exec';
 
-// Counter WO monitoring per session — disimpan di sessionStorage (works di file://)
+// Counter WO — localStorage agar tidak reset saat browser ditutup
 // key: 'ps_wo_counter'  value: number (global sequential counter)
 function getWOCounter() {
-  try { return parseInt(sessionStorage.getItem('ps_wo_counter') || '0') || 0; } catch(e) { return 0; }
+  try { return parseInt(localStorage.getItem('ps_wo_counter') || '0') || 0; } catch(e) { return 0; }
 }
 function incrementWOCounter() {
   const n = getWOCounter() + 1;
-  try { sessionStorage.setItem('ps_wo_counter', String(n)); } catch(e) {}
+  try { localStorage.setItem('ps_wo_counter', String(n)); } catch(e) {}
   return n;
 }
 
 /**
- * generateWONumber — format:
- *   Mon/DDMMYYYY/Shift/Unit/Area/Equipment/0001
+ * generateWONumber — format MaintWare WO_ORDERS:
+ *   WO-YYYYMMDD-ELEC-UNIT-XXXX
  *
- * Semua komponen di-sanitize (huruf kapital, tanpa spasi, maks 10 char per segmen)
- * Nomor urut 4 digit, global sequential.
+ * Contoh: WO-20250505-ELEC-U1-0042
+ * Format ini konsisten dengan WO_ORDERS di MaintWare Sheets sehingga
+ * tracking tidak terputus antara Monitoring System dan MaintWare.
+ *
+ * Prioritas:
+ *   1. Tanya API WO_API_URL?fn=nextWoId → pakai ID dari Sheets (paling aman)
+ *   2. Fallback lokal jika API tidak tersedia
  */
+async function fetchWOIdFromAPI(finding, shift, seqNum) {
+  try {
+    const resp = await fetch(
+      WO_API_URL + '?fn=nextWoId&sheet=WO_ORDERS&key=' + encodeURIComponent(WEBHOOK_KEY),
+      { redirect: 'follow' }
+    ).then(r => r.text());
+    const parsed = JSON.parse(resp);
+    if ((parsed.ok || parsed.status === 'ok') && parsed.woId) {
+      return parsed.woId; // ID resmi dari Sheets
+    }
+  } catch(e) {
+    console.warn('[WO] Tidak bisa ambil ID dari API, fallback ke format lokal:', e.message);
+  }
+  return null; // trigger fallback
+}
+
 function generateWONumber(finding, shift, seqNum) {
   const d = finding.tanggal ? new Date(finding.tanggal) : new Date();
 
-  // Tanggal DDMMYYYY
-  const dd   = String(d.getDate()).padStart(2,'0');
-  const mm   = String(d.getMonth()+1).padStart(2,'0');
+  // Format YYYYMMDD
   const yyyy = d.getFullYear();
-  const dateStr = dd + mm + yyyy;
+  const mm   = String(d.getMonth()+1).padStart(2,'0');
+  const dd   = String(d.getDate()).padStart(2,'0');
+  const dateStr = `${yyyy}${mm}${dd}`;
 
-  // Sanitize helper — uppercase, only alphanumeric, max N chars
+  // Sanitize — uppercase alphanumeric, maks N char
   function san(s, maxLen) {
-    return (s||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0, maxLen || 10) || 'X';
+    return (s||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0, maxLen || 8) || 'X';
   }
 
-  const unitPart  = san(finding.unit,  8);
-  const areaPart  = san(finding.area,  8);
-  const equipPart = san(finding.equipment, 10);
-  const seq       = String(seqNum).padStart(4,'0');
+  // Unit disingkat: "Unit 1" → "U1", "Unit 2" → "U2", fallback san()
+  const rawUnit = (finding.unit || '').trim();
+  const unitMatch = rawUnit.match(/unit\s*(\d+)/i);
+  const unitPart = unitMatch ? `U${unitMatch[1]}` : san(rawUnit, 4);
 
-  return `Mon/${dateStr}/${shift}/${unitPart}/${areaPart}/${equipPart}/${seq}`;
+  const seq = String(seqNum).padStart(4,'0');
+
+  // Format: WO-YYYYMMDD-ELEC-{UNIT}-{SEQ}
+  // Sama persis dengan kolom `id` di WO_ORDERS MaintWare
+  return `WO-${dateStr}-ELEC-${unitPart}-${seq}`;
 }
 
 // State for current WO being built
@@ -4179,9 +4499,13 @@ async function submitWOFromFinding() {
   const dept     = document.getElementById('wo-dept')?.value     || 'Electrical';
   const estH     = parseFloat(document.getElementById('wo-esthours')?.value) || 2;
 
-  // Finalise WO number — increment counter now
-  const seqNum = incrementWOCounter();
-  const woId   = generateWONumber(f, shift, seqNum);
+  // Finalise WO number — coba ambil dari API (MaintWare) dulu untuk tracking konsisten
+  const seqNum  = incrementWOCounter();
+  let woId = await fetchWOIdFromAPI(f, shift, seqNum);
+  if (!woId) {
+    // Fallback: generate lokal dengan format WO_ORDERS MaintWare
+    woId = generateWONumber(f, shift, seqNum);
+  }
 
   const now    = new Date().toISOString();
   const notesLog = JSON.stringify([{
@@ -4261,7 +4585,7 @@ async function submitWOFromFinding() {
     }
   } catch(err) {
     // Roll back counter if failed
-    try { sessionStorage.setItem('ps_wo_counter', String(seqNum - 1)); } catch(e) {}
+    try { localStorage.setItem('ps_wo_counter', String(seqNum - 1)); } catch(e) {}
     if (res) {
       res.style.display = 'block';
       res.style.background = 'var(--red-dim)';
@@ -4277,3 +4601,6 @@ async function submitWOFromFinding() {
 
 
 </script>
+
+</body>
+</html>
