@@ -1887,9 +1887,14 @@ const USERS = [
 let currentUser = null;
 
 function doLogin() {
-  const username = (document.getElementById('loginUser')?.value || '').trim().toLowerCase();
-  const password = (document.getElementById('loginPass')?.value || '').trim();
-  const errEl    = document.getElementById('loginErr');
+  const userEl = document.getElementById('loginUser');
+  const passEl = document.getElementById('loginPass');
+  const errEl  = document.getElementById('loginErr');
+
+  const username = (userEl?.value || '').trim().toLowerCase();
+  const password = (passEl?.value || '').trim();
+
+  if (errEl) errEl.textContent = '';
 
   if (!username || !password) {
     if (errEl) errEl.textContent = '⚠ Username dan password wajib diisi.';
@@ -1899,24 +1904,29 @@ function doLogin() {
   const user = USERS.find(u => u.username === username && u.password === password);
   if (!user) {
     if (errEl) errEl.textContent = '✗ Username atau password salah.';
-    // Shake animation
-    const card = document.querySelector('.login-card');
-    if (card) { card.style.animation = 'none'; setTimeout(() => card.style.animation = '', 10); }
     return;
   }
 
   currentUser = user;
-  // Simpan sesi login
-  try { sessionStorage.setItem('ps_session', JSON.stringify({ username: user.username, role: user.role, name: user.name })); } catch(e){}
+  try {
+    sessionStorage.setItem('ps_session', JSON.stringify({
+      username: user.username,
+      role: user.role,
+      name: user.name
+    }));
+  } catch(e) {}
 
-  // Sembunyikan login screen
   const loginScreen = document.getElementById('loginScreen');
   if (loginScreen) loginScreen.classList.add('hidden');
 
-  // Init app
-  initApp();
+  try {
+    initApp();
+  } catch(e) {
+    console.error('initApp error setelah login:', e);
+    // Tetap lanjut — jangan balik ke login screen hanya karena render error
+    toast('Peringatan: sebagian fitur mungkin tidak tampil. Coba refresh.', 'error');
+  }
 }
-
 function doLogout() {
   currentUser = null;
   try { sessionStorage.removeItem('ps_session'); } catch(e){}
@@ -2082,17 +2092,27 @@ document.addEventListener('DOMContentLoaded', () => {
         currentUser = user;
         const loginScreen = document.getElementById('loginScreen');
         if (loginScreen) loginScreen.classList.add('hidden');
-        initApp();
+        try {
+          initApp();
+        } catch(e) {
+          console.error('initApp error:', e);
+          // Jika initApp gagal, reset ke login screen
+          currentUser = null;
+          sessionStorage.removeItem('ps_session');
+          const ls = document.getElementById('loginScreen');
+          if (ls) ls.classList.remove('hidden');
+        }
         return;
       }
     }
-  } catch(e){}
-  // Tampilkan login screen (sudah visible by default)
-  // Focus ke input username
+  } catch(e) {
+    // Session corrupt — bersihkan
+    try { sessionStorage.removeItem('ps_session'); } catch(e2) {}
+  }
+  // Tampilkan login screen
   const loginUser = document.getElementById('loginUser');
   if (loginUser) loginUser.focus();
 });
-
 function loadAll() {
   try { const d = localStorage.getItem('ps_hierarchy'); if (d) hierarchy = JSON.parse(d); } catch(e){}
   try { const d = localStorage.getItem('ps_sessions');  if (d) sessions  = JSON.parse(d); } catch(e){}
