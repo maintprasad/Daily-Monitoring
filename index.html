@@ -2933,12 +2933,15 @@ function onNSUnitChange() {
   const unitId = getVal('ns-unit');
   const areaSel = document.getElementById('ns-area');
   areaSel.innerHTML = '<option value="">— Pilih Area —</option>';
-  document.getElementById('ns-subarea').innerHTML = '<option value="">— Tanpa Sub Area —</option>';
-  document.getElementById('ns-equip').innerHTML   = '<option value="">— Pilih Equipment —</option>';
+  document.getElementById('ns-equip').innerHTML = '<option value="">— Pilih Equipment —</option>';
+  document.getElementById('ns-param-preview').style.display = 'none';
   if (!unitId) return;
   const unit = findUnit(unitId);
-  (unit?.areas||[]).forEach(a => {
-    const o = document.createElement('option'); o.value=a.id; o.textContent=a.name; areaSel.appendChild(o);
+  (unit?.areas || []).forEach(a => {
+    const o = document.createElement('option');
+    o.value = a.id;
+    o.textContent = a.name;
+    areaSel.appendChild(o);
   });
 }
 
