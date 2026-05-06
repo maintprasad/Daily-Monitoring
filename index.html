@@ -2462,7 +2462,6 @@ function renderAreaNode(unitId, area) {
       <span class="hier-area-name">📁 ${esc(area.name)}</span>
       <span class="badge b-gray" style="margin-right:8px;font-size:9px">${countLabel}</span>
       <div style="display:flex;gap:4px">
-        <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();openAddSubAreaModal('${unitId}','${area.id}')">+ Sub Area</button>
         <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();openAddEquipModal('${unitId}','${area.id}','')">+ Equipment</button>
         <button class="btn btn-danger btn-xs" onclick="event.stopPropagation();deleteArea('${unitId}','${area.id}')">✕</button>
       </div>
@@ -2898,7 +2897,7 @@ function saveParamEdits() {
 function openNewSessionModal(preUnitId, preAreaId, preSAId, preEqId) {
   // Reset
   ['ns-date','ns-start','ns-end'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
-  ['ne-date','ne-start','ne-unit','ne-area','ne-subarea','ne-equip','ne-pic'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent=''; });
+  ['ne-date','ne-start','ne-unit','ne-area','ne-equip','ne-pic'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent=''; });
   document.getElementById('ns-area').innerHTML    = '<option value="">— Pilih Area —</option>';
   // dihapus document.getElementById('ns-subarea').innerHTML = '<option value="">— Pilih Sub Area —</option>';
   document.getElementById('ns-equip').innerHTML   = '<option value="">— Pilih Equipment —</option>';
@@ -2914,18 +2913,12 @@ function openNewSessionModal(preUnitId, preAreaId, preSAId, preEqId) {
       setTimeout(() => {
         setVal('ns-area', preAreaId);
         onNSAreaChange();
-        if (preSAId) {
-          setTimeout(() => {
-            setVal('ns-subarea', preSAId);
-            onNSSubAreaChange();
-            if (preEqId) {
-              setTimeout(() => {
-                setVal('ns-equip', preEqId);
-                onNSEquipChange();
-              }, 50);
-            }
-          }, 50);
-        }
+        if (preEqId) {
+  setTimeout(() => {
+    setVal('ns-equip', preEqId);
+    onNSEquipChange();
+        }, 50);
+      }
       }, 50);
     }
   }
@@ -3038,7 +3031,7 @@ function submitNewSession() {
     id, tanggal, startTime: start, endTime: getVal('ns-end'),
     unitId, unitName: unit?.name||'',
     areaId, areaName: area?.name||'',
-    subAreaId: saId, subAreaName: sa?.name||'',
+    subAreaId: '', subAreaNam: '',
     equipId: eqId, equipName: eq?.name||'',
     pic: pics.join(', '),
     catatan: '', tindakan: '',
