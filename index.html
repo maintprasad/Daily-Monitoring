@@ -2582,6 +2582,7 @@ function submitAddUnit() {
   saveAll(); renderHierTree(); populateUnitFilters();
   closeOverlay('addUnitOverlay');
   toast('Unit "' + name + '" ' + (_ctx.editingUnit ? 'diperbarui' : 'ditambahkan') + ' ✓', 'success');
+   if (WEBHOOK_URL) syncAll(true);
 }
 
 function deleteUnit(unitId) {
@@ -2611,6 +2612,7 @@ function submitAddArea() {
   saveAll(); renderHierTree(); populateUnitFilters();
   closeOverlay('addAreaOverlay');
   toast('Area "' + name + '" ditambahkan ✓', 'success');
+  if (WEBHOOK_URL) syncAll(true);
 }
 
 function deleteArea(unitId, areaId) {
@@ -2714,6 +2716,7 @@ function submitAddEquip() {
   closeOverlay('addEquipOverlay');
   const msg = autoParams.length ? `Equipment "${equipName}" + ${autoParams.length} param auto ✓` : `Equipment "${equipName}" ditambahkan ✓`;
   toast(msg, 'success');
+if (WEBHOOK_URL) syncAll(true);
 }
 
 // ADD START: Conditional dropdown & type preview
@@ -3571,10 +3574,11 @@ async function syncAll(silent=false) {
   try {
     // GAS v4: doPost body { action:'full_sync', key:..., payload:{ sessions, picList, hierarchy } }
     const payload = {
-      sessions:  buildGASSessionsPayload(),
-      picList:   PIC_LIST,
-      hierarchy: hierarchy,
-    };
+  sessions:   buildGASSessionsPayload(),
+  picList:    PIC_LIST,
+  hierarchy:  hierarchy,
+  eqData:     buildGASHierarchyPayload(),
+};
 
     const res = await fetch(WEBHOOK_URL, {
       method: 'POST',
