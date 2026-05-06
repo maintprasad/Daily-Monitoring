@@ -3727,10 +3727,19 @@ async function pullFromSheets(opts) {
       console.error('[pullFromSheets] GAS error:', res);
   } catch(e) {
    if (!(opts && opts.isPolling)) {
+        setSyncStatus('error');
+        const errMsg = res?.message || 'Error tidak diketahui';
+        toast('✗ Pull gagal: ' + errMsg, 'error');
+      }
+      console.error('[pullFromSheets] GAS error:', res);
+    }
+  } catch(e) {
+    if (!(opts && opts.isPolling)) {
       setSyncStatus('error');
       toast('✗ Pull gagal: ' + e.message, 'error');
     }
     console.error('[pullFromSheets] Fetch error:', e);
+  }
 }
 
 // Konversi format equipment GAS v4 (nested params) → format lokal
