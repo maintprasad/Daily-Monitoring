@@ -1868,7 +1868,7 @@ let _ctx = {
 
 // Webhook — hardcoded configuration
 // gantien ndek kene
-const HARDCODED_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbxegzE5iu22srvEDWztgsyPWFsQ_S9FBk-PChln63eF143ILcE8OmdsiQ2o6oCBUKIlNQ/exec';
+const HARDCODED_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbwqJw-G4nZ_Qx6i8pZCdWCgsBb6BNYT3Iz09B7HHT9PyI7AUaJ23n1I9BKxgJ01yvTrlQ/exec';
 const HARDCODED_WEBHOOK_KEY = 'prasad2024';
 let WEBHOOK_URL = HARDCODED_WEBHOOK_URL;
 let WEBHOOK_KEY = HARDCODED_WEBHOOK_KEY;
@@ -2713,6 +2713,11 @@ function submitAddEquip() {
 
   saveAll(); renderHierTree(); setText('sc-equip', countEquipments());
   closeOverlay('addEquipOverlay');
+   // Reset form
+document.getElementById('equipTypeInput').value = '';
+document.getElementById('equipTypePreview').style.display = 'none';
+document.getElementById('mccPanelGroup').style.display = 'none';
+document.getElementById('compressorLocGroup').style.display = 'none';
   const msg = autoParams.length ? `Equipment "${equipName}" + ${autoParams.length} param auto ✓` : `Equipment "${equipName}" ditambahkan ✓`;
   toast(msg, 'success');
 if (WEBHOOK_URL) syncAll(true);
