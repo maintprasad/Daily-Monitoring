@@ -2469,7 +2469,7 @@ function renderAreaNode(unitId, area) {
     <div class="hier-area-body">
       ${subAreas.map(sa => renderSubAreaNode(unitId, area.id, sa)).join('')}
       ${directEquip.map(eq => renderEquipNode(unitId, area.id, '', eq)).join('')}
-      ${(!totalSub && !totalDirect) ? `<div style="color:var(--text3);font-size:12px;padding:6px 4px">Belum ada sub area / equipment. Klik "+ Sub Area" atau "+ Equipment" untuk menambahkan.</div>` : ''}
+      ${(!totalSub && !totalDirect) ? `<div style="color:var(--text3);font-size:12px;padding:6px 4px">Belum ada sub area / equipment. Klik "+ Equipment" untuk menambahkan.</div>` : ''}
     </div>
   </div>`;
 }
