@@ -2990,19 +2990,18 @@ function onNSEquipChange() {
   const unitId = getVal('ns-unit');
   const areaId = getVal('ns-area');
   const eqId   = getVal('ns-equip');
-  const area2  = findArea(unitId, areaId);
-  const allEqs = [...(area2?.equipments||[]), ...(area2?.subAreas||[]).flatMap(s=>s.equipments||[])];
-  const eq     = allEqs.find(e => e.id === eqId);
   const preview = document.getElementById('ns-param-preview');
   const plist   = document.getElementById('ns-param-list');
   if (!eqId) { preview.style.display='none'; return; }
-  const eq = findEquipFlex(unitId, areaId, saId, eqId);
+  const area2  = findArea(unitId, areaId);
+  const allEqs = [...(area2?.equipments||[]), ...(area2?.subAreas||[]).flatMap(s=>s.equipments||[])];
+  const eq     = allEqs.find(e => e.id === eqId);
   const params = eq?.params || [];
   if (!params.length) { preview.style.display='none'; return; }
   plist.innerHTML = params.map(p => `<span class="badge b-gray">${esc(p.label)} (${esc(p.unit||'—')})</span>`).join('');
   preview.style.display = 'block';
 }
-
+   
 function submitNewSession() {
   let ok = true;
   const unitId  = getVal('ns-unit');
@@ -3023,11 +3022,9 @@ function submitNewSession() {
   if (!pics.length) { setErr('ne-pic','Pilih minimal satu PIC'); ok=false; }
   if (!ok) return;
 
-  const unit = findUnit(unitId);
+ const unit = findUnit(unitId);
   const area = findArea(unitId, areaId);
-  const sa   = null;
-  const saId = '';
-  const eq   = findEquipFlex(unitId, areaId, '', eqId) 
+  const eq   = findEquipFlex(unitId, areaId, '', eqId)
           || (area?.subAreas||[]).flatMap(s=>s.equipments||[]).find(e=>e.id===eqId);
 
   const id = genId();
