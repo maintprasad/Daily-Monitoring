@@ -301,19 +301,6 @@ body {
 .hier-area-body { display: none; padding: 0 10px 10px; }
 .hier-area-body.open { display: block; }
 
-.hier-subarea {
-  background: var(--bg4); border: 1px solid var(--border);
-  border-radius: 6px; margin-bottom: 5px; overflow: hidden;
-}
-.hier-subarea-hdr {
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px 12px; cursor: pointer; user-select: none;
-}
-.hier-subarea-hdr:hover { background: rgba(255,255,255,.03); }
-.hier-subarea-name { font-size: 12px; color: var(--text2); flex: 1; }
-.hier-subarea-body { display: none; padding: 0 8px 8px; }
-.hier-subarea-body.open { display: block; }
-
 .hier-equip {
   display: flex; align-items: center; gap: 8px;
   padding: 7px 10px; background: var(--bg);
@@ -1468,7 +1455,6 @@ body {
           </select>
           <div class="ferr" id="ne-area"></div>
         </div>
-      //sub area sudah dihapus
         <div class="fg">
           <label class="flabel">Equipment <span class="req">*</span></label>
           <select class="fsel2" id="ns-equip" required onchange="onNSEquipChange()">
@@ -2203,7 +2189,6 @@ function dashRow(s) {
     <td style="font-size:11px;color:var(--text3)">${fmtDate(s.tanggal)}</td>
     <td><span class="badge b-blue">${esc(s.unitName||'—')}</span></td>
     <td style="font-size:11px">${esc(s.areaName||'—')}</td>
-    <td style="font-size:11px">${esc(s.subAreaName||'—')}</td>
     <td style="font-size:12px;font-weight:500">${esc(s.equipName||'—')}</td>
     <td style="font-size:11px">${esc(s.pic||'—')}</td>
     <td><span class="badge ${stBadge(st)}">${st}</span></td>
@@ -2234,9 +2219,7 @@ function renderMonitorPage() {
     const subStr   = saName
       ? `${esc(unit.name)} → ${esc(area.name)} · ${equips.length} equipment`
       : `${esc(unit.name)} · ${equips.length} equipment (tanpa sub area)`;
-    const btnOnclick = saId
-      ? `openNewSessionModal('${unit.id}','${area.id}','${saId}')`
-      : `openNewSessionModal('${unit.id}','${area.id}','')`;
+    const btnOnclick = `openNewSessionModal('${unit.id}','${area.id}','','')`;
     return `<div class="card" style="margin-bottom:16px">
       <div class="card-hdr">
         <div>
@@ -2447,14 +2430,11 @@ function renderUnitNode(unit) {
 }
 
 function renderAreaNode(unitId, area) {
-  const subAreas    = area.subAreas    || [];
-  const directEquip = area.equipments  || [];
-  const totalSub    = subAreas.length;
-  const totalDirect = directEquip.length;
-  const countLabel  = [
-    totalSub    ? `${totalSub} sub area`       : '',
-    totalDirect ? `${totalDirect} equip langsung` : '',
-  ].filter(Boolean).join(' · ') || 'kosong';
+  const equips = [
+    ...(area.equipments || []),
+    ...(area.subAreas || []).flatMap(sa => sa.equipments || [])
+  ];
+  const countLabel = equips.length ? `${equips.length} equipment` : 'kosong';
 
   return `<div class="hier-area">
     <div class="hier-area-hdr" onclick="toggleNode(this)" data-node-id="${unitId}_${area.id}">
@@ -2462,18 +2442,17 @@ function renderAreaNode(unitId, area) {
       <span class="hier-area-name">📁 ${esc(area.name)}</span>
       <span class="badge b-gray" style="margin-right:8px;font-size:9px">${countLabel}</span>
       <div style="display:flex;gap:4px">
-        <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();openAddEquipModal('${unitId}','${area.id}','')">+ Equipment</button>
+        <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();openAddEquipModal('${unitId}','${area.id}')">+ Equipment</button>
         <button class="btn btn-danger btn-xs" onclick="event.stopPropagation();deleteArea('${unitId}','${area.id}')">✕</button>
       </div>
     </div>
     <div class="hier-area-body">
-      ${subAreas.map(sa => renderSubAreaNode(unitId, area.id, sa)).join('')}
-      ${directEquip.map(eq => renderEquipNode(unitId, area.id, '', eq)).join('')}
-      ${(!totalSub && !totalDirect) ? `<div style="color:var(--text3);font-size:12px;padding:6px 4px">Belum ada sub area / equipment. Klik "+ Equipment" untuk menambahkan.</div>` : ''}
+      ${equips.map(eq => renderEquipNode(unitId, area.id, '', eq)).join('')}
+      ${!equips.length ? `<div style="color:var(--text3);font-size:12px;padding:6px 4px">Belum ada equipment. Klik "+ Equipment" untuk menambahkan.</div>` : ''}
     </div>
   </div>`;
 }
-
+   
 function renderSubAreaNode(unitId, areaId, sa) {
   const equips = sa.equipments || [];
   return `<div class="hier-subarea">
@@ -2653,53 +2632,30 @@ function deleteSubArea(unitId, areaId, saId) {
   toast('Sub Area dihapus', 'info');
 }
 
-function openAddEquipModal(unitId, areaId, saId) {
-  _ctx.addEqUnit = unitId; _ctx.addEqArea = areaId; _ctx.addEqSA = saId;
+function openAddEquipModal(unitId, areaId) {
+  _ctx.addEqUnit = unitId; _ctx.addEqArea = areaId; _ctx.addEqSA = '';
   document.getElementById('equipNameInput').value = '';
   document.getElementById('equipTagInput').value  = '';
   document.getElementById('equipNameErr').textContent = '';
-  let parentName = '';
-  if (saId) {
-    const sa = findSubArea(unitId, areaId, saId);
-    parentName = sa?.name || '';
-  } else {
-    const area = findArea(unitId, areaId);
-    parentName = (area?.name || '') + ' (langsung)';
-  }
+  const area = findArea(unitId, areaId);
+  const parentName = area?.name || '';
   document.getElementById('addEquipTitle').textContent = `✚ Tambah Equipment — ${parentName}`;
   openOverlay('addEquipOverlay');
 }
-
 function submitAddEquip() {
   const name = document.getElementById('equipNameInput').value.trim();
   const tag  = document.getElementById('equipTagInput').value.trim();
-  // ADD START: equipment type
   const type = document.getElementById('equipTypeInput')?.value || 'OTHER';
   if (!type || type === '') { document.getElementById('equipTypeErr').textContent = 'Pilih tipe equipment'; return; }
-  // ADD END
   if (!name) { document.getElementById('equipNameErr').textContent = 'Nama equipment wajib diisi'; return; }
-  let equipContainer;
-  if (_ctx.addEqSA) {
-    const sa = findSubArea(_ctx.addEqUnit, _ctx.addEqArea, _ctx.addEqSA);
-    if (!sa) return;
-    if (!sa.equipments) sa.equipments = [];
-    equipContainer = sa;
-  } else {
-    // Tanpa sub area → tambah langsung ke area
-    const area = findArea(_ctx.addEqUnit, _ctx.addEqArea);
-    if (!area) return;
-    if (!area.equipments) area.equipments = [];
-    equipContainer = area;
-  }
 
-  // ADD START: auto-generate params from template
+  const area = findArea(_ctx.addEqUnit, _ctx.addEqArea);
+  if (!area) return;
+  if (!area.equipments) area.equipments = [];
+
   const templateParams = EQUIP_PARAM_TEMPLATES[type] || [];
-  const autoParams = templateParams.map((p, i) => ({
-    ...p,
-    id: genPId()
-  }));
+  const autoParams = templateParams.map(p => ({ ...p, id: genPId() }));
 
-  // Additional context for MCC and AIR_COMPRESSOR
   let subLabel = '';
   if (type === 'MCC') {
     subLabel = document.getElementById('mccPanelInput')?.value || '';
@@ -2708,19 +2664,17 @@ function submitAddEquip() {
   }
 
   const equipName = subLabel ? `${name} — ${subLabel}` : name;
-  equipContainer.equipments.push({ id: genEId(), name: equipName, tag, type, params: autoParams });
-  // ADD END
+  area.equipments.push({ id: genEId(), name: equipName, tag, type, params: autoParams });
 
   saveAll(); renderHierTree(); setText('sc-equip', countEquipments());
   closeOverlay('addEquipOverlay');
-   // Reset form
-document.getElementById('equipTypeInput').value = '';
-document.getElementById('equipTypePreview').style.display = 'none';
-document.getElementById('mccPanelGroup').style.display = 'none';
-document.getElementById('compressorLocGroup').style.display = 'none';
+  document.getElementById('equipTypeInput').value = '';
+  document.getElementById('equipTypePreview').style.display = 'none';
+  document.getElementById('mccPanelGroup').style.display = 'none';
+  document.getElementById('compressorLocGroup').style.display = 'none';
   const msg = autoParams.length ? `Equipment "${equipName}" + ${autoParams.length} param auto ✓` : `Equipment "${equipName}" ditambahkan ✓`;
   toast(msg, 'success');
-if (WEBHOOK_URL) syncAll(true);
+  if (WEBHOOK_URL) syncAll(true);
 }
 
 // ADD START: Conditional dropdown & type preview
@@ -2954,42 +2908,19 @@ function onNSAreaChange() {
   document.getElementById('ns-param-preview').style.display = 'none';
   if (!areaId) return;
 
-  // Kumpulkan semua equipment: langsung di area + dari semua sub area
-  const area   = findArea(unitId, areaId);
+  const area = findArea(unitId, areaId);
   const direct = area?.equipments || [];
   const fromSubs = (area?.subAreas || []).flatMap(sa => sa.equipments || []);
   const allEquips = [...direct, ...fromSubs];
 
   allEquips.forEach(eq => {
     const o = document.createElement('option');
-    o.value       = eq.id;
+    o.value = eq.id;
     o.textContent = eq.name + (eq.tag ? ` (${eq.tag})` : '');
     eqSel.appendChild(o);
   });
 }
-function onNSSubAreaChange() {
-  const unitId = getVal('ns-unit');
-  const areaId = getVal('ns-area');
-  const saId   = getVal('ns-subarea');
-  const eqSel  = document.getElementById('ns-equip');
-  eqSel.innerHTML = '<option value="">— Pilih Equipment —</option>';
-  document.getElementById('ns-param-preview').style.display = 'none';
-  if (!areaId) return;
-  let equips = [];
-  if (saId) {
-    // Ada sub area dipilih → load equipment dari sub area
-    const sa = findSubArea(unitId, areaId, saId);
-    equips = sa?.equipments || [];
-  } else {
-    // Tanpa sub area → load equipment langsung dari area
-    const area = findArea(unitId, areaId);
-    equips = area?.equipments || [];
-  }
-  equips.forEach(eq => {
-    const o = document.createElement('option'); o.value=eq.id; o.textContent=eq.name + (eq.tag?` (${eq.tag})`:''); eqSel.appendChild(o);
-  });
-}
-
+   
 function onNSEquipChange() {
   const unitId = getVal('ns-unit');
   const areaId = getVal('ns-area');
@@ -3010,7 +2941,6 @@ function submitNewSession() {
   let ok = true;
   const unitId  = getVal('ns-unit');
   const areaId  = getVal('ns-area');
-  const saId    = getVal('ns-subarea');
   const eqId    = getVal('ns-equip');
   const tanggal = getVal('ns-date');
   const start   = getVal('ns-start');
@@ -3028,15 +2958,14 @@ function submitNewSession() {
 
  const unit = findUnit(unitId);
   const area = findArea(unitId, areaId);
-  const eq   = findEquipFlex(unitId, areaId, '', eqId)
-          || (area?.subAreas||[]).flatMap(s=>s.equipments||[]).find(e=>e.id===eqId);
+  const eq = findEquipFlex(unitId, areaId, '', eqId);
 
   const id = genId();
   const session = {
     id, tanggal, startTime: start, endTime: getVal('ns-end'),
     unitId, unitName: unit?.name||'',
     areaId, areaName: area?.name||'',
-    subAreaId: '', subAreaNam: '',
+    subAreaId: '', subAreaName: '',
     equipId: eqId, equipName: eq?.name||'',
     pic: pics.join(', '),
     catatan: '', tindakan: '',
@@ -3048,13 +2977,12 @@ function submitNewSession() {
   closeOverlay('newSessionOverlay');
   toast('Sesi ' + id + ' dibuat. Isi parameter di bawah ↓', 'success');
 
-  // Sync sesi baru ke Sheets langsung (tanpa delay)
   if (WEBHOOK_URL) {
     setSyncStatus('syncing');
     autoSyncSession(session);
   }
 
-  openChecklistModal(id, unitId, areaId, saId, eqId);
+  openChecklistModal(id, unitId, areaId, '', eqId);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -3827,109 +3755,76 @@ function exportCSV() {
 // SEED UNIT 1 — Auto-generate hierarki Unit 1
 // ═══════════════════════════════════════════════════════
 function seedUnit1() {
-  // Cek apakah Unit 1 sudah ada
   const existing = hierarchy.units.find(u => u.name === 'Unit 1');
   if (existing) {
     if (!confirm('Unit 1 sudah ada. Generate ulang akan menambahkan equipment baru (tidak hapus yang ada). Lanjutkan?')) return;
   }
-
   const u1Id = existing ? existing.id : genUId();
   if (!existing) hierarchy.units.push({ id: u1Id, name: 'Unit 1', desc: 'Unit Produksi 1', areas: [] });
   const u1 = hierarchy.units.find(u => u.id === u1Id);
 
-  // Helper buat area jika belum ada
   function getOrCreateArea(name) {
     let a = u1.areas.find(x => x.name === name);
     if (!a) { a = { id: genAId(), name, subAreas: [], equipments: [] }; u1.areas.push(a); }
+    if (!a.equipments) a.equipments = [];
     return a;
   }
-
   function makeParams(type) {
     return (EQUIP_PARAM_TEMPLATES[type]||[]).map(p => ({...p, id: genPId()}));
   }
 
-  // ── 1. TRANSFORMER & CUBICLE ───────────────────────────
+  // 1. TRANSFORMER
   const aTrafo = getOrCreateArea('Transformer & Cubicle');
-  if (!aTrafo.equipments) aTrafo.equipments = [];
-  if (!aTrafo.equipments.find(e => e.name === 'Transformer & Cubicle')) {
+  if (!aTrafo.equipments.find(e => e.name === 'Transformer & Cubicle'))
     aTrafo.equipments.push({ id: genEId(), name: 'Transformer & Cubicle', tag: 'TRF-01', type: 'TRANSFORMER', params: makeParams('TRANSFORMER') });
-  }
 
-  // ── 2. LVMDP ───────────────────────────────────────────
+  // 2. LVMDP
   const aLvmdp = getOrCreateArea('LVMDP');
-  if (!aLvmdp.equipments) aLvmdp.equipments = [];
-  if (!aLvmdp.equipments.find(e => e.name === 'LVMDP')) {
+  if (!aLvmdp.equipments.find(e => e.name === 'LVMDP'))
     aLvmdp.equipments.push({ id: genEId(), name: 'LVMDP', tag: 'LVMDP-01', type: 'LVMDP', params: makeParams('LVMDP') });
-  }
 
-  // ── 3. CAPACITOR BANK ─────────────────────────────────
+  // 3. CAPACITOR BANK
   const aCap = getOrCreateArea('Capacitor Bank');
-  if (!aCap.equipments) aCap.equipments = [];
-  if (!aCap.equipments.find(e => e.name === 'Capacitor Bank')) {
+  if (!aCap.equipments.find(e => e.name === 'Capacitor Bank'))
     aCap.equipments.push({ id: genEId(), name: 'Capacitor Bank', tag: 'CAP-01', type: 'CAPACITOR_BANK', params: makeParams('CAPACITOR_BANK') });
-  }
 
-  // ── 4. MCC PANEL — sub area per panel ─────────────────
+  // 4. MCC PANEL — langsung ke area.equipments
   const aMcc = getOrCreateArea('MCC Panel');
   const mccList = [
-    'MCC Distribusi Blower 1 (Prairie)',
-    'MCC Distribusi Blower 2 (Prairie)',
-    'MCC Receiving (Prairie)',
-    'MCC Sheller (Prairie)',
-    'MCC Blower (Peanut)',
-    'MCC Receiving (Peanut)',
-    'MCC Sheller (Peanut)',
-    'MCC Blower (Petkus)',
-    'MCC Receiving (Petkus)',
-    'MCC Sheller (Petkus)',
-    'MCC 1 (CTP 1)',
-    'MCC 2 (CTP 1)',
-    'MCC Office (ADV)',
-    'MCC Office (Prasad)',
-    'MCC 1 (CTP 2)',
+    'MCC Distribusi Blower 1 (Prairie)', 'MCC Distribusi Blower 2 (Prairie)',
+    'MCC Receiving (Prairie)', 'MCC Sheller (Prairie)',
+    'MCC Blower (Peanut)', 'MCC Receiving (Peanut)', 'MCC Sheller (Peanut)',
+    'MCC Blower (Petkus)', 'MCC Receiving (Petkus)', 'MCC Sheller (Petkus)',
+    'MCC 1 (CTP 1)', 'MCC 2 (CTP 1)', 'MCC Office (ADV)', 'MCC Office (Prasad)', 'MCC 1 (CTP 2)',
   ];
   mccList.forEach((mccName, i) => {
-    let sa = aMcc.subAreas.find(s => s.name === mccName);
-    if (!sa) { sa = { id: genSId(), name: mccName, equipments: [] }; aMcc.subAreas.push(sa); }
-    if (!sa.equipments) sa.equipments = [];
-    if (!sa.equipments.find(e => e.name === mccName)) {
-      sa.equipments.push({ id: genEId(), name: mccName, tag: `MCC-${String(i+1).padStart(2,'0')}`, type: 'MCC', params: makeParams('MCC') });
-    }
+    if (!aMcc.equipments.find(e => e.name === mccName))
+      aMcc.equipments.push({ id: genEId(), name: mccName, tag: `MCC-${String(i+1).padStart(2,'0')}`, type: 'MCC', params: makeParams('MCC') });
   });
 
-  // ── 5. AIR COMPRESSOR — sub area per lokasi ───────────
+  // 5. AIR COMPRESSOR — langsung ke area.equipments
   const aComp = getOrCreateArea('Air Compressor');
   const compList = ['CTP 1','CTP 2','Peanut','Prairie','Petkus'];
   compList.forEach((loc, i) => {
-    let sa = aComp.subAreas.find(s => s.name === loc);
-    if (!sa) { sa = { id: genSId(), name: loc, equipments: [] }; aComp.subAreas.push(sa); }
-    if (!sa.equipments) sa.equipments = [];
     const eName = `Air Compressor ${loc}`;
-    if (!sa.equipments.find(e => e.name === eName)) {
-      sa.equipments.push({ id: genEId(), name: eName, tag: `AC-${String(i+1).padStart(2,'0')}`, type: 'AIR_COMPRESSOR', params: makeParams('AIR_COMPRESSOR') });
-    }
+    if (!aComp.equipments.find(e => e.name === eName))
+      aComp.equipments.push({ id: genEId(), name: eName, tag: `AC-${String(i+1).padStart(2,'0')}`, type: 'AIR_COMPRESSOR', params: makeParams('AIR_COMPRESSOR') });
   });
 
-  // ── 6. HYDRANT ─────────────────────────────────────────
+  // 6. HYDRANT
   const aHydrant = getOrCreateArea('Hydrant');
-  if (!aHydrant.equipments) aHydrant.equipments = [];
-  if (!aHydrant.equipments.find(e => e.name === 'Hydrant System')) {
+  if (!aHydrant.equipments.find(e => e.name === 'Hydrant System'))
     aHydrant.equipments.push({ id: genEId(), name: 'Hydrant System', tag: 'HYD-01', type: 'HYDRANT', params: makeParams('HYDRANT') });
-  }
 
-  // ── 7. MINI CHAMBER ───────────────────────────────────
+  // 7. MINI CHAMBER
   const aChamber = getOrCreateArea('Mini Chamber');
-  if (!aChamber.equipments) aChamber.equipments = [];
-  if (!aChamber.equipments.find(e => e.name === 'Mini Chamber')) {
+  if (!aChamber.equipments.find(e => e.name === 'Mini Chamber'))
     aChamber.equipments.push({ id: genEId(), name: 'Mini Chamber', tag: 'MCH-01', type: 'MINI_CHAMBER', params: makeParams('MINI_CHAMBER') });
-  }
 
-  saveAll(); renderHierTree(); populateUnitFilters();
-  renderDashboard();
-  // Sembunyikan banner setelah setup
+  saveAll(); renderHierTree(); populateUnitFilters(); renderDashboard();
   const banner = document.getElementById('seedUnit1Banner');
   if (banner) banner.style.display = 'none';
-  toast('✅ Unit 1 berhasil di-generate! 7 area, 24 equipment, parameter lengkap.', 'success');
+  toast('✅ Unit 1 berhasil di-generate! 7 area, ' + (3 + mccList.length + compList.length + 2) + ' equipment, parameter lengkap.', 'success');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -3940,7 +3835,6 @@ function seedUnit2() {
   if (existing) {
     if (!confirm('Unit 2 sudah ada. Generate ulang akan menambahkan equipment baru (tidak hapus yang ada). Lanjutkan?')) return;
   }
-
   const u2Id = existing ? existing.id : genUId();
   if (!existing) hierarchy.units.push({ id: u2Id, name: 'Unit 2', desc: 'Unit Produksi 2', areas: [] });
   const u2 = hierarchy.units.find(u => u.id === u2Id);
@@ -3948,93 +3842,63 @@ function seedUnit2() {
   function getOrCreateArea(name) {
     let a = u2.areas.find(x => x.name === name);
     if (!a) { a = { id: genAId(), name, subAreas: [], equipments: [] }; u2.areas.push(a); }
-    if (!a.subAreas)   a.subAreas   = [];
     if (!a.equipments) a.equipments = [];
     return a;
   }
-
   function makeParams(type) {
     return (EQUIP_PARAM_TEMPLATES[type] || []).map(p => ({ ...p, id: genPId() }));
   }
 
-  // ── 1. TRANSFORMER & CUBICLE ──────────────────────────
+  // 1. TRANSFORMER
   const aTrafo = getOrCreateArea('Transformer & Cubicle');
-  if (!aTrafo.equipments.find(e => e.name === 'Transformer & Cubicle')) {
+  if (!aTrafo.equipments.find(e => e.name === 'Transformer & Cubicle'))
     aTrafo.equipments.push({ id: genEId(), name: 'Transformer & Cubicle', tag: 'TRF-U2-01', type: 'TRANSFORMER', params: makeParams('TRANSFORMER') });
-  }
 
-  // ── 2. LVMDP ──────────────────────────────────────────
+  // 2. LVMDP
   const aLvmdp = getOrCreateArea('LVMDP');
-  if (!aLvmdp.equipments.find(e => e.name === 'LVMDP')) {
+  if (!aLvmdp.equipments.find(e => e.name === 'LVMDP'))
     aLvmdp.equipments.push({ id: genEId(), name: 'LVMDP', tag: 'LVMDP-U2-01', type: 'LVMDP', params: makeParams('LVMDP') });
-  }
 
-  // ── 3. CAPACITOR BANK ─────────────────────────────────
+  // 3. CAPACITOR BANK
   const aCap = getOrCreateArea('Capacitor Bank');
-  if (!aCap.equipments.find(e => e.name === 'Capacitor Bank')) {
+  if (!aCap.equipments.find(e => e.name === 'Capacitor Bank'))
     aCap.equipments.push({ id: genEId(), name: 'Capacitor Bank', tag: 'CAP-U2-01', type: 'CAPACITOR_BANK', params: makeParams('CAPACITOR_BANK') });
-  }
 
-  // ── 4. MCC PANEL — 23 panel sebagai sub area ──────────
+  // 4. MCC PANEL — langsung ke area.equipments
   const aMcc = getOrCreateArea('MCC Panel');
   const mccList = [
-    'MCC Cold Storage (CS 1 & CS 2)',
-    'Panel Antiroom CS1',
-    'Panel Antiroom CS2',
-    'MCB BOX Office Bayer',
-    'MCB BOX Prasad',
-    'MCB BOX Shigenta',
-    'Panel Security',
-    'MCC Cold Storage (CS 3 & CS 4)',
-    'Panel Antiroom CS3',
-    'Panel Antiroom CS4',
-    'MCC Office Bioseed',
-    'MCC Distribusi Blower 1 (SPR)',
-    'MCC Distribusi Blower 2 (SPR)',
-    'MCC Distribusi Blower 3 (SPR)',
-    'MCC Receiving (SPR)',
-    'MCC Sheller (SPR)',
-    'MCC Blower (PS Drier)',
-    'MCC Receiving (PS Drier)',
-    'MCC Sheller (PS Drier)',
-    'MCC Blower (Peanut)',
-    'MCC Receiving (Peanut)',
-    'MCC Sheller (Peanut)',
-    'MCC 1 (CTP 1)',
-    'MCC 1 (CTP 2)',
+    'MCC Cold Storage (CS 1 & CS 2)', 'Panel Antiroom CS1', 'Panel Antiroom CS2',
+    'MCB BOX Office Bayer', 'MCB BOX Prasad', 'MCB BOX Shigenta', 'Panel Security',
+    'MCC Cold Storage (CS 3 & CS 4)', 'Panel Antiroom CS3', 'Panel Antiroom CS4',
+    'MCC Office Bioseed', 'MCC Distribusi Blower 1 (SPR)', 'MCC Distribusi Blower 2 (SPR)',
+    'MCC Distribusi Blower 3 (SPR)', 'MCC Receiving (SPR)', 'MCC Sheller (SPR)',
+    'MCC Blower (PS Drier)', 'MCC Receiving (PS Drier)', 'MCC Sheller (PS Drier)',
+    'MCC Blower (Peanut)', 'MCC Receiving (Peanut)', 'MCC Sheller (Peanut)',
+    'MCC 1 (CTP 1)', 'MCC 1 (CTP 2)',
   ];
   mccList.forEach((mccName, i) => {
-    let sa = aMcc.subAreas.find(s => s.name === mccName);
-    if (!sa) { sa = { id: genSId(), name: mccName, equipments: [] }; aMcc.subAreas.push(sa); }
-    if (!sa.equipments) sa.equipments = [];
-    if (!sa.equipments.find(e => e.name === mccName)) {
-      sa.equipments.push({ id: genEId(), name: mccName, tag: `MCC-U2-${String(i+1).padStart(2,'0')}`, type: 'MCC', params: makeParams('MCC') });
-    }
+    if (!aMcc.equipments.find(e => e.name === mccName))
+      aMcc.equipments.push({ id: genEId(), name: mccName, tag: `MCC-U2-${String(i+1).padStart(2,'0')}`, type: 'MCC', params: makeParams('MCC') });
   });
 
-  // ── 5. AIR COMPRESSOR — 3 lokasi ──────────────────────
+  // 5. AIR COMPRESSOR — langsung ke area.equipments
   const aComp = getOrCreateArea('Air Compressor');
   const compList = [
-    { name: 'AIR Compressor CTP',              tag: 'AC-U2-01' },
-    { name: 'AIR Compressor SPR',              tag: 'AC-U2-02' },
-    { name: 'AIR Compressor Packing Bioseed',  tag: 'AC-U2-03' },
+    { name: 'AIR Compressor CTP',             tag: 'AC-U2-01' },
+    { name: 'AIR Compressor SPR',             tag: 'AC-U2-02' },
+    { name: 'AIR Compressor Packing Bioseed', tag: 'AC-U2-03' },
   ];
   compList.forEach(({ name, tag }) => {
-    let sa = aComp.subAreas.find(s => s.name === name);
-    if (!sa) { sa = { id: genSId(), name, equipments: [] }; aComp.subAreas.push(sa); }
-    if (!sa.equipments) sa.equipments = [];
-    if (!sa.equipments.find(e => e.name === name)) {
-      sa.equipments.push({ id: genEId(), name, tag, type: 'AIR_COMPRESSOR', params: makeParams('AIR_COMPRESSOR') });
-    }
+    if (!aComp.equipments.find(e => e.name === name))
+      aComp.equipments.push({ id: genEId(), name, tag, type: 'AIR_COMPRESSOR', params: makeParams('AIR_COMPRESSOR') });
   });
 
-  // ── 6. HYDRANT ────────────────────────────────────────
+  // 6. HYDRANT
   const aHydrant = getOrCreateArea('Hydrant');
-  if (!aHydrant.equipments.find(e => e.name === 'Hydrant System')) {
+  if (!aHydrant.equipments.find(e => e.name === 'Hydrant System'))
     aHydrant.equipments.push({ id: genEId(), name: 'Hydrant System', tag: 'HYD-U2-01', type: 'HYDRANT', params: makeParams('HYDRANT') });
-  }
 
-  // ── 7. COLD STORAGE — 4 unit, masing-masing punya mesin ─
+  // 7. COLD STORAGE — langsung ke area.equipments, nama mesin include nama CS
   const aCs = getOrCreateArea('Cold Storage');
   const coldStorageConfig = [
     { unit: 'Cold Storage 1', mesin: 6 },
@@ -4042,35 +3906,37 @@ function seedUnit2() {
     { unit: 'Cold Storage 3', mesin: 4 },
     { unit: 'Cold Storage 4', mesin: 5 },
   ];
-  coldStorageConfig.forEach(({ unit, mesin }) => {
-    let sa = aCs.subAreas.find(s => s.name === unit);
-    if (!sa) { sa = { id: genSId(), name: unit, equipments: [] }; aCs.subAreas.push(sa); }
-    if (!sa.equipments) sa.equipments = [];
+  coldStorageConfig.forEach(({ unit, mesin }, csIdx) => {
     for (let m = 1; m <= mesin; m++) {
       const eName = `${unit} - Mesin ${m}`;
-      const csIdx = coldStorageConfig.findIndex(c => c.unit === unit) + 1;
-      if (!sa.equipments.find(e => e.name === eName)) {
-        sa.equipments.push({ id: genEId(), name: eName, tag: `CS${csIdx}-M${m}`, type: 'COLD_STORAGE', params: makeParams('COLD_STORAGE') });
-      }
+      if (!aCs.equipments.find(e => e.name === eName))
+        aCs.equipments.push({ id: genEId(), name: eName, tag: `CS${csIdx+1}-M${m}`, type: 'COLD_STORAGE', params: makeParams('COLD_STORAGE') });
     }
   });
 
-  saveAll(); renderHierTree(); populateUnitFilters();
-  renderDashboard();
+  saveAll(); renderHierTree(); populateUnitFilters(); renderDashboard();
   const banner = document.getElementById('seedUnit2Banner');
   if (banner) banner.style.display = 'none';
-  const totalEquip = 1+1+1+mccList.length+compList.length+1+coldStorageConfig.reduce((s,c)=>s+c.mesin,0);
+  const totalEquip = 3 + mccList.length + compList.length + 1 + coldStorageConfig.reduce((s,c) => s+c.mesin, 0);
   toast(`✅ Unit 2 berhasil di-generate! 7 area, ${totalEquip} equipment, parameter lengkap.`, 'success');
 }
+   
 function findUnit(uid)                           { return hierarchy.units.find(u => u.id === uid); }
 function findArea(uid, aid)                      { return findUnit(uid)?.areas.find(a => a.id === aid); }
 function findSubArea(uid, aid, sid)              { return findArea(uid, aid)?.subAreas.find(s => s.id === sid); }
 function findEquip(uid, aid, sid, eid)           { return findSubArea(uid, aid, sid)?.equipments?.find(e => e.id === eid); }
 // findEquipFlex: support saId kosong (equipment langsung di area)
 function findEquipFlex(uid, aid, sid, eid) {
-  if (sid) return findEquip(uid, aid, sid, eid);
-  // Tanpa sub area — cari di area.equipments
-  return findArea(uid, aid)?.equipments?.find(e => e.id === eid) || null;
+  // Cari di area.equipments langsung
+  const direct = findArea(uid, aid)?.equipments?.find(e => e.id === eid);
+  if (direct) return direct;
+  // Fallback: cari di subAreas (untuk data lama yg masih punya subAreaId)
+  const area = findArea(uid, aid);
+  for (const sa of (area?.subAreas || [])) {
+    const eq = sa.equipments?.find(e => e.id === eid);
+    if (eq) return eq;
+  }
+  return null;
 }
 // getAllEquipsInArea: kumpulkan semua equip di area (subArea maupun langsung)
 function getAllEquipsInArea(uid, aid) {
