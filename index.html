@@ -1493,14 +1493,6 @@ body {
           <div class="chk-grid" id="nsPICGrid"></div>
           <div class="ferr" id="ne-pic"></div>
         </div>
-        <div class="fg full">
-          <label class="flabel">Catatan / Temuan</label>
-          <textarea class="ftextarea" id="ns-catatan" placeholder="Catatan kondisi, temuan anomali..."></textarea>
-        </div>
-        <div class="fg full">
-          <label class="flabel">Tindakan yang Dilakukan</label>
-          <textarea class="ftextarea" id="ns-tindakan" placeholder="Tindakan perbaikan atau pencegahan..."></textarea>
-        </div>
       </div>
       <!-- Param preview -->
       <div id="ns-param-preview" style="display:none;margin-top:16px">
@@ -2908,7 +2900,7 @@ function saveParamEdits() {
 // ═══════════════════════════════════════════════════════
 function openNewSessionModal(preUnitId, preAreaId, preSAId, preEqId) {
   // Reset
-  ['ns-date','ns-start','ns-end','ns-catatan','ns-tindakan'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  ['ns-date','ns-start','ns-end'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
   ['ne-date','ne-start','ne-unit','ne-area','ne-subarea','ne-equip','ne-pic'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent=''; });
   document.getElementById('ns-area').innerHTML    = '<option value="">— Pilih Area —</option>';
   document.getElementById('ns-subarea').innerHTML = '<option value="">— Pilih Sub Area —</option>';
@@ -3046,7 +3038,7 @@ function submitNewSession() {
     subAreaId: saId, subAreaName: sa?.name||'',
     equipId: eqId, equipName: eq?.name||'',
     pic: pics.join(', '),
-    catatan: getVal('ns-catatan'), tindakan: getVal('ns-tindakan'),
+    catatan: '', tindakan: '',
     createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     items: []
   };
