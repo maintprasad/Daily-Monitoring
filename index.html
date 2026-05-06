@@ -593,8 +593,16 @@ body {
 .toast-item.success { background: #e8f5e8; border: 1px solid rgba(74,158,63,.4); color: var(--green-d); }
 .toast-item.error   { background: #fdecea; border: 1px solid rgba(192,57,43,.3); color: var(--red); }
 .toast-item.info    { background: var(--bg2); border: 1px solid var(--border); color: var(--text2); }
-@keyframes toastin { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+/* ── TABLE ACTION BUTTONS ────────────────────────────────── */
+.tbl-btn {
+  background: none; border: 1px solid var(--border);
+  color: var(--text2); font-size: 12px; padding: 4px 8px;
+  border-radius: 5px; cursor: pointer; transition: all .12s;
+  white-space: nowrap; line-height: 1.4;
+}
+.tbl-btn:hover { border-color: var(--border2); color: var(--text); background: var(--bg3); }
 
+@keyframes toastin { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 /* ── PROGRESS ────────────────────────────────── */
 .progress-wrap { background: var(--border); border-radius: 4px; height: 6px; overflow: hidden; flex: 1; }
 .progress-bar  { height: 100%; border-radius: 4px; transition: width .4s ease; }
@@ -1939,6 +1947,26 @@ function initApp() {
   if (WO_API_URL) {
     setTimeout(() => fetchAndSyncHierarchyIds({ silent: true }), 1500);
   }
+
+  // ── AUTO POLLING 30 detik — supaya realtime dari Sheets ───
+  startAutoPolling();
+}
+
+// Handle interval polling
+let _pollingInterval = null;
+
+function startAutoPolling() {
+  if (_pollingInterval) clearInterval(_pollingInterval);
+  if (!WEBHOOK_URL) return;
+  _pollingInterval = setInterval(async () => {
+    if (_pullInProgress) return; // jangan poll saat sedang pull manual
+    await pullFromSheets({ silent: true, isPolling: true });
+  }, 30000); // 30 detik
+  console.log('[Polling] Auto-sync aktif setiap 30 detik');
+}
+
+function stopAutoPolling() {
+  if (_pollingInterval) { clearInterval(_pollingInterval); _pollingInterval = null; }
 }
 
 /**
@@ -3339,9 +3367,35 @@ function viewSession(sessId) {
 function deleteSession(sessId) {
   if (!confirm('Hapus sesi ' + sessId + '? Tidak bisa dibatalkan.')) return;
   sessions = sessions.filter(s => s.id !== sessId);
-  saveAll(); renderAll();
-  if (WEBHOOK_URL) webhookPost('delete_session', { id: sessId });
-  toast('Sesi dihapus', 'info');
+  saveAll(); renderAll(); regenerateFindings();
+  if (WEBHOOK_URL) {
+    fetch(WEBHOOK_URL, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        action: 'delete_session',
+        key: WEBHOOK_KEY,
+        payload: { id: sessId }
+      }),
+    })
+    .then(r => r.text())
+    .then(t => {
+      try {
+        const j = JSON.parse(t);
+        if (j.status === 'ok') {
+          toast('Sesi dihapus & tersync ke Sheets ✓', 'success');
+        } else {
+          toast('Dihapus lokal. Sheets: ' + (j.message || 'error'), 'info');
+        }
+      } catch(e) {
+        toast('Sesi dihapus lokal ✓', 'info');
+      }
+    })
+    .catch(() => toast('Sesi dihapus lokal (offline) ✓', 'info'));
+  } else {
+    toast('Sesi dihapus ✓', 'success');
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -3644,11 +3698,10 @@ async function pullFromSheets(opts) {
       }
 
       // ── Sync sessions ─────────────────────────────────────────
-      if (Array.isArray(res.sessions) && res.sessions.length > 0) {
-        // Merge: pertahankan sesi lokal yang tidak ada di Sheets
-        const sheetIds = new Set(res.sessions.map(s => s.id));
-        const localOnly = sessions.filter(s => !sheetIds.has(s.id));
-        sessions = [...res.sessions, ...localOnly];
+      // HARD REPLACE: Sheets = source of truth.
+      // Sesi dihapus di Sheets → otomatis hilang di HTML.
+      if (Array.isArray(res.sessions)) {
+        sessions = res.sessions;
         changed = true;
       }
 
@@ -3658,23 +3711,26 @@ async function pullFromSheets(opts) {
 
       renderAll(); populateUnitFilters();
       _lastSyncAt = new Date(); setSyncStatus('ok');
-      if (!silent || changed) {
+      // Polling otomatis: jangan tampilkan toast supaya tidak mengganggu
+      if (!silent && !(opts && opts.isPolling)) {
         const unitCount = (gasHier && gasHier.units) ? gasHier.units.length : 0;
         toast(changed
           ? '✓ Pull selesai — ' + unitCount + ' unit, ' + (res.sessions||[]).length + ' sesi'
           : '✓ Data sudah terkini', 'success');
       }
     } else {
-      setSyncStatus('error');
-      const errMsg = res?.message || 'Error tidak diketahui';
-      toast('✗ Pull gagal: ' + errMsg, 'error');
+     if (!(opts && opts.isPolling)) {
+        setSyncStatus('error');
+        const errMsg = res?.message || 'Error tidak diketahui';
+        toast('✗ Pull gagal: ' + errMsg, 'error');
+      }
       console.error('[pullFromSheets] GAS error:', res);
-    }
   } catch(e) {
-    setSyncStatus('error');
-    toast('✗ Pull gagal: ' + e.message, 'error');
+   if (!(opts && opts.isPolling)) {
+      setSyncStatus('error');
+      toast('✗ Pull gagal: ' + e.message, 'error');
+    }
     console.error('[pullFromSheets] Fetch error:', e);
-  }
 }
 
 // Konversi format equipment GAS v4 (nested params) → format lokal
@@ -3727,7 +3783,7 @@ function setSyncStatus(s) {
   const cfgs  = {
     idle:    { text:'☁ Sync',      cls:'',    side:'⬡ Belum sync' },
     syncing: { text:'↻ Syncing...',cls:'',    side:'↻ Sedang sync...' },
-    ok:      { text:'✓ Synced',    cls:'ok',  side:`✓ ${_lastSyncAt?_lastSyncAt.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}):''}` },
+    ok:      { text:'✓ Live ●',    cls:'ok',  side:`✓ Realtime aktif · ${_lastSyncAt?_lastSyncAt.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):''}` },
     error:   { text:'✗ Gagal',     cls:'err', side:'✗ Sync gagal' },
     nourl:   { text:'☁ Sync',      cls:'',    side:'⬡ Webhook belum diset' },
   };
