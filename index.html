@@ -2945,22 +2945,24 @@ function onNSUnitChange() {
 function onNSAreaChange() {
   const unitId = getVal('ns-unit');
   const areaId = getVal('ns-area');
-  const saSel  = document.getElementById('ns-subarea');
-  saSel.innerHTML = '<option value="">— Tanpa Sub Area —</option>';
-  document.getElementById('ns-equip').innerHTML = '<option value="">— Pilih Equipment —</option>';
+  const eqSel  = document.getElementById('ns-equip');
+  eqSel.innerHTML = '<option value="">— Pilih Equipment —</option>';
   document.getElementById('ns-param-preview').style.display = 'none';
   if (!areaId) return;
-  const area = findArea(unitId, areaId);
-  const subAreas = area?.subAreas || [];
-  subAreas.forEach(sa => {
-    const o = document.createElement('option'); o.value=sa.id; o.textContent=sa.name; saSel.appendChild(o);
-  });
-  // Kalau area tidak punya sub area sama sekali → langsung load equipment dari area
-  if (!subAreas.length) {
-    onNSSubAreaChange(); // saId akan kosong → load equip dari area
-  }
-}
 
+  // Kumpulkan semua equipment: langsung di area + dari semua sub area
+  const area   = findArea(unitId, areaId);
+  const direct = area?.equipments || [];
+  const fromSubs = (area?.subAreas || []).flatMap(sa => sa.equipments || []);
+  const allEquips = [...direct, ...fromSubs];
+
+  allEquips.forEach(eq => {
+    const o = document.createElement('option');
+    o.value       = eq.id;
+    o.textContent = eq.name + (eq.tag ? ` (${eq.tag})` : '');
+    eqSel.appendChild(o);
+  });
+}
 function onNSSubAreaChange() {
   const unitId = getVal('ns-unit');
   const areaId = getVal('ns-area');
@@ -2987,8 +2989,10 @@ function onNSSubAreaChange() {
 function onNSEquipChange() {
   const unitId = getVal('ns-unit');
   const areaId = getVal('ns-area');
-  const saId   = getVal('ns-subarea');
   const eqId   = getVal('ns-equip');
+  const area2  = findArea(unitId, areaId);
+  const allEqs = [...(area2?.equipments||[]), ...(area2?.subAreas||[]).flatMap(s=>s.equipments||[])];
+  const eq     = allEqs.find(e => e.id === eqId);
   const preview = document.getElementById('ns-param-preview');
   const plist   = document.getElementById('ns-param-list');
   if (!eqId) { preview.style.display='none'; return; }
@@ -3021,8 +3025,10 @@ function submitNewSession() {
 
   const unit = findUnit(unitId);
   const area = findArea(unitId, areaId);
-  const sa   = saId ? findSubArea(unitId, areaId, saId) : null;
-  const eq   = findEquipFlex(unitId, areaId, saId, eqId);
+  const sa   = null;
+  const saId = '';
+  const eq   = findEquipFlex(unitId, areaId, '', eqId) 
+          || (area?.subAreas||[]).flatMap(s=>s.equipments||[]).find(e=>e.id===eqId);
 
   const id = genId();
   const session = {
