@@ -1468,13 +1468,7 @@ body {
           </select>
           <div class="ferr" id="ne-area"></div>
         </div>
-        <div class="fg">
-          <label class="flabel">Sub Area <span style="color:var(--text3);font-size:10px">(opsional)</span></label>
-          <select class="fsel2" id="ns-subarea" onchange="onNSSubAreaChange()">
-            <option value="">— Tanpa Sub Area —</option>
-          </select>
-          <div class="ferr" id="ne-subarea"></div>
-        </div>
+      //sub area sudah dihapus
         <div class="fg">
           <label class="flabel">Equipment <span class="req">*</span></label>
           <select class="fsel2" id="ns-equip" required onchange="onNSEquipChange()">
@@ -2903,7 +2897,7 @@ function openNewSessionModal(preUnitId, preAreaId, preSAId, preEqId) {
   ['ns-date','ns-start','ns-end'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
   ['ne-date','ne-start','ne-unit','ne-area','ne-subarea','ne-equip','ne-pic'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent=''; });
   document.getElementById('ns-area').innerHTML    = '<option value="">— Pilih Area —</option>';
-  document.getElementById('ns-subarea').innerHTML = '<option value="">— Pilih Sub Area —</option>';
+  // dihapus document.getElementById('ns-subarea').innerHTML = '<option value="">— Pilih Sub Area —</option>';
   document.getElementById('ns-equip').innerHTML   = '<option value="">— Pilih Equipment —</option>';
   document.getElementById('ns-param-preview').style.display = 'none';
   setTodayDate();
