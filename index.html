@@ -3719,17 +3719,9 @@ async function pullFromSheets(opts) {
           : '✓ Data sudah terkini', 'success');
       }
     } else {
-     if (!(opts && opts.isPolling)) {
+      if (!(opts && opts.isPolling)) {
         setSyncStatus('error');
-        const errMsg = res?.message || 'Error tidak diketahui';
-        toast('✗ Pull gagal: ' + errMsg, 'error');
-      }
-      console.error('[pullFromSheets] GAS error:', res);
-  } catch(e) {
-   if (!(opts && opts.isPolling)) {
-        setSyncStatus('error');
-        const errMsg = res?.message || 'Error tidak diketahui';
-        toast('✗ Pull gagal: ' + errMsg, 'error');
+        toast('✗ Pull gagal: ' + (res?.message || 'Error tidak diketahui'), 'error');
       }
       console.error('[pullFromSheets] GAS error:', res);
     }
