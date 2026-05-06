@@ -2172,6 +2172,7 @@ function renderAll() {
   renderHistory();
   renderHierTree();
   renderConfigPage();
+  checkSeedBanners();
   // Re-render monitor page kalau sedang aktif
   if (document.getElementById('page-monitor')?.classList.contains('active')) {
     renderMonitorPage();
@@ -2392,7 +2393,17 @@ function resetHistFilters() {
 // ═══════════════════════════════════════════════════════
 // HIERARCHY TREE RENDERER
 // ═══════════════════════════════════════════════════════
+   function checkSeedBanners() {
+  const hasUnit1 = hierarchy.units.some(u => u.name === 'Unit 1');
+  const hasUnit2 = hierarchy.units.some(u => u.name === 'Unit 2');
+  const b1 = document.getElementById('seedUnit1Banner');
+  const b2 = document.getElementById('seedUnit2Banner');
+  if (b1) b1.style.display = hasUnit1 ? 'none' : '';
+  if (b2) b2.style.display = hasUnit2 ? 'none' : '';
+}
+   
 function renderHierTree() {
+  checkSeedBanners();
   const container = document.getElementById('hierTree');
   if (!container) return;
   if (!hierarchy.units.length) {
