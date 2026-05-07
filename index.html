@@ -1878,9 +1878,10 @@ let _pullInProgress = false; // flag: hindari auto-sync loop saat pull
 // LOGIN / AUTH
 // ═══════════════════════════════════════════════════════
 const USERS = [
-  { username: 'admin',  password: 'admin123',   role: 'admin',  name: 'Administrator' },
-  { username: 'spv',    password: 'spv123',      role: 'spv',    name: 'Supervisor' },
-  { username: 'leader', password: 'leader123',   role: 'leader', name: 'Team Leader' },
+  { username: 'admin',  password: 'admin123',   role: 'admin',  name: 'Bintang-Administrator' },
+  { username: 'spv',    password: 'spv123',      role: 'spv',    name: 'Krisna-Supervisor' },
+  { username: 'leader-1', password: 'leader123',   role: 'leader', name: 'Iwan-Leader' },
+  { username: 'leader-2', password: 'leader123',   role: 'leader', name: 'Aynur-Leader' },
   { username: 'crew',   password: 'crew123',     role: 'crew',   name: 'Crew' },
 ];
 
@@ -1939,7 +1940,42 @@ function doLogout() {
   if (passEl) passEl.value = '';
   if (errEl)  errEl.textContent = '';
 }
+function applyRoleRestrictions() {
+  const isCrew = currentUser && currentUser.role === 'crew';
 
+  // ── Sembunyikan menu Hierarki & Config dari topbar nav ──
+  document.querySelectorAll('.nav-btn[data-page="hierarchy"], .nav-btn[data-page="config"]').forEach(el => {
+    el.style.display = isCrew ? 'none' : '';
+  });
+
+  // ── Sembunyikan menu Hierarki & Config dari sidebar ──
+  document.querySelectorAll('.sb-item[data-page="hierarchy"], .sb-item[data-page="config"]').forEach(el => {
+    el.style.display = isCrew ? 'none' : '';
+  });
+
+  // ── Sembunyikan section "Sheets Sync" di sidebar (Push & Pull manual) ──
+  // Cara: sembunyikan tombol Push dan Pull di sidebar, tapi Auto-sync tetap jalan
+  document.querySelectorAll('.sb-section').forEach(section => {
+    const label = section.querySelector('.sb-label');
+    if (label && label.textContent.trim() === 'Sheets Sync') {
+      section.style.display = isCrew ? 'none' : '';
+    }
+  });
+
+  // ── Sembunyikan tombol Sync di topbar dan icon webhook ──
+  const syncBadge = document.getElementById('syncBadge');
+  const webhookBtn = document.querySelector('.icon-btn[onclick*="openWebhookModal"]');
+  if (syncBadge)  syncBadge.style.display  = isCrew ? 'none' : '';
+  if (webhookBtn) webhookBtn.style.display = isCrew ? 'none' : '';
+
+  // ── Sembunyikan tombol "Tambah Unit" di halaman Hierarki ──
+  // (jaga-jaga jika crew bisa akses via URL)
+  if (isCrew) {
+    const addUnitBtn = document.querySelector('#page-hierarchy .btn-primary');
+    if (addUnitBtn) addUnitBtn.style.display = 'none';
+  }
+}
+   
 function initApp() {
   loadAll();
   initNav();
@@ -1948,6 +1984,7 @@ function initApp() {
   renderAll();
   populateUnitFilters();
   setSyncStatus(WEBHOOK_URL ? 'idle' : 'nourl');
+  applyRoleRestrictions();
   // Auto-pull dari Sheets saat pertama kali dibuka
   if (WEBHOOK_URL) {
     setTimeout(() => pullFromSheets({ silent: true }), 800);
@@ -3308,12 +3345,15 @@ function saveChecklist(sessId) {
   renderAll();
   toast('Data monitoring disimpan ✓', 'success');
 
-  // Sync ke Google Sheets setelah checklist disimpan
+  // Sync ke Google Sheets — crew langsung full_sync, role lain pakai autoSyncSession
   if (WEBHOOK_URL) {
     setSyncStatus('syncing');
-    autoSyncSession(sess);
+    if (currentUser && currentUser.role === 'crew') {
+      syncAll(true); // silent full sync
+    } else {
+      autoSyncSession(sess);
+    }
   }
-}
 
 // ═══════════════════════════════════════════════════════
 // VIEW SESSION
