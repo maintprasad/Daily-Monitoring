@@ -4253,36 +4253,63 @@ function renderFindingsPage() {
     tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="empty-ico">✅</div><div class="empty-msg">Tidak ada finding${filterArea||filterStatus?' dengan filter ini':''}.</div></div></td></tr>`;
     return;
   }
-  tbody.innerHTML = filtered
-    .sort((a,b) => b.status.localeCompare(a.status) || (b.tanggal||'').localeCompare(a.tanggal||''))
-    .map(f => {
-      const badgeCls = f.status === 'ALERT' ? 'b-alert' : 'b-warn';
-      const woBadge  = f.hasWO
-        ? `<span class="badge" style="background:var(--green-dim);color:var(--green);border:1px solid rgba(74,158,63,.3);font-size:9px;display:block;margin-bottom:3px">✅ ${esc(f.woId||'WO Dibuat')}</span>`
-        : '';
-      const woBtn = f.hasWO
-        ? `<button class="tbl-btn" style="font-size:10px;padding:4px 7px;background:var(--green-dim);color:var(--green);border:1px solid rgba(74,158,63,.3)" disabled>✅ WO Ada</button>`
-        : `<button class="tbl-btn" style="font-size:10px;padding:4px 7px;background:var(--blue-dim);color:var(--blue);border:1px solid rgba(43,108,184,.3)"
-             onclick="openWOFromFinding('${esc(f.id)}')">🔧 Buat WO</button>`;
-      return `<tr>
-        <td style="font-size:11px;white-space:nowrap">${fmtDate(f.tanggal)}</td>
-        <td>
-          <span class="badge b-blue">${esc(f.unit)}</span>
-          <div style="font-size:10px;color:var(--text3);margin-top:2px">${esc(f.area)}</div>
-        </td>
-        <td style="font-weight:500;font-size:12px">${esc(f.equipment)}</td>
-        <td style="font-size:12px">${esc(f.parameter)}</td>
-        <td style="font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:13px;color:${f.status==='ALERT'?'var(--red)':'var(--orange)'}">
+  // Group findings by session
+  const bySess = {};
+  filtered.forEach(f => {
+    if (!bySess[f.sessId]) {
+      bySess[f.sessId] = {
+        sessId: f.sessId, tanggal: f.tanggal,
+        unit: f.unit, unitId: f.unitId,
+        area: f.area, areaId: f.areaId,
+        equipment: f.equipment, equipId: f.equipId,
+        findings: [], hasWO: false, woId: ''
+      };
+    }
+    bySess[f.sessId].findings.push(f);
+    if (f.hasWO) { bySess[f.sessId].hasWO = true; bySess[f.sessId].woId = f.woId; }
+  });
+
+  const groups = Object.values(bySess)
+    .sort((a,b) => {
+      const aHasAlert = a.findings.some(f=>f.status==='ALERT') ? 0 : 1;
+      const bHasAlert = b.findings.some(f=>f.status==='ALERT') ? 0 : 1;
+      return aHasAlert - bHasAlert || (b.tanggal||'').localeCompare(a.tanggal||'');
+    });
+
+  tbody.innerHTML = groups.map(g => {
+    const alertCount = g.findings.filter(f=>f.status==='ALERT').length;
+    const warnCount  = g.findings.filter(f=>f.status==='WARNING').length;
+    const woBtn = g.hasWO
+      ? `<button class="tbl-btn" style="font-size:10px;background:var(--green-dim);color:var(--green);border:1px solid rgba(74,158,63,.3)" disabled>✅ ${esc(g.woId||'WO Ada')}</button>`
+      : `<button class="tbl-btn" style="font-size:10px;background:var(--blue-dim);color:var(--blue);border:1px solid rgba(43,108,184,.3)"
+           onclick="openWOFromSession('${esc(g.sessId)}')">🔧 Buat WO</button>`;
+
+    const detailRows = g.findings.map(f => `
+      <tr style="background:${f.status==='ALERT'?'rgba(239,68,68,.04)':'rgba(249,115,22,.03)'}">
+        <td style="padding:5px 12px 5px 28px;font-size:11px;color:var(--text3)" colspan="2">↳ ${esc(f.parameter)}</td>
+        <td style="padding:5px 12px;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:${f.status==='ALERT'?'var(--red)':'var(--orange)'}">
           ${esc(f.value)} <span style="font-size:10px;font-weight:400;color:var(--text3)">${esc(f.unit_param)}</span>
         </td>
-        <td><span class="badge ${badgeCls}">${f.status}</span></td>
-        <td style="min-width:110px">${woBadge}${woBtn}</td>
+        <td style="padding:5px 12px"><span class="badge ${f.status==='ALERT'?'b-alert':'b-warn'}">${f.status}</span></td>
+        <td style="padding:5px 12px;font-size:11px;color:var(--text3)">${esc(f.note||'—')}</td>
+        <td colspan="3"></td>
+      </tr>`).join('');
+
+    return `
+      <tr style="border-top:2px solid var(--border2)">
+        <td style="font-size:11px;white-space:nowrap">${fmtDate(g.tanggal)}</td>
+        <td><span class="badge b-blue">${esc(g.unit)}</span><div style="font-size:10px;color:var(--text3);margin-top:2px">${esc(g.area)}</div></td>
+        <td style="font-weight:600;font-size:12px">${esc(g.equipment)}</td>
         <td>
-          <button class="tbl-btn" onclick="viewSession('${esc(f.sessId)}')">👁 Lihat Sesi</button>
+          <span class="badge b-alert" style="margin-right:3px">🚨 ${alertCount}</span>
+          <span class="badge b-warn">⚠ ${warnCount}</span>
         </td>
-      </tr>`;
-    }).join('');
-}
+        <td style="font-size:11px;color:var(--text3)">${g.findings.length} temuan</td>
+        <td>${woBtn}</td>
+        <td colspan="2"><button class="tbl-btn" onclick="viewSession('${esc(g.sessId)}')">👁 Lihat Sesi</button></td>
+      </tr>
+      ${detailRows}`;
+  }).join('');
 // ADD END: FINDING SYSTEM
 
 // ═══════════════════════════════════════════════════════════════════
@@ -4440,6 +4467,103 @@ function openWOFromFinding(findingId) {
   openOverlay('woFromFindingOverlay');
 }
 
+   function openWOFromSession(sessId) {
+  const sessFindings = findings.filter(f => f.sessId === sessId);
+  if (!sessFindings.length) { toast('Tidak ada finding untuk sesi ini','error'); return; }
+
+  const first    = sessFindings[0];
+  const hasAlert = sessFindings.some(f => f.status === 'ALERT');
+  const alertC   = sessFindings.filter(f=>f.status==='ALERT').length;
+  const warnC    = sessFindings.filter(f=>f.status==='WARNING').length;
+
+  // Buat objek gabungan untuk dipakai _currentWOFinding
+  _currentWOFinding = {
+    id: sessId + '_grouped', sessId,
+    tanggal: first.tanggal,
+    unit: first.unit, unitId: first.unitId,
+    area: first.area, areaId: first.areaId,
+    equipment: first.equipment, equipId: first.equipId,
+    parameter: sessFindings.map(f=>f.parameter).join(', '),
+    value: '', unit_param: '', note: '',
+    _allFindings: sessFindings,
+    status: hasAlert ? 'ALERT' : 'WARNING',
+  };
+
+  // Shift otomatis
+  const h = new Date().getHours();
+  const shiftEl = document.getElementById('wo-shift');
+  if (shiftEl) shiftEl.value = h >= 6 && h < 14 ? '1' : h >= 14 && h < 22 ? '2' : '3';
+
+  // Priority & type
+  const prioEl = document.getElementById('wo-priority');
+  if (prioEl) prioEl.value = hasAlert ? 'Critical' : 'High';
+  const typeEl = document.getElementById('wo-type');
+  if (typeEl) typeEl.value = hasAlert ? 'Emergency' : 'Corrective';
+
+  // Title
+  const titleEl = document.getElementById('wo-title');
+  if (titleEl) titleEl.value = `[${hasAlert?'ALERT':'WARNING'}] ${first.equipment} — ${alertC} Alert, ${warnC} Warning`;
+
+  // Notes — rangkum semua temuan
+  const notesEl = document.getElementById('wo-notes');
+  if (notesEl) {
+    const lines = sessFindings.map(f =>
+      `  [${f.status}] ${f.parameter}: ${f.value} ${f.unit_param}${f.note?' — '+f.note:''}`
+    ).join('\n');
+    notesEl.value =
+      `Temuan dari Monitoring System (Sesi: ${sessId})\n` +
+      `Tanggal   : ${fmtDate(first.tanggal)}\n` +
+      `Unit      : ${first.unit}\n` +
+      `Area      : ${first.area}\n` +
+      `Equipment : ${first.equipment}\n` +
+      `\nDaftar Temuan (${sessFindings.length} item):\n` + lines;
+  }
+
+  // Requestor
+  const reqEl = document.getElementById('wo-requestor');
+  if (reqEl && currentUser) reqEl.value = currentUser.name || currentUser.username;
+
+  // Due date besok
+  const dueEl = document.getElementById('wo-duedate');
+  if (dueEl) {
+    const due = new Date(); due.setDate(due.getDate()+1);
+    dueEl.value = due.toISOString().split('T')[0];
+  }
+
+  // Context box — daftar temuan
+  const ctx = document.getElementById('woFindingContext');
+  if (ctx) ctx.innerHTML = `
+    <div><div class="dl">Unit</div><div class="dv" style="font-size:12px">${esc(first.unit)}</div></div>
+    <div><div class="dl">Area</div><div class="dv" style="font-size:12px">${esc(first.area)}</div></div>
+    <div style="grid-column:1/-1"><div class="dl">Equipment</div><div class="dv" style="font-size:12px;font-weight:600">${esc(first.equipment)}</div></div>
+    <div style="grid-column:1/-1">
+      <div class="dl">Daftar Temuan (${sessFindings.length})</div>
+      <div style="margin-top:6px;display:flex;flex-direction:column;gap:4px">
+        ${sessFindings.map(f=>`
+          <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg);border-radius:5px;border:1px solid var(--border)">
+            <span class="badge ${f.status==='ALERT'?'b-alert':'b-warn'}" style="flex-shrink:0">${f.status}</span>
+            <span style="font-size:11px;font-weight:500;flex:1">${esc(f.parameter)}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:${f.status==='ALERT'?'var(--red)':'var(--orange)'}">${esc(f.value)} ${esc(f.unit_param)}</span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+
+  // Subtitle
+  const sub = document.getElementById('woFromFindingSub');
+  if (sub) sub.textContent = `Sesi: ${sessId} · ${sessFindings.length} temuan · ${fmtDate(first.tanggal)}`;
+
+  // Reset UI
+  const res = document.getElementById('woSendResult');
+  if (res) res.style.display = 'none';
+  const btn = document.getElementById('woSendBtn');
+  if (btn) { btn.disabled = false; btn.textContent = '🔧 Kirim WO ke MaintWare'; }
+  const titleErr = document.getElementById('wo-title-err');
+  if (titleErr) titleErr.textContent = '';
+
+  refreshWOPreviewNo();
+  openOverlay('woFromFindingOverlay');
+}
+   
 function refreshWOPreviewNo() {
   if (!_currentWOFinding) return;
   const shift  = document.getElementById('wo-shift')?.value || '1';
@@ -4564,9 +4688,14 @@ async function submitWOFromFinding() {
       if (btn) { btn.textContent = '✅ WO Terkirim'; }
       toast(`✅ WO dibuat: ${woId}`, 'success', 5000);
 
-      // Mark finding as has_wo in local state
-      f.woId    = woId;
-      f.hasWO   = true;
+      // Mark SEMUA findings dalam sesi yang sama sebagai hasWO
+      const targetSessId = f._allFindings ? f.sessId : f.sessId;
+      findings.forEach(finding => {
+        if (finding.sessId === targetSessId) {
+          finding.woId  = woId;
+          finding.hasWO = true;
+        }
+      });
       renderFindingsPage();
     } else {
       throw new Error(json.message || 'API mengembalikan error');
