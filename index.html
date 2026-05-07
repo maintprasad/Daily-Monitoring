@@ -3869,173 +3869,348 @@ function exportCSV() {
 }
 
 // ═══════════════════════════════════════════════════════
-// SEED UNIT 1 — Auto-generate hierarki Unit 1
+// MASTER EQUIPMENT MAP — hardcoded dari List_Equipment.ods
+// ID unit, area, equipment sudah fix dan sinkron dengan MaintWare Sheets
 // ═══════════════════════════════════════════════════════
-function seedUnit1() {
-  const existing = hierarchy.units.find(u => u.name === 'Unit 1');
-  if (existing) {
-    if (!confirm('Unit 1 sudah ada. Generate ulang akan menambahkan equipment baru (tidak hapus yang ada). Lanjutkan?')) return;
-  }
-  const u1Id = existing ? existing.id : genUId();
-  if (!existing) hierarchy.units.push({ id: u1Id, name: 'Unit 1', desc: 'Unit Produksi 1', areas: [] });
-  const u1 = hierarchy.units.find(u => u.id === u1Id);
+const MASTER_UNITS = {
+  'Unit 1': { id: 'U-001' },
+  'Unit 2': { id: 'U-002' },
+};
 
-  function getOrCreateArea(name) {
-    let a = u1.areas.find(x => x.name === name);
-    if (!a) { a = { id: genAId(), name, subAreas: [], equipments: [] }; u1.areas.push(a); }
-    if (!a.equipments) a.equipments = [];
-    return a;
-  }
-  function makeParams(type) {
-    return (EQUIP_PARAM_TEMPLATES[type]||[]).map(p => ({...p, id: genPId()}));
-  }
+// area id hardcoded sesuai Sheets
+const MASTER_AREAS = {
+  // Unit 1
+  'U-001_A-001': { id: 'A-001', name: 'CTP 1',                unitId: 'U-001' },
+  'U-001_A-002': { id: 'A-002', name: 'CTP 2',                unitId: 'U-001' },
+  'U-001_A-003': { id: 'A-003', name: 'Petkus',               unitId: 'U-001' },
+  'U-001_A-004': { id: 'A-004', name: 'Peanut',               unitId: 'U-001' },
+  'U-001_A-005': { id: 'A-005', name: 'Prairie',              unitId: 'U-001' },
+  'U-001_A-006': { id: 'A-006', name: 'Mini Chamber',         unitId: 'U-001' },
+  'U-001_A-008': { id: 'A-008', name: 'Utility & Electrical', unitId: 'U-001' },
+  // Unit 2
+  'U-002_A-009': { id: 'A-009', name: 'CTP 1',                unitId: 'U-002' },
+  'U-002_A-010': { id: 'A-010', name: 'CTP 2',                unitId: 'U-002' },
+  'U-002_A-011': { id: 'A-011', name: 'SPR Drier',            unitId: 'U-002' },
+  'U-002_A-012': { id: 'A-012', name: 'PS Drier',             unitId: 'U-002' },
+  'U-002_A-013': { id: 'A-013', name: 'Peanut',               unitId: 'U-002' },
+  'U-002_A-014': { id: 'A-014', name: 'Cold Storage',         unitId: 'U-002' },
+  'U-002_A-015': { id: 'A-015', name: 'Utility',              unitId: 'U-002' },
+  'U-002_A-016': { id: 'A-016', name: 'Office',               unitId: 'U-002' },
+};
 
-  // 1. TRANSFORMER
-  const aTrafo = getOrCreateArea('Transformer & Cubicle');
-  if (!aTrafo.equipments.find(e => e.name === 'Transformer & Cubicle'))
-    aTrafo.equipments.push({ id: genEId(), name: 'Transformer & Cubicle', tag: 'TRF-01', type: 'TRANSFORMER', params: makeParams('TRANSFORMER') });
+// equipment hardcoded — id sesuai Sheets MaintWare
+// field: id, name, areaKey, type, tag
+const MASTER_EQUIPMENT = [
+  // ── UNIT 1 ─────────────────────────────────────────────────────────
+  // A-001 CTP 1
+  { id:'E-165', name:'MCC 1 (CTP 1)',           areaKey:'U-001_A-001', type:'MCC',            tag:'MCC-U1-01' },
+  { id:'E-166', name:'MCC 2 (CTP 1)',           areaKey:'U-001_A-001', type:'MCC',            tag:'MCC-U1-02' },
+  { id:'E-170', name:'Air Compressor CTP 1',    areaKey:'U-001_A-001', type:'AIR_COMPRESSOR', tag:'AC-U1-01'  },
+  // A-002 CTP 2
+  { id:'E-167', name:'MCC 1 (CTP 2)',           areaKey:'U-001_A-002', type:'MCC',            tag:'MCC-U1-03' },
+  { id:'E-171', name:'Air Compressor CTP 2',    areaKey:'U-001_A-002', type:'AIR_COMPRESSOR', tag:'AC-U1-02'  },
+  // A-003 Petkus
+  { id:'E-162', name:'MCC Blower (Petkus)',      areaKey:'U-001_A-003', type:'MCC',            tag:'MCC-U1-04' },
+  { id:'E-163', name:'MCC Receiving (Petkus)',   areaKey:'U-001_A-003', type:'MCC',            tag:'MCC-U1-05' },
+  { id:'E-164', name:'MCC Sheller (Petkus)',     areaKey:'U-001_A-003', type:'MCC',            tag:'MCC-U1-06' },
+  { id:'E-174', name:'Air Compressor Petkus',   areaKey:'U-001_A-003', type:'AIR_COMPRESSOR', tag:'AC-U1-03'  },
+  // A-004 Peanut
+  { id:'E-159', name:'MCC Blower (Peanut)',      areaKey:'U-001_A-004', type:'MCC',            tag:'MCC-U1-07' },
+  { id:'E-160', name:'MCC Receiving (Peanut)',   areaKey:'U-001_A-004', type:'MCC',            tag:'MCC-U1-08' },
+  { id:'E-161', name:'MCC Sheller (Peanut)',     areaKey:'U-001_A-004', type:'MCC',            tag:'MCC-U1-09' },
+  { id:'E-172', name:'Air Compressor Peanut',   areaKey:'U-001_A-004', type:'AIR_COMPRESSOR', tag:'AC-U1-04'  },
+  // A-005 Prairie
+  { id:'E-155', name:'MCC Distribusi Blower 1 (Prairie)', areaKey:'U-001_A-005', type:'MCC', tag:'MCC-U1-10' },
+  { id:'E-156', name:'MCC Distribusi Blower 2 (Prairie)', areaKey:'U-001_A-005', type:'MCC', tag:'MCC-U1-11' },
+  { id:'E-157', name:'MCC Receiving (Prairie)',  areaKey:'U-001_A-005', type:'MCC',            tag:'MCC-U1-12' },
+  { id:'E-158', name:'MCC Sheller (Prairie)',    areaKey:'U-001_A-005', type:'MCC',            tag:'MCC-U1-13' },
+  { id:'E-173', name:'Air Compressor Prairie',  areaKey:'U-001_A-005', type:'AIR_COMPRESSOR', tag:'AC-U1-05'  },
+  { id:'E-063', name:'Tripercar Conveyor',       areaKey:'U-001_A-005', type:'OTHER',          tag:'TRP-U1-01' },
+  // A-006 Mini Chamber
+  { id:'E-175', name:'Mini Chamber',             areaKey:'U-001_A-006', type:'MINI_CHAMBER',  tag:'MCH-U1-01' },
+  // A-008 Utility & Electrical
+  { id:'E-249', name:'Transformer',              areaKey:'U-001_A-008', type:'TRANSFORMER',   tag:'TRF-U1-01' },
+  { id:'E-638', name:'LVMDP',                    areaKey:'U-001_A-008', type:'LVMDP',         tag:'LVMDP-U1-01' },
+  { id:'E-251', name:'Capacitor Bank',           areaKey:'U-001_A-008', type:'CAPACITOR_BANK',tag:'CAP-U1-01'  },
+  { id:'E-244', name:'Piston Compressor 15 kW',  areaKey:'U-001_A-008', type:'AIR_COMPRESSOR',tag:'AC-U1-06'  },
+  { id:'E-245', name:'Screw Compressor Cecato',  areaKey:'U-001_A-008', type:'AIR_COMPRESSOR',tag:'AC-U1-07'  },
+  { id:'E-240', name:'Fire Hydrant',             areaKey:'U-001_A-008', type:'HYDRANT',       tag:'HYD-U1-01' },
+  { id:'E-168', name:'MCC Office (ADV)',          areaKey:'U-001_A-008', type:'MCC',           tag:'MCC-U1-14' },
+  { id:'E-169', name:'MCC Office (Prasad)',       areaKey:'U-001_A-008', type:'MCC',           tag:'MCC-U1-15' },
 
-  // 2. LVMDP
-  const aLvmdp = getOrCreateArea('LVMDP');
-  if (!aLvmdp.equipments.find(e => e.name === 'LVMDP'))
-    aLvmdp.equipments.push({ id: genEId(), name: 'LVMDP', tag: 'LVMDP-01', type: 'LVMDP', params: makeParams('LVMDP') });
+  // ── UNIT 2 ─────────────────────────────────────────────────────────
+  // A-009 CTP 1
+  { id:'E-198', name:'MCC 1 (CTP 1)',            areaKey:'U-002_A-009', type:'MCC',            tag:'MCC-U2-01' },
+  // A-010 CTP 2
+  { id:'E-199', name:'MCC 1 (CTP 2)',            areaKey:'U-002_A-010', type:'MCC',            tag:'MCC-U2-02' },
+  // A-011 SPR Drier
+  { id:'E-423', name:'Truck Tippler',            areaKey:'U-002_A-011', type:'OTHER',          tag:'TRP-U2-01' },
+  { id:'E-187', name:'MCC Distribusi Blower 1 (SPR)', areaKey:'U-002_A-011', type:'MCC',      tag:'MCC-U2-03' },
+  { id:'E-188', name:'MCC Distribusi Blower 2 (SPR)', areaKey:'U-002_A-011', type:'MCC',      tag:'MCC-U2-04' },
+  { id:'E-189', name:'MCC Distribusi Blower 3 (SPR)', areaKey:'U-002_A-011', type:'MCC',      tag:'MCC-U2-05' },
+  { id:'E-190', name:'MCC Receiving (SPR)',      areaKey:'U-002_A-011', type:'MCC',            tag:'MCC-U2-06' },
+  { id:'E-191', name:'MCC Sheller (SPR)',        areaKey:'U-002_A-011', type:'MCC',            tag:'MCC-U2-07' },
+  // A-012 PS Drier
+  { id:'E-192', name:'MCC Blower (PS Drier)',    areaKey:'U-002_A-012', type:'MCC',            tag:'MCC-U2-08' },
+  { id:'E-193', name:'MCC Receiving (PS Drier)', areaKey:'U-002_A-012', type:'MCC',            tag:'MCC-U2-09' },
+  { id:'E-194', name:'MCC Sheller (PS Drier)',   areaKey:'U-002_A-012', type:'MCC',            tag:'MCC-U2-10' },
+  // A-013 Peanut
+  { id:'E-195', name:'MCC Blower (Peanut)',      areaKey:'U-002_A-013', type:'MCC',            tag:'MCC-U2-11' },
+  { id:'E-196', name:'MCC Receiving (Peanut)',   areaKey:'U-002_A-013', type:'MCC',            tag:'MCC-U2-12' },
+  { id:'E-197', name:'MCC Sheller (Peanut)',     areaKey:'U-002_A-013', type:'MCC',            tag:'MCC-U2-13' },
+  // A-014 Cold Storage — CS1,2,4 = 5 mesin | CS3 = 4 mesin
+  { id:'E-573', name:'Cold Storage 1 Mesin 1',  areaKey:'U-002_A-014', type:'COLD_STORAGE',   tag:'CS1-M1' },
+  { id:'E-574', name:'Cold Storage 1 Mesin 2',  areaKey:'U-002_A-014', type:'COLD_STORAGE',   tag:'CS1-M2' },
+  { id:'E-575', name:'Cold Storage 1 Mesin 3',  areaKey:'U-002_A-014', type:'COLD_STORAGE',   tag:'CS1-M3' },
+  { id:'E-576', name:'Cold Storage 1 Mesin 4',  areaKey:'U-002_A-014', type:'COLD_STORAGE',   tag:'CS1-M4' },
+  { id:'E-577', name:'Cold Storage 1 Mesin 5',  areaKey:'U-002_A-014', type:'COLD_STORAGE',   tag:'CS1-M5' },
+  { id:'E-578', name:'Cold Storage 2 Mesin 1',  areaKey:'U-002_A-014', type:'COLD_STORAGE',   tag:'CS2-M1' },
+  { id:'E-579', name:'Cold Storage 2 Mesin 2',  areaKey:'U-002_A-014', type:'COLD_STORAGE',   tag:'CS2-M2' },
+  { id:'E-580', name:'Cold Storage 2 Mesin 3',  areaKey:'U-002_A-014', type:'COLD_STORAGE',   tag:'CS2-M3' },
+  { id:'E-581', name:'Cold Storage 2 Mesin 4',  areaKey:'U-002_A-014', type:'COLD_STORAGE',   tag:'CS2-M4' },
+  { id:'E-582', name:'Cold Storage 2 Mesin 5',  areaKey:'U-002_A-014', type:'COLD_STORAGE',   tag:'CS2-M5' },
+  { id:'E-583', name:'Cold Storage 3 Mesin 1',  areaKey:'U-002_A-014', type:'COLD_STORAGE',   tag:'CS3-M1' },
+  { id:'E-584', name:'Cold Storage 3 Mesin 2',  areaKey:'U-002_A-014', type:'COLD_STORAGE',   tag:'CS3-M2' },
+  { id:'E-585', name:'Cold Storage 3 Mesin 3',  areaKey:'U-002_A-014', type:'COLD_STORAGE',   tag:'CS3-M3' },
+  { id:'E-586', name:'Cold Storage 3 Mesin 4',  areaKey:'U-002_A-014', type:'COLD_STORAGE',   tag:'CS3-M4' },
+  { id:'E-587', name:'Cold Storage 4 Mesin 1',  areaKey:'U-002_A-014', type:'COLD_STORAGE',   tag:'CS4-M1' },
+  { id:'E-588', name:'Cold Storage 4 Mesin 2',  areaKey:'U-002_A-014', type:'COLD_STORAGE',   tag:'CS4-M2' },
+  { id:'E-589', name:'Cold Storage 4 Mesin 3',  areaKey:'U-002_A-014', type:'COLD_STORAGE',   tag:'CS4-M3' },
+  { id:'E-590', name:'Cold Storage 4 Mesin 4',  areaKey:'U-002_A-014', type:'COLD_STORAGE',   tag:'CS4-M4' },
+  { id:'E-591', name:'Cold Storage 4 Mesin 5',  areaKey:'U-002_A-014', type:'COLD_STORAGE',   tag:'CS4-M5' },
+  { id:'E-176', name:'MCC Cold Storage (CS 1 & CS 2)', areaKey:'U-002_A-014', type:'MCC',     tag:'MCC-U2-14' },
+  { id:'E-177', name:'Panel Antiroom CS1',       areaKey:'U-002_A-014', type:'MCC',            tag:'MCC-U2-15' },
+  { id:'E-178', name:'Panel Antiroom CS2',       areaKey:'U-002_A-014', type:'MCC',            tag:'MCC-U2-16' },
+  { id:'E-183', name:'MCC Cold Storage (CS 3 & CS 4)', areaKey:'U-002_A-014', type:'MCC',     tag:'MCC-U2-17' },
+  { id:'E-184', name:'Panel Antiroom CS3',       areaKey:'U-002_A-014', type:'MCC',            tag:'MCC-U2-18' },
+  { id:'E-185', name:'Panel Antiroom CS4',       areaKey:'U-002_A-014', type:'MCC',            tag:'MCC-U2-19' },
+  // A-015 Utility
+  { id:'E-200', name:'Air Compressor CTP',       areaKey:'U-002_A-015', type:'AIR_COMPRESSOR', tag:'AC-U2-01' },
+  { id:'E-201', name:'Air Compressor SPR',       areaKey:'U-002_A-015', type:'AIR_COMPRESSOR', tag:'AC-U2-02' },
+  { id:'E-363', name:'Air Compressor Packing Bioseed', areaKey:'U-002_A-015', type:'AIR_COMPRESSOR', tag:'AC-U2-03' },
+  { id:'E-600', name:'Fire Hydrant',             areaKey:'U-002_A-015', type:'HYDRANT',        tag:'HYD-U2-01' },
+  // A-016 Office
+  { id:'E-179', name:'MCB Box Office Bayer',     areaKey:'U-002_A-016', type:'MCC',            tag:'MCC-U2-20' },
+  { id:'E-180', name:'MCB Box Office Prasad',    areaKey:'U-002_A-016', type:'MCC',            tag:'MCC-U2-21' },
+  { id:'E-181', name:'MCB Box Office Shigenta',  areaKey:'U-002_A-016', type:'MCC',            tag:'MCC-U2-22' },
+  { id:'E-182', name:'Panel Security',           areaKey:'U-002_A-016', type:'MCC',            tag:'MCC-U2-23' },
+  { id:'E-186', name:'MCC Office Bioseed',       areaKey:'U-002_A-016', type:'MCC',            tag:'MCC-U2-24' },
+];
 
-  // 3. CAPACITOR BANK
-  const aCap = getOrCreateArea('Capacitor Bank');
-  if (!aCap.equipments.find(e => e.name === 'Capacitor Bank'))
-    aCap.equipments.push({ id: genEId(), name: 'Capacitor Bank', tag: 'CAP-01', type: 'CAPACITOR_BANK', params: makeParams('CAPACITOR_BANK') });
+// ── CORE SEED ENGINE ──────────────────────────────────────────────────────────
+/**
+ * buildUnitFromMaster(unitName)
+ * Bangun objek unit lengkap dari MASTER_EQUIPMENT + MASTER_AREAS.
+ * Selalu pakai ID hardcoded (U-001/U-002, A-xxx, E-xxx).
+ */
+function buildUnitFromMaster(unitName) {
+  const unitMeta = MASTER_UNITS[unitName];
+  if (!unitMeta) return null;
+  const uid = unitMeta.id;
 
-  // 4. MCC PANEL — langsung ke area.equipments
-  const aMcc = getOrCreateArea('MCC Panel');
-  const mccList = [
-    'MCC Distribusi Blower 1 (Prairie)', 'MCC Distribusi Blower 2 (Prairie)',
-    'MCC Receiving (Prairie)', 'MCC Sheller (Prairie)',
-    'MCC Blower (Peanut)', 'MCC Receiving (Peanut)', 'MCC Sheller (Peanut)',
-    'MCC Blower (Petkus)', 'MCC Receiving (Petkus)', 'MCC Sheller (Petkus)',
-    'MCC 1 (CTP 1)', 'MCC 2 (CTP 1)', 'MCC Office (ADV)', 'MCC Office (Prasad)', 'MCC 1 (CTP 2)',
-  ];
-  mccList.forEach((mccName, i) => {
-    if (!aMcc.equipments.find(e => e.name === mccName))
-      aMcc.equipments.push({ id: genEId(), name: mccName, tag: `MCC-${String(i+1).padStart(2,'0')}`, type: 'MCC', params: makeParams('MCC') });
-  });
+  // Kumpulkan area yang relevan untuk unit ini
+  const areaMap = {};
+  Object.entries(MASTER_AREAS)
+    .filter(([key]) => key.startsWith(uid + '_'))
+    .forEach(([key, a]) => {
+      areaMap[a.id] = { id: a.id, name: a.name, subAreas: [], equipments: [] };
+    });
 
-  // 5. AIR COMPRESSOR — langsung ke area.equipments
-  const aComp = getOrCreateArea('Air Compressor');
-  const compList = ['CTP 1','CTP 2','Peanut','Prairie','Petkus'];
-  compList.forEach((loc, i) => {
-    const eName = `Air Compressor ${loc}`;
-    if (!aComp.equipments.find(e => e.name === eName))
-      aComp.equipments.push({ id: genEId(), name: eName, tag: `AC-${String(i+1).padStart(2,'0')}`, type: 'AIR_COMPRESSOR', params: makeParams('AIR_COMPRESSOR') });
-  });
+  // Isi equipment ke area masing-masing
+  MASTER_EQUIPMENT
+    .filter(eq => eq.areaKey.startsWith(uid + '_'))
+    .forEach(eq => {
+      const areaId = eq.areaKey.split('_')[1]; // "A-001" dst
+      if (!areaMap[areaId]) return;
+      const tpl = EQUIP_PARAM_TEMPLATES[eq.type] || [];
+      areaMap[areaId].equipments.push({
+        id:     eq.id,
+        name:   eq.name,
+        tag:    eq.tag,
+        type:   eq.type,
+        params: tpl.map(p => ({ ...p, id: genPId() })),
+      });
+    });
 
-  // 6. HYDRANT
-  const aHydrant = getOrCreateArea('Hydrant');
-  if (!aHydrant.equipments.find(e => e.name === 'Hydrant System'))
-    aHydrant.equipments.push({ id: genEId(), name: 'Hydrant System', tag: 'HYD-01', type: 'HYDRANT', params: makeParams('HYDRANT') });
-
-  // 7. MINI CHAMBER
-  const aChamber = getOrCreateArea('Mini Chamber');
-  if (!aChamber.equipments.find(e => e.name === 'Mini Chamber'))
-    aChamber.equipments.push({ id: genEId(), name: 'Mini Chamber', tag: 'MCH-01', type: 'MINI_CHAMBER', params: makeParams('MINI_CHAMBER') });
-
-  saveAll(); renderHierTree(); populateUnitFilters(); renderDashboard();
-  const banner = document.getElementById('seedUnit1Banner');
-  if (banner) banner.style.display = 'none';
-  toast('✅ Unit 1 berhasil di-generate! 7 area, ' + (3 + mccList.length + compList.length + 2) + ' equipment, parameter lengkap.', 'success');
+  return {
+    id:    uid,
+    name:  unitName,
+    desc:  `Unit Produksi ${unitName.replace('Unit ','')}`,
+    areas: Object.values(areaMap),
+  };
 }
 
-// ═══════════════════════════════════════════════════════
-// SEED UNIT 2 — Auto-generate hierarki Unit 2
-// ═══════════════════════════════════════════════════════
-function seedUnit2() {
-  const existing = hierarchy.units.find(u => u.name === 'Unit 2');
-  if (existing) {
-    if (!confirm('Unit 2 sudah ada. Generate ulang akan menambahkan equipment baru (tidak hapus yang ada). Lanjutkan?')) return;
-  }
-  const u2Id = existing ? existing.id : genUId();
-  if (!existing) hierarchy.units.push({ id: u2Id, name: 'Unit 2', desc: 'Unit Produksi 2', areas: [] });
-  const u2 = hierarchy.units.find(u => u.id === u2Id);
+/**
+ * diffEquipment(existing, master)
+ * Return { added, updated, same }
+ * - added   : ada di master, tidak ada di existing (by equipId)
+ * - updated : ada keduanya tapi nama/tag/type berbeda
+ * - same    : identik
+ */
+function diffEquipment(existingEquips, masterEquips) {
+  const added = [], updated = [], same = [];
+  const existMap = {};
+  existingEquips.forEach(e => { existMap[e.id] = e; });
 
-  function getOrCreateArea(name) {
-    let a = u2.areas.find(x => x.name === name);
-    if (!a) { a = { id: genAId(), name, subAreas: [], equipments: [] }; u2.areas.push(a); }
-    if (!a.equipments) a.equipments = [];
-    return a;
-  }
-  function makeParams(type) {
-    return (EQUIP_PARAM_TEMPLATES[type] || []).map(p => ({ ...p, id: genPId() }));
-  }
-
-  // 1. TRANSFORMER
-  const aTrafo = getOrCreateArea('Transformer & Cubicle');
-  if (!aTrafo.equipments.find(e => e.name === 'Transformer & Cubicle'))
-    aTrafo.equipments.push({ id: genEId(), name: 'Transformer & Cubicle', tag: 'TRF-U2-01', type: 'TRANSFORMER', params: makeParams('TRANSFORMER') });
-
-  // 2. LVMDP
-  const aLvmdp = getOrCreateArea('LVMDP');
-  if (!aLvmdp.equipments.find(e => e.name === 'LVMDP'))
-    aLvmdp.equipments.push({ id: genEId(), name: 'LVMDP', tag: 'LVMDP-U2-01', type: 'LVMDP', params: makeParams('LVMDP') });
-
-  // 3. CAPACITOR BANK
-  const aCap = getOrCreateArea('Capacitor Bank');
-  if (!aCap.equipments.find(e => e.name === 'Capacitor Bank'))
-    aCap.equipments.push({ id: genEId(), name: 'Capacitor Bank', tag: 'CAP-U2-01', type: 'CAPACITOR_BANK', params: makeParams('CAPACITOR_BANK') });
-
-  // 4. MCC PANEL — langsung ke area.equipments
-  const aMcc = getOrCreateArea('MCC Panel');
-  const mccList = [
-    'MCC Cold Storage (CS 1 & CS 2)', 'Panel Antiroom CS1', 'Panel Antiroom CS2',
-    'MCB BOX Office Bayer', 'MCB BOX Prasad', 'MCB BOX Shigenta', 'Panel Security',
-    'MCC Cold Storage (CS 3 & CS 4)', 'Panel Antiroom CS3', 'Panel Antiroom CS4',
-    'MCC Office Bioseed', 'MCC Distribusi Blower 1 (SPR)', 'MCC Distribusi Blower 2 (SPR)',
-    'MCC Distribusi Blower 3 (SPR)', 'MCC Receiving (SPR)', 'MCC Sheller (SPR)',
-    'MCC Blower (PS Drier)', 'MCC Receiving (PS Drier)', 'MCC Sheller (PS Drier)',
-    'MCC Blower (Peanut)', 'MCC Receiving (Peanut)', 'MCC Sheller (Peanut)',
-    'MCC 1 (CTP 1)', 'MCC 1 (CTP 2)',
-  ];
-  mccList.forEach((mccName, i) => {
-    if (!aMcc.equipments.find(e => e.name === mccName))
-      aMcc.equipments.push({ id: genEId(), name: mccName, tag: `MCC-U2-${String(i+1).padStart(2,'0')}`, type: 'MCC', params: makeParams('MCC') });
-  });
-
-  // 5. AIR COMPRESSOR — langsung ke area.equipments
-  const aComp = getOrCreateArea('Air Compressor');
-  const compList = [
-    { name: 'AIR Compressor CTP',             tag: 'AC-U2-01' },
-    { name: 'AIR Compressor SPR',             tag: 'AC-U2-02' },
-    { name: 'AIR Compressor Packing Bioseed', tag: 'AC-U2-03' },
-  ];
-  compList.forEach(({ name, tag }) => {
-    if (!aComp.equipments.find(e => e.name === name))
-      aComp.equipments.push({ id: genEId(), name, tag, type: 'AIR_COMPRESSOR', params: makeParams('AIR_COMPRESSOR') });
-  });
-
-  // 6. HYDRANT
-  const aHydrant = getOrCreateArea('Hydrant');
-  if (!aHydrant.equipments.find(e => e.name === 'Hydrant System'))
-    aHydrant.equipments.push({ id: genEId(), name: 'Hydrant System', tag: 'HYD-U2-01', type: 'HYDRANT', params: makeParams('HYDRANT') });
-
-  // 7. COLD STORAGE — langsung ke area.equipments, nama mesin include nama CS
-  const aCs = getOrCreateArea('Cold Storage');
-  const coldStorageConfig = [
-    { unit: 'Cold Storage 1', mesin: 6 },
-    { unit: 'Cold Storage 2', mesin: 5 },
-    { unit: 'Cold Storage 3', mesin: 4 },
-    { unit: 'Cold Storage 4', mesin: 5 },
-  ];
-  coldStorageConfig.forEach(({ unit, mesin }, csIdx) => {
-    for (let m = 1; m <= mesin; m++) {
-      const eName = `${unit} - Mesin ${m}`;
-      if (!aCs.equipments.find(e => e.name === eName))
-        aCs.equipments.push({ id: genEId(), name: eName, tag: `CS${csIdx+1}-M${m}`, type: 'COLD_STORAGE', params: makeParams('COLD_STORAGE') });
+  masterEquips.forEach(m => {
+    const ex = existMap[m.id];
+    if (!ex) {
+      added.push(m);
+    } else if (ex.name !== m.name || ex.tag !== m.tag || ex.type !== m.type) {
+      updated.push({ old: ex, new: m });
+    } else {
+      same.push(m);
     }
   });
+  return { added, updated, same };
+}
 
+/**
+ * applyMasterToUnit(unit, masterUnit)
+ * Merge: tambah equipment baru, update yg berubah, jangan hapus yg tidak ada di master.
+ * Return ringkasan perubahan.
+ */
+function applyMasterToUnit(localUnit, masterUnit) {
+  let totalAdded = 0, totalUpdated = 0;
+
+  masterUnit.areas.forEach(masterArea => {
+    // Cari/buat area yang matching by id
+    let localArea = localUnit.areas.find(a => a.id === masterArea.id);
+    if (!localArea) {
+      localArea = { id: masterArea.id, name: masterArea.name, subAreas: [], equipments: [] };
+      localUnit.areas.push(localArea);
+    } else {
+      // Update nama area jika berbeda
+      if (localArea.name !== masterArea.name) localArea.name = masterArea.name;
+    }
+    if (!localArea.equipments) localArea.equipments = [];
+
+    const diff = diffEquipment(localArea.equipments, masterArea.equipments);
+
+    // Tambahkan yang baru
+    diff.added.forEach(eq => {
+      localArea.equipments.push(eq);
+      totalAdded++;
+    });
+
+    // Update yang berubah — pertahankan params lama agar data monitoring tidak hilang
+    diff.updated.forEach(({ old: oldEq, new: newEq }) => {
+      const idx = localArea.equipments.findIndex(e => e.id === oldEq.id);
+      if (idx !== -1) {
+        localArea.equipments[idx] = {
+          ...localArea.equipments[idx], // pertahankan params + data lama
+          name: newEq.name,
+          tag:  newEq.tag,
+          type: newEq.type,
+        };
+        totalUpdated++;
+      }
+    });
+  });
+
+  return { totalAdded, totalUpdated };
+}
+
+// ── SEED UNIT 1 ───────────────────────────────────────────────────────────────
+function seedUnit1() {
+  const masterUnit = buildUnitFromMaster('Unit 1');
+  if (!masterUnit) { toast('Master data Unit 1 tidak ditemukan', 'error'); return; }
+
+  let localUnit = hierarchy.units.find(u => u.name === 'Unit 1' || u.id === 'U-001');
+
+  if (!localUnit) {
+    // Fresh install
+    hierarchy.units.push(masterUnit);
+    localUnit = masterUnit;
+    saveAll(); renderHierTree(); populateUnitFilters(); renderDashboard();
+    checkSeedBanners();
+    const eqCount = masterUnit.areas.reduce((s,a) => s + a.equipments.length, 0);
+    toast(`✅ Unit 1 di-generate: ${masterUnit.areas.length} area, ${eqCount} equipment`, 'success');
+    if (WEBHOOK_URL) syncAll(true);
+    return;
+  }
+
+  // Sudah ada — cek diff vs master
+  // Tampilkan ringkasan diff sebelum apply
+  let diffSummary = [];
+  masterUnit.areas.forEach(masterArea => {
+    const localArea = localUnit.areas.find(a => a.id === masterArea.id);
+    const localEquips = localArea ? (localArea.equipments || []) : [];
+    const diff = diffEquipment(localEquips, masterArea.equipments);
+    if (diff.added.length)   diffSummary.push(`Area ${masterArea.name}: +${diff.added.length} equipment baru`);
+    if (diff.updated.length) diffSummary.push(`Area ${masterArea.name}: ${diff.updated.length} equipment diperbarui`);
+  });
+
+  if (!diffSummary.length) {
+    toast('✅ Unit 1 sudah sinkron dengan master data — tidak ada perubahan', 'success');
+    return;
+  }
+
+  const confirmMsg =
+    `Ditemukan perbedaan antara data lokal dan master:\n\n` +
+    diffSummary.join('\n') +
+    `\n\nLanjutkan update? (Data monitoring/params yang ada tidak akan dihapus)`;
+
+  if (!confirm(confirmMsg)) return;
+
+  // Sync unit id juga
+  localUnit.id = 'U-001';
+
+  const { totalAdded, totalUpdated } = applyMasterToUnit(localUnit, masterUnit);
   saveAll(); renderHierTree(); populateUnitFilters(); renderDashboard();
-  const banner = document.getElementById('seedUnit2Banner');
-  if (banner) banner.style.display = 'none';
-  const totalEquip = 3 + mccList.length + compList.length + 1 + coldStorageConfig.reduce((s,c) => s+c.mesin, 0);
-  toast(`✅ Unit 2 berhasil di-generate! 7 area, ${totalEquip} equipment, parameter lengkap.`, 'success');
+  checkSeedBanners();
+  toast(`✅ Unit 1 diperbarui: +${totalAdded} baru, ${totalUpdated} diupdate`, 'success');
+  if (WEBHOOK_URL) syncAll(true);
+}
+
+// ── SEED UNIT 2 ───────────────────────────────────────────────────────────────
+function seedUnit2() {
+  const masterUnit = buildUnitFromMaster('Unit 2');
+  if (!masterUnit) { toast('Master data Unit 2 tidak ditemukan', 'error'); return; }
+
+  let localUnit = hierarchy.units.find(u => u.name === 'Unit 2' || u.id === 'U-002');
+
+  if (!localUnit) {
+    // Fresh install
+    hierarchy.units.push(masterUnit);
+    localUnit = masterUnit;
+    saveAll(); renderHierTree(); populateUnitFilters(); renderDashboard();
+    checkSeedBanners();
+    const eqCount = masterUnit.areas.reduce((s,a) => s + a.equipments.length, 0);
+    toast(`✅ Unit 2 di-generate: ${masterUnit.areas.length} area, ${eqCount} equipment`, 'success');
+    if (WEBHOOK_URL) syncAll(true);
+    return;
+  }
+
+  // Sudah ada — cek diff
+  let diffSummary = [];
+  masterUnit.areas.forEach(masterArea => {
+    const localArea = localUnit.areas.find(a => a.id === masterArea.id);
+    const localEquips = localArea ? (localArea.equipments || []) : [];
+    const diff = diffEquipment(localEquips, masterArea.equipments);
+    if (diff.added.length)   diffSummary.push(`Area ${masterArea.name}: +${diff.added.length} equipment baru`);
+    if (diff.updated.length) diffSummary.push(`Area ${masterArea.name}: ${diff.updated.length} equipment diperbarui`);
+  });
+
+  if (!diffSummary.length) {
+    toast('✅ Unit 2 sudah sinkron dengan master data — tidak ada perubahan', 'success');
+    return;
+  }
+
+  const confirmMsg =
+    `Ditemukan perbedaan antara data lokal dan master:\n\n` +
+    diffSummary.join('\n') +
+    `\n\nLanjutkan update? (Data monitoring/params yang ada tidak akan dihapus)`;
+
+  if (!confirm(confirmMsg)) return;
+
+  localUnit.id = 'U-002';
+
+  const { totalAdded, totalUpdated } = applyMasterToUnit(localUnit, masterUnit);
+  saveAll(); renderHierTree(); populateUnitFilters(); renderDashboard();
+  checkSeedBanners();
+  toast(`✅ Unit 2 diperbarui: +${totalAdded} baru, ${totalUpdated} diupdate`, 'success');
+  if (WEBHOOK_URL) syncAll(true);
 }
    
 function findUnit(uid)                           { return hierarchy.units.find(u => u.id === uid); }
