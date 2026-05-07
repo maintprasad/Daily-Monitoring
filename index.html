@@ -273,7 +273,7 @@ body {
   border-radius: var(--r2); overflow: hidden;
 }
 .hier-unit-hdr {
-  display: flex; align-items: center; gap: 10px;Update index.html
+  display: flex; align-items: center; gap: 10px;
   padding: 12px 16px; cursor: pointer; user-select: none;
   transition: background .12s;
 }
@@ -898,8 +898,8 @@ body {
     <div class="tbl-scroll">
       <table class="data-table">
         <thead><tr>
-          <th>ID</th><th>Tanggal</th><th>Unit</th><th>Area</th><th>Sub Area</th><th>Equipment</th><th>PIC</th><th>Status</th><th>Catatan</th>
-        </tr></thead>
+  <th>ID</th><th>Tanggal</th><th>Unit</th><th>Area</th><th>Equipment</th><th>PIC</th><th>Status</th><th>Catatan</th>
+</tr></thead>
         <tbody id="recentBody">
           <tr><td colspan="9"><div class="empty"><div class="empty-ico">📊</div><div class="empty-msg">Belum ada data. Buat sesi monitoring pertama!</div></div></td></tr>
         </tbody>
@@ -957,8 +957,8 @@ body {
     <div class="tbl-scroll">
       <table class="data-table">
         <thead><tr>
-          <th>ID</th><th>Tanggal</th><th>Unit</th><th>Area</th><th>Sub Area</th><th>Equipment</th><th>PIC</th><th>Mulai</th><th>Selesai</th><th>Status</th><th>Catatan</th><th>Aksi</th>
-        </tr></thead>
+  <th>ID</th><th>Tanggal</th><th>Unit</th><th>Area</th><th>Equipment</th><th>PIC</th><th>Mulai</th><th>Selesai</th><th>Status</th><th>Catatan</th><th>Aksi</th>
+</tr></thead>
         <tbody id="histBody"></tbody>
       </table>
     </div>
@@ -1007,7 +1007,8 @@ body {
       <button class="btn btn-blue btn-sm" onclick="seedUnit2()">⚡ Generate / Sync Unit 2</button>
       <button class="btn btn-danger btn-sm" onclick="resetAndSeedUnit('Unit 2')">🗑 Reset &amp; Generate Ulang</button>
   </div>
-
+</div>
+   
   <div class="hier-tree" id="hierTree">
     <div class="empty"><div class="empty-ico">🗂</div><div class="empty-msg">Belum ada hierarki. Klik "Tambah Unit" untuk mulai.</div></div>
   </div>
@@ -2413,7 +2414,7 @@ function renderHistory() {
 
   const tbody = document.getElementById('histBody');
   if (!slice.length) {
-    tbody.innerHTML = `<tr><td colspan="12"><div class="empty"><div class="empty-ico">📋</div><div class="empty-msg">Tidak ada riwayat ditemukan.</div></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11"><div class="empty"><div class="empty-ico">📋</div><div class="empty-msg">Tidak ada riwayat ditemukan.</div></div></td></tr>`;
     return;
   }
   tbody.innerHTML = slice.map(s => histRow(s)).join('');
@@ -2426,7 +2427,6 @@ function histRow(s) {
     <td style="font-size:11px;white-space:nowrap">${fmtDate(s.tanggal)}</td>
     <td><span class="badge b-blue">${esc(s.unitName||'—')}</span></td>
     <td style="font-size:11px">${esc(s.areaName||'—')}</td>
-    <td style="font-size:11px">${esc(s.subAreaName||'—')}</td>
     <td style="font-size:12px;font-weight:500">${esc(s.equipName||'—')}</td>
     <td style="font-size:11px">${esc(s.pic||'—')}</td>
     <td style="font-family:'IBM Plex Mono',monospace;font-size:10px">${esc(s.startTime||'—')}</td>
@@ -3047,7 +3047,18 @@ function submitNewSession() {
 
  const unit = findUnit(unitId);
   const area = findArea(unitId, areaId);
-  const eq = findEquipFlex(unitId, areaId, '', eqId);
+  const eq   = findEquipFlex(unitId, areaId, '', eqId);
+  // Resolve subAreaId jika equipment ada di dalam sub area
+  let resolvedSAId = '', resolvedSAName = '';
+  if (area) {
+    for (const sa of (area.subAreas || [])) {
+      if ((sa.equipments || []).some(e => e.id === eqId)) {
+        resolvedSAId   = sa.id;
+        resolvedSAName = sa.name;
+        break;
+      }
+    }
+  }
 
   const id = genId();
   const session = {
@@ -4272,11 +4283,9 @@ function getAllEquipsInArea(uid, aid) {
 }
 
 function getLastSession(uid, aid, sid, eid) {
-  return sessions.filter(s =>
-    s.unitId===uid && s.areaId===aid &&
-    (sid ? s.subAreaId===sid : (!s.subAreaId||s.subAreaId==='')) &&
-    s.equipId===eid
-  ).sort((a,b) => new Date(b.createdAt||0) - new Date(a.createdAt||0))[0] || null;
+  return sessions
+    .filter(s => s.unitId === uid && s.areaId === aid && s.equipId === eid)
+    .sort((a,b) => new Date(b.createdAt||0) - new Date(a.createdAt||0))[0] || null;
 }
 
 function countEquipments() {
@@ -4304,10 +4313,14 @@ function fmtDate(d) {
   if (!d) return '—';
   try {
     // Handle Google Sheets date serial (number)
-    if (typeof d === 'number') {
+   if (typeof d === 'number') {
       const ms = (d - 25569) * 86400000;
-      d = new Date(ms).toISOString().split('T')[0];
+      const dt = new Date(ms);
+      d = dt.getUTCFullYear() + '-' +
+          String(dt.getUTCMonth()+1).padStart(2,'0') + '-' +
+          String(dt.getUTCDate()).padStart(2,'0');
     }
+     
     if (typeof d === 'string' && d.includes('T')) d = d.split('T')[0];
     const [y,m,dd] = d.split('-');
     const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'];
