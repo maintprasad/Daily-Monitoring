@@ -3680,12 +3680,20 @@ async function pullFromSheets(opts) {
       let changed = false;
        // ── Sync workOrders ───────────────────────────────────
       if (Array.isArray(res.workOrders) && res.workOrders.length > 0) {
-        // Merge — jangan overwrite WO lokal yang lebih baru
+        // Parse checklist string → array jika perlu
+        res.workOrders.forEach(wo => {
+          if (typeof wo.checklist === 'string') {
+            try { wo.checklist = JSON.parse(wo.checklist); } catch(e) { wo.checklist = []; }
+          }
+          if (!Array.isArray(wo.checklist)) wo.checklist = [];
+        });
+
         res.workOrders.forEach(remoteWO => {
           const localIdx = workOrders.findIndex(w => w.id === remoteWO.id);
           if (localIdx === -1) {
             workOrders.push(remoteWO);
           } else {
+             
             // Ambil yang lebih baru berdasarkan checklistDone
             const localWO = workOrders[localIdx];
             if ((remoteWO.checklistDone || 0) >= (localWO.checklistDone || 0)) {
@@ -4891,7 +4899,7 @@ async function submitWOFromFinding() {
     id:             woId,
     title,
     type,
-    status,           // 'Open' saat baru dibuat
+    status,
     priority,
     equipId:        f.equipId    || '',
     techId:         '',
@@ -4911,12 +4919,12 @@ async function submitWOFromFinding() {
     closingNote:    '',
     checklistDone:  0,
     checklistTotal: checklist.length,
-    checklist:      checklist,        // array lengkap
+    checklist:      JSON.stringify(checklist),   // ← wajib stringify agar GAS tidak salah baca
     partsUsed:      '',
     partsCount:     0,
     notesLog,
     attachments:    '',
-    sessId:         f.sessId,         // referensi ke sesi monitoring
+    sessId:         f.sessId,
   };
 
   // UI state
@@ -4937,8 +4945,9 @@ async function submitWOFromFinding() {
     try { json = JSON.parse(text); } catch(e) { throw new Error('Respons bukan JSON: ' + text.slice(0,100)); }
 
     if (json.ok === true || json.success === true) {
-      // Simpan WO ke state lokal (embed juga ke session)
-      workOrders.push(woRow);
+      // Simpan WO ke state lokal — checklist tetap array untuk UI
+      const woLocal = { ...woRow, checklist };   // override: simpan array, bukan string
+      workOrders.push(woLocal);
 
       // Embed woId ke session terkait
       const sess = sessions.find(s => s.id === f.sessId);
@@ -5286,13 +5295,30 @@ async function saveWOProgress(woId) {
   if (btn) { btn.disabled = true; btn.textContent = '↻ Menyimpan...'; }
 
   try {
+   // Checklist harus di-stringify sebelum dikirim ke GAS
+    const woPayload = {
+      ...wo,
+      checklist: typeof wo.checklist === 'string'
+        ? wo.checklist
+        : JSON.stringify(wo.checklist || []),
+    };
+
+    // Checklist harus di-stringify sebelum dikirim ke GAS
+    const woPayload = {
+      ...wo,
+      checklist: typeof wo.checklist === 'string'
+        ? wo.checklist
+        : JSON.stringify(wo.checklist || []),
+    };
+
     const res = await fetch(WO_API_URL + '?fn=upsert', {
       method:   'POST',
       headers:  { 'Content-Type': 'text/plain;charset=utf-8' },
-      body:     JSON.stringify({ fn: 'upsert', sheet: 'WO_ORDERS', row: wo }),
+      body:     JSON.stringify({ fn: 'upsert', sheet: 'WO_ORDERS', row: woPayload }),
       redirect: 'follow',
     }).then(r => r.text()).then(t => { try { return JSON.parse(t); } catch(e) { return { ok: false, message: t.slice(0,100) }; }});
 
+     
     if (res.ok === true || res.success === true) {
       toast(`✅ WO ${woId} tersimpan · ${doneCnt}/${wo.checklist.length} closed`, 'success');
       // Re-render modal dengan data terbaru
