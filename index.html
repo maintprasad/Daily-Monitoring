@@ -1110,6 +1110,21 @@ body {
     <div class="modal-body" id="findingDetailBody"></div>
   </div>
 </div>
+
+   <!-- ════ MODAL: WO DETAIL & CLOSE ITEMS ════ -->
+<div class="overlay" id="woDetailOverlay">
+  <div class="modal modal-xl">
+    <div class="modal-hdr">
+      <div>
+        <div class="modal-title" id="woDetailTitle">📋 Detail Work Order</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:3px" id="woDetailSub">—</div>
+      </div>
+      <button class="modal-close" onclick="closeOverlay('woDetailOverlay')">×</button>
+    </div>
+    <div class="modal-body" id="woDetailBody"></div>
+  </div>
+</div>
+   
 <!-- ADD END -->
 
 <!-- ════ MODAL: BUAT WO DARI FINDING ════ -->
@@ -1640,7 +1655,8 @@ let histPage  = 1;
 const HIST_PAGE_SIZE = 20;
 
 // ADD START: Findings state & Equipment Type Templates
-let findings  = []; // auto-generated, not persisted (derived from sessions)
+let findings    = [];
+let workOrders  = [];
 
 const EQUIP_TYPE_LABELS = {
   TRANSFORMER:    '🔌 TRANSFORMER & CUBICLE',
@@ -2157,21 +2173,20 @@ document.addEventListener('DOMContentLoaded', () => {
   if (loginUser) loginUser.focus();
 });
 function loadAll() {
-  try { const d = localStorage.getItem('ps_hierarchy'); if (d) hierarchy = JSON.parse(d); } catch(e){}
-  try { const d = localStorage.getItem('ps_sessions');  if (d) sessions  = JSON.parse(d); } catch(e){}
-  try { const d = localStorage.getItem('ps_pic_list');  if (d) PIC_LIST  = JSON.parse(d); } catch(e){}
-  // Webhook config — tetap dari hardcoded, bisa di-override via UI
+  try { const d = localStorage.getItem('ps_hierarchy');    if (d) hierarchy   = JSON.parse(d); } catch(e){}
+  try { const d = localStorage.getItem('ps_sessions');     if (d) sessions    = JSON.parse(d); } catch(e){}
+  try { const d = localStorage.getItem('ps_pic_list');     if (d) PIC_LIST    = JSON.parse(d); } catch(e){}
+  try { const d = localStorage.getItem('ps_workorders');   if (d) workOrders  = JSON.parse(d); } catch(e){}
   WEBHOOK_URL = HARDCODED_WEBHOOK_URL;
   WEBHOOK_KEY = HARDCODED_WEBHOOK_KEY;
   SYNC_MODE   = 'auto';
 }
 
 function saveAll() {
-  try { localStorage.setItem('ps_hierarchy', JSON.stringify(hierarchy)); } catch(e){}
-  try { localStorage.setItem('ps_sessions',  JSON.stringify(sessions));  } catch(e){}
-  try { localStorage.setItem('ps_pic_list',  JSON.stringify(PIC_LIST));  } catch(e){}
-  // Auto-sync ke Sheets hanya dipanggil eksplisit via autoSyncSession() setelah checklist disimpan
-  // Tidak trigger di sini agar tidak spam request ke GAS
+  try { localStorage.setItem('ps_hierarchy',  JSON.stringify(hierarchy));  } catch(e){}
+  try { localStorage.setItem('ps_sessions',   JSON.stringify(sessions));   } catch(e){}
+  try { localStorage.setItem('ps_pic_list',   JSON.stringify(PIC_LIST));   } catch(e){}
+  try { localStorage.setItem('ps_workorders', JSON.stringify(workOrders)); } catch(e){}
 }
 
 function setTodayDate() {
@@ -2345,13 +2360,8 @@ function renderMonitorPage() {
   units.forEach(unit => {
     const areas = unit.areas.filter(a => !areaF || a.id === areaF);
     areas.forEach(area => {
-      // Equip langsung di area (tanpa sub area)
-      const directEquips = area.equipments || [];
-      html += renderEquipTileGroup(unit, area, null, directEquips);
-      // Equip di dalam sub area
-      (area.subAreas || []).forEach(sa => {
-        html += renderEquipTileGroup(unit, area, sa, sa.equipments || []);
-      });
+      const equips = area.equipments || [];
+      html += renderEquipTileGroup(unit, area, null, equips);
     });
   });
 
@@ -2453,11 +2463,29 @@ function resetHistFilters() {
 // HIERARCHY TREE RENDERER
 // ═══════════════════════════════════════════════════════
    function checkSeedBanners() {
-  // Banner selalu tampil — seed engine sendiri yang handle kondisi fresh vs update
+  const hasUnit1 = hierarchy.units.some(u =>
+    u.name.toLowerCase() === 'unit 1' || u.id === 'U-001'
+  );
+  const hasUnit2 = hierarchy.units.some(u =>
+    u.name.toLowerCase() === 'unit 2' || u.id === 'U-002'
+  );
+
   const b1 = document.getElementById('seedUnit1Banner');
   const b2 = document.getElementById('seedUnit2Banner');
-  if (b1) b1.style.display = '';
-  if (b2) b2.style.display = '';
+
+  // Tampilkan banner jika unit belum ada ATAU unit ada tapi equipment-nya kosong
+  const unit1Empty = !hasUnit1 || (() => {
+    const u = hierarchy.units.find(u => u.name.toLowerCase() === 'unit 1' || u.id === 'U-001');
+    return (u?.areas || []).reduce((s, a) => s + (a.equipments || []).length, 0) === 0;
+  })();
+
+  const unit2Empty = !hasUnit2 || (() => {
+    const u = hierarchy.units.find(u => u.name.toLowerCase() === 'unit 2' || u.id === 'U-002');
+    return (u?.areas || []).reduce((s, a) => s + (a.equipments || []).length, 0) === 0;
+  })();
+
+  if (b1) b1.style.display = unit1Empty ? '' : 'none';
+  if (b2) b2.style.display = unit2Empty ? '' : 'none';
 }
    
 function renderHierTree() {
@@ -2497,9 +2525,7 @@ function renderHierTree() {
 function renderUnitNode(unit) {
   const areas = unit.areas || [];
   const totalEquip = areas.reduce((sum, a) => {
-    const directEq = (a.equipments || []).length;
-    const subEq    = (a.subAreas  || []).reduce((s, sa) => s + (sa.equipments||[]).length, 0);
-    return sum + directEq + subEq;
+    return sum + (a.equipments || []).length;
   }, 0);
   return `<div class="hier-unit">
     <div class="hier-unit-hdr" onclick="toggleNode(this)" data-node-id="${unit.id}">
@@ -2519,10 +2545,7 @@ function renderUnitNode(unit) {
 }
 
 function renderAreaNode(unitId, area) {
-  const equips = [
-    ...(area.equipments || []),
-    ...(area.subAreas || []).flatMap(sa => sa.equipments || [])
-  ];
+  const equips = area.equipments || [];
   const countLabel = equips.length ? `${equips.length} equipment` : 'kosong';
 
   return `<div class="hier-area">
@@ -2540,26 +2563,7 @@ function renderAreaNode(unitId, area) {
       ${!equips.length ? `<div style="color:var(--text3);font-size:12px;padding:6px 4px">Belum ada equipment. Klik "+ Equipment" untuk menambahkan.</div>` : ''}
     </div>
   </div>`;
-}
-   
-function renderSubAreaNode(unitId, areaId, sa) {
-  const equips = sa.equipments || [];
-  return `<div class="hier-subarea">
-    <div class="hier-subarea-hdr" onclick="toggleNode(this)" data-node-id="${unitId}_${areaId}_${sa.id}">
-      <span class="chevron" style="font-size:10px;color:var(--text3)">▶</span>
-      <span class="hier-subarea-name">📂 ${esc(sa.name)}</span>
-      <span class="badge b-gray" style="margin-right:8px;font-size:9px">${equips.length} equipment</span>
-      <div style="display:flex;gap:4px">
-        <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();openAddEquipModal('${unitId}','${areaId}','${sa.id}')">+ Equipment</button>
-        <button class="btn btn-danger btn-xs" onclick="event.stopPropagation();deleteSubArea('${unitId}','${areaId}','${sa.id}')">✕</button>
-      </div>
-    </div>
-    <div class="hier-subarea-body">
-      ${equips.map(eq => renderEquipNode(unitId, areaId, sa.id, eq)).join('')}
-      ${!equips.length ? `<div style="color:var(--text3);font-size:12px;padding:4px">Belum ada equipment.</div>` : ''}
-    </div>
-  </div>`;
-}
+}   
 
 function renderEquipNode(unitId, areaId, subAreaId, eq) {
   const paramCount = (eq.params||[]).length;
@@ -2689,36 +2693,6 @@ function deleteArea(unitId, areaId) {
   unit.areas = unit.areas.filter(a => a.id !== areaId);
   saveAll(); renderHierTree(); populateUnitFilters();
   toast('Area dihapus', 'info');
-}
-
-function openAddSubAreaModal(unitId, areaId) {
-  _ctx.addSAUnit = unitId; _ctx.addSAArea = areaId;
-  document.getElementById('subAreaNameInput').value = '';
-  document.getElementById('subAreaNameErr').textContent = '';
-  const unit = findUnit(unitId);
-  const area = unit?.areas.find(a => a.id === areaId);
-  document.getElementById('addSubAreaTitle').textContent = `✚ Tambah Sub Area — ${area?.name||''}`;
-  openOverlay('addSubAreaOverlay');
-}
-
-function submitAddSubArea() {
-  const name = document.getElementById('subAreaNameInput').value.trim();
-  if (!name) { document.getElementById('subAreaNameErr').textContent = 'Nama sub area wajib diisi'; return; }
-  const area = findArea(_ctx.addSAUnit, _ctx.addSAArea);
-  if (!area) return;
-  area.subAreas.push({ id: genSId(), name, equipments: [] });
-  saveAll(); renderHierTree();
-  closeOverlay('addSubAreaOverlay');
-  toast('Sub Area "' + name + '" ditambahkan ✓', 'success');
-}
-
-function deleteSubArea(unitId, areaId, saId) {
-  const area = findArea(unitId, areaId);
-  const sa   = (area?.subAreas||[]).find(s => s.id === saId);
-  if (!sa || !confirm(`Hapus Sub Area "${sa.name}"?`)) return;
-  area.subAreas = (area.subAreas||[]).filter(s => s.id !== saId);
-  saveAll(); renderHierTree();
-  toast('Sub Area dihapus', 'info');
 }
 
 function openAddEquipModal(unitId, areaId) {
@@ -2998,9 +2972,7 @@ function onNSAreaChange() {
   if (!areaId) return;
 
   const area = findArea(unitId, areaId);
-  const direct = area?.equipments || [];
-  const fromSubs = (area?.subAreas || []).flatMap(sa => sa.equipments || []);
-  const allEquips = [...direct, ...fromSubs];
+  const allEquips = area?.equipments || [];
 
   allEquips.forEach(eq => {
     const o = document.createElement('option');
@@ -3018,12 +2990,8 @@ function onNSEquipChange() {
   const plist   = document.getElementById('ns-param-list');
   if (!eqId) { preview.style.display='none'; return; }
   const area2  = findArea(unitId, areaId);
-  const allEqs = [...(area2?.equipments||[]), ...(area2?.subAreas||[]).flatMap(s=>s.equipments||[])];
+  const allEqs = area2?.equipments || [];
   const eq     = allEqs.find(e => e.id === eqId);
-  const params = eq?.params || [];
-  if (!params.length) { preview.style.display='none'; return; }
-  plist.innerHTML = params.map(p => `<span class="badge b-gray">${esc(p.label)} (${esc(p.unit||'—')})</span>`).join('');
-  preview.style.display = 'block';
 }
    
 function submitNewSession() {
@@ -3047,18 +3015,7 @@ function submitNewSession() {
 
  const unit = findUnit(unitId);
   const area = findArea(unitId, areaId);
-  const eq   = findEquipFlex(unitId, areaId, '', eqId);
-  // Resolve subAreaId jika equipment ada di dalam sub area
-  let resolvedSAId = '', resolvedSAName = '';
-  if (area) {
-    for (const sa of (area.subAreas || [])) {
-      if ((sa.equipments || []).some(e => e.id === eqId)) {
-        resolvedSAId   = sa.id;
-        resolvedSAName = sa.name;
-        break;
-      }
-    }
-  }
+  const eq   = (area?.equipments || []).find(e => e.id === eqId);
 
   const id = genId();
   const session = {
@@ -3072,6 +3029,7 @@ function submitNewSession() {
     createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     items: []
   };
+   
   sessions.unshift(session);
   saveAll(); renderAll();
   closeOverlay('newSessionOverlay');
@@ -3673,6 +3631,9 @@ function buildGASSessionsPayload() {
     tindakan:    s.tindakan    || '',
     createdAt:   s.createdAt   || '',
     updatedAt:   s.updatedAt   || '',
+    woId:        s.woId      || '',
+    woStatus:    s.woStatus  || '',
+    checklist:   s.checklist ? JSON.stringify(s.checklist) : '',
     items:       (s.items || []).map(i => ({
       paramId: i.paramId || '', label:  i.label  || '',
       unit:    i.unit    || '', section:i.section || '',
@@ -3689,24 +3650,13 @@ function buildGASHierarchyPayload() {
     units.push({ id: u.id, name: u.name, desc: u.desc || '' });
     (u.areas || []).forEach(a => {
       areas.push({ id: a.id, name: a.name, unitId: u.id, location: '' });
-      // Equipment langsung di area
+      // Semua equipment langsung di area
       (a.equipments || []).forEach(eq => {
         equipment.push({
           id: eq.id, name: eq.name, unitId: u.id, areaId: a.id,
           brand: eq.brand || '', model: eq.model || '', serial: eq.serial || '',
           installDate: '', status: 'Active', category: eq.type || '',
           spec: eq.tag || '', notes: JSON.stringify(eq.params || [])
-        });
-      });
-      // Equipment di sub area
-      (a.subAreas || []).forEach(sa => {
-        (sa.equipments || []).forEach(eq => {
-          equipment.push({
-            id: eq.id, name: eq.name, unitId: u.id, areaId: a.id,
-            brand: eq.brand || '', model: eq.model || '', serial: sa.id,
-            installDate: '', status: 'Active', category: eq.type || '',
-            spec: eq.tag || '', notes: JSON.stringify(eq.params || [])
-          });
         });
       });
     });
@@ -3735,6 +3685,30 @@ async function pullFromSheets(opts) {
 
     if (res?.status === 'ok' || res?.ok === true) {
       let changed = false;
+       // ── Sync workOrders ───────────────────────────────────
+      if (Array.isArray(res.workOrders) && res.workOrders.length > 0) {
+        // Merge — jangan overwrite WO lokal yang lebih baru
+        res.workOrders.forEach(remoteWO => {
+          const localIdx = workOrders.findIndex(w => w.id === remoteWO.id);
+          if (localIdx === -1) {
+            workOrders.push(remoteWO);
+          } else {
+            // Ambil yang lebih baru berdasarkan checklistDone
+            const localWO = workOrders[localIdx];
+            if ((remoteWO.checklistDone || 0) >= (localWO.checklistDone || 0)) {
+              workOrders[localIdx] = remoteWO;
+            }
+          }
+          // Sync balik ke session terkait
+          const sess = sessions.find(s => s.id === remoteWO.sessId || s.woId === remoteWO.id);
+          if (sess) {
+            sess.woId      = remoteWO.id;
+            sess.woStatus  = remoteWO.status;
+            sess.checklist = remoteWO.checklist;
+          }
+        });
+        changed = true;
+      }
 
       // ── Rekonstruksi hierarchy dari format GAS v4 ──────────────
       // GAS v4 pullAll() mengembalikan { hierarchy: { units:[...] }, sessions:[...], picList:[...] }
@@ -3746,18 +3720,16 @@ async function pullFromSheets(opts) {
         gasHier.units.forEach(u => {
           const localUnit = { id: u.id, name: u.name, desc: u.desc || '', areas: [] };
           (u.areas || []).forEach(a => {
-            const localArea = { id: a.id, name: a.name, equipments: [], subAreas: [] };
-            // Equipment langsung di area
+            const localArea = { id: a.id, name: a.name, equipments: [] };
+            // Semua equipment langsung di area (tidak ada sub area)
             (a.equipments || []).forEach(eq => {
               localArea.equipments.push(gasV4EquipToLocal(eq));
             });
-            // Sub areas
+            // Jika GAS masih mengirim subAreas (data lama), flatten equipnya ke area
             (a.subAreas || []).forEach(sa => {
-              const localSA = { id: sa.id, name: sa.name, equipments: [] };
               (sa.equipments || []).forEach(eq => {
-                localSA.equipments.push(gasV4EquipToLocal(eq));
+                localArea.equipments.push(gasV4EquipToLocal(eq));
               });
-              localArea.subAreas.push(localSA);
             });
             localUnit.areas.push(localArea);
           });
@@ -4049,12 +4021,11 @@ function buildUnitFromMaster(unitName) {
       areaMap[a.id] = {
         id:         areaId,
         name:       a.name,
-        subAreas:   [],
         equipments: [],
-        _masterKey: a.id, // simpan master key untuk lookup equipment
+        _masterKey: a.id,
       };
     });
-
+   
   MASTER_EQUIPMENT
     .filter(eq => eq.areaKey.startsWith(masterUid + '_'))
     .forEach(eq => {
@@ -4134,14 +4105,14 @@ function applyMasterToUnit(localUnit, masterUnit) {
     // Cari/buat area yang matching by id
     let localArea = localUnit.areas.find(a => a.id === masterArea.id);
     if (!localArea) {
-      localArea = { id: masterArea.id, name: masterArea.name, subAreas: [], equipments: [] };
+      localArea = { id: masterArea.id, name: masterArea.name, equipments: [] };
       localUnit.areas.push(localArea);
     } else {
       // Update nama area jika berbeda
       if (localArea.name !== masterArea.name) localArea.name = masterArea.name;
     }
     if (!localArea.equipments) localArea.equipments = [];
-
+     
     const diff = diffEquipment(localArea.equipments, masterArea.equipments);
 
     // Tambahkan yang baru
@@ -4173,31 +4144,39 @@ function seedUnit1() {
   const masterUnit = buildUnitFromMaster('Unit 1');
   if (!masterUnit) { toast('Master data Unit 1 tidak ditemukan', 'error'); return; }
 
-  // Di seedUnit1():
-let localUnit = hierarchy.units.find(u =>
-  u.name === 'Unit 1' || u.id === 'U-001' || u.id === masterUnit.id
-);
+  let localUnit = hierarchy.units.find(u =>
+    u.name.toLowerCase() === 'unit 1' || u.id === 'U-001'
+  );
 
-if (!localUnit) {
-  hierarchy.units.push(masterUnit);
-    localUnit = masterUnit;
-    saveAll(); renderHierTree(); populateUnitFilters(); renderDashboard();
-    checkSeedBanners();
-    const eqCount = masterUnit.areas.reduce((s,a) => s + a.equipments.length, 0);
+  // Belum ada unit sama sekali — langsung generate
+  if (!localUnit) {
+    hierarchy.units.push(masterUnit);
+    saveAll(); renderHierTree(); populateUnitFilters(); renderDashboard(); checkSeedBanners();
+    const eqCount = masterUnit.areas.reduce((s, a) => s + a.equipments.length, 0);
     toast(`✅ Unit 1 di-generate: ${masterUnit.areas.length} area, ${eqCount} equipment`, 'success');
     if (WEBHOOK_URL) syncAll(true);
     return;
   }
 
-  // Sudah ada — cek diff vs master
-  // Tampilkan ringkasan diff sebelum apply
+  // Unit ada tapi equipment kosong — langsung apply tanpa confirm
+  const existingEqCount = (localUnit.areas || []).reduce((s, a) => s + (a.equipments || []).length, 0);
+  if (existingEqCount === 0) {
+    localUnit.id = 'U-001';
+    const { totalAdded } = applyMasterToUnit(localUnit, masterUnit);
+    saveAll(); renderHierTree(); populateUnitFilters(); renderDashboard(); checkSeedBanners();
+    toast(`✅ Unit 1 di-generate: ${totalAdded} equipment`, 'success');
+    if (WEBHOOK_URL) syncAll(true);
+    return;
+  }
+
+  // Unit ada & sudah punya equipment — cek diff dulu
   let diffSummary = [];
   masterUnit.areas.forEach(masterArea => {
-    const localArea = localUnit.areas.find(a => a.id === masterArea.id);
+    const localArea   = localUnit.areas.find(a => a.id === masterArea.id || a.name.toLowerCase() === masterArea.name.toLowerCase());
     const localEquips = localArea ? (localArea.equipments || []) : [];
-    const diff = diffEquipment(localEquips, masterArea.equipments);
-    if (diff.added.length)   diffSummary.push(`Area ${masterArea.name}: +${diff.added.length} equipment baru`);
-    if (diff.updated.length) diffSummary.push(`Area ${masterArea.name}: ${diff.updated.length} equipment diperbarui`);
+    const diff        = diffEquipment(localEquips, masterArea.equipments);
+    if (diff.added.length)   diffSummary.push(`  • ${masterArea.name}: +${diff.added.length} equipment baru`);
+    if (diff.updated.length) diffSummary.push(`  • ${masterArea.name}: ${diff.updated.length} equipment diperbarui`);
   });
 
   if (!diffSummary.length) {
@@ -4205,51 +4184,56 @@ if (!localUnit) {
     return;
   }
 
-  const confirmMsg =
-    `Ditemukan perbedaan antara data lokal dan master:\n\n` +
+  if (!confirm(
+    `Ditemukan perbedaan Unit 1 vs master data:\n\n` +
     diffSummary.join('\n') +
-    `\n\nLanjutkan update? (Data monitoring/params yang ada tidak akan dihapus)`;
+    `\n\nLanjutkan? (Data monitoring & params yang ada tidak akan dihapus)`
+  )) return;
 
-  if (!confirm(confirmMsg)) return;
-
-  // Sync unit id juga
   localUnit.id = 'U-001';
-
   const { totalAdded, totalUpdated } = applyMasterToUnit(localUnit, masterUnit);
-  saveAll(); renderHierTree(); populateUnitFilters(); renderDashboard();
-  checkSeedBanners();
+  saveAll(); renderHierTree(); populateUnitFilters(); renderDashboard(); checkSeedBanners();
   toast(`✅ Unit 1 diperbarui: +${totalAdded} baru, ${totalUpdated} diupdate`, 'success');
   if (WEBHOOK_URL) syncAll(true);
 }
-
 // ── SEED UNIT 2 ───────────────────────────────────────────────────────────────
 function seedUnit2() {
   const masterUnit = buildUnitFromMaster('Unit 2');
   if (!masterUnit) { toast('Master data Unit 2 tidak ditemukan', 'error'); return; }
 
- let localUnit = hierarchy.units.find(u =>
-  u.name === 'Unit 2' || u.id === 'U-002' || u.id === masterUnit.id
-);
+  let localUnit = hierarchy.units.find(u =>
+    u.name.toLowerCase() === 'unit 2' || u.id === 'U-002'
+  );
 
-if (!localUnit) {
-  hierarchy.units.push(masterUnit);
-    localUnit = masterUnit;
-    saveAll(); renderHierTree(); populateUnitFilters(); renderDashboard();
-    checkSeedBanners();
-    const eqCount = masterUnit.areas.reduce((s,a) => s + a.equipments.length, 0);
+  // Belum ada unit sama sekali — langsung generate
+  if (!localUnit) {
+    hierarchy.units.push(masterUnit);
+    saveAll(); renderHierTree(); populateUnitFilters(); renderDashboard(); checkSeedBanners();
+    const eqCount = masterUnit.areas.reduce((s, a) => s + a.equipments.length, 0);
     toast(`✅ Unit 2 di-generate: ${masterUnit.areas.length} area, ${eqCount} equipment`, 'success');
     if (WEBHOOK_URL) syncAll(true);
     return;
   }
 
-  // Sudah ada — cek diff
+  // Unit ada tapi equipment kosong — langsung apply tanpa confirm
+  const existingEqCount = (localUnit.areas || []).reduce((s, a) => s + (a.equipments || []).length, 0);
+  if (existingEqCount === 0) {
+    localUnit.id = 'U-002';
+    const { totalAdded } = applyMasterToUnit(localUnit, masterUnit);
+    saveAll(); renderHierTree(); populateUnitFilters(); renderDashboard(); checkSeedBanners();
+    toast(`✅ Unit 2 di-generate: ${totalAdded} equipment`, 'success');
+    if (WEBHOOK_URL) syncAll(true);
+    return;
+  }
+
+  // Unit ada & sudah punya equipment — cek diff dulu
   let diffSummary = [];
   masterUnit.areas.forEach(masterArea => {
-    const localArea = localUnit.areas.find(a => a.id === masterArea.id);
+    const localArea   = localUnit.areas.find(a => a.id === masterArea.id || a.name.toLowerCase() === masterArea.name.toLowerCase());
     const localEquips = localArea ? (localArea.equipments || []) : [];
-    const diff = diffEquipment(localEquips, masterArea.equipments);
-    if (diff.added.length)   diffSummary.push(`Area ${masterArea.name}: +${diff.added.length} equipment baru`);
-    if (diff.updated.length) diffSummary.push(`Area ${masterArea.name}: ${diff.updated.length} equipment diperbarui`);
+    const diff        = diffEquipment(localEquips, masterArea.equipments);
+    if (diff.added.length)   diffSummary.push(`  • ${masterArea.name}: +${diff.added.length} equipment baru`);
+    if (diff.updated.length) diffSummary.push(`  • ${masterArea.name}: ${diff.updated.length} equipment diperbarui`);
   });
 
   if (!diffSummary.length) {
@@ -4257,18 +4241,15 @@ if (!localUnit) {
     return;
   }
 
-  const confirmMsg =
-    `Ditemukan perbedaan antara data lokal dan master:\n\n` +
+  if (!confirm(
+    `Ditemukan perbedaan Unit 2 vs master data:\n\n` +
     diffSummary.join('\n') +
-    `\n\nLanjutkan update? (Data monitoring/params yang ada tidak akan dihapus)`;
-
-  if (!confirm(confirmMsg)) return;
+    `\n\nLanjutkan? (Data monitoring & params yang ada tidak akan dihapus)`
+  )) return;
 
   localUnit.id = 'U-002';
-
   const { totalAdded, totalUpdated } = applyMasterToUnit(localUnit, masterUnit);
-  saveAll(); renderHierTree(); populateUnitFilters(); renderDashboard();
-  checkSeedBanners();
+  saveAll(); renderHierTree(); populateUnitFilters(); renderDashboard(); checkSeedBanners();
   toast(`✅ Unit 2 diperbarui: +${totalAdded} baru, ${totalUpdated} diupdate`, 'success');
   if (WEBHOOK_URL) syncAll(true);
 }
@@ -4286,14 +4267,15 @@ function resetAndSeedUnit(unitName) {
     `Lanjutkan?`
   )) return;
 
-  // Hapus unit dari hierarki lokal
-  // Hapus semua unit yang match by name (case-insensitive) ATAU by hardcoded ID
-hierarchy.units = hierarchy.units.filter(u =>
-  u.name.toLowerCase() !== unitName.toLowerCase() &&
-  u.id !== MASTER_UNITS[unitName]?.id
-);
+  const masterUnitId = MASTER_UNITS[unitName]?.id || '';
 
-  // Generate fresh dari master
+  // Hapus semua unit yang match by name (case-insensitive) ATAU by hardcoded ID
+  hierarchy.units = hierarchy.units.filter(u =>
+    u.name.toLowerCase() !== unitName.toLowerCase() &&
+    (masterUnitId ? u.id !== masterUnitId : true)
+  );
+
+  // Generate fresh dari master — buildUnitFromMaster akan buat unit baru tanpa existing
   const masterUnit = buildUnitFromMaster(unitName);
   if (!masterUnit) { toast('Master data tidak ditemukan', 'error'); return; }
 
@@ -4307,28 +4289,17 @@ hierarchy.units = hierarchy.units.filter(u =>
    
 function findUnit(uid)                           { return hierarchy.units.find(u => u.id === uid); }
 function findArea(uid, aid)                      { return findUnit(uid)?.areas.find(a => a.id === aid); }
-function findSubArea(uid, aid, sid)              { return findArea(uid, aid)?.subAreas.find(s => s.id === sid); }
+
 function findEquip(uid, aid, sid, eid)           { return findSubArea(uid, aid, sid)?.equipments?.find(e => e.id === eid); }
 // findEquipFlex: support saId kosong (equipment langsung di area)
 function findEquipFlex(uid, aid, sid, eid) {
-  // Cari di area.equipments langsung
-  const direct = findArea(uid, aid)?.equipments?.find(e => e.id === eid);
-  if (direct) return direct;
-  // Fallback: cari di subAreas (untuk data lama yg masih punya subAreaId)
-  const area = findArea(uid, aid);
-  for (const sa of (area?.subAreas || [])) {
-    const eq = sa.equipments?.find(e => e.id === eid);
-    if (eq) return eq;
-  }
-  return null;
+  return findArea(uid, aid)?.equipments?.find(e => e.id === eid) || null;
 }
 // getAllEquipsInArea: kumpulkan semua equip di area (subArea maupun langsung)
 function getAllEquipsInArea(uid, aid) {
   const area = findArea(uid, aid);
   if (!area) return [];
-  const fromSubs  = (area.subAreas||[]).flatMap(sa => sa.equipments||[]);
-  const fromDirect = area.equipments || [];
-  return [...fromDirect, ...fromSubs];
+  return area.equipments || [];
 }
 
 function getLastSession(uid, aid, sid, eid) {
@@ -4338,11 +4309,9 @@ function getLastSession(uid, aid, sid, eid) {
 }
 
 function countEquipments() {
-  return hierarchy.units.flatMap(u => u.areas.flatMap(a => {
-    const fromSubs   = (a.subAreas||[]).flatMap(sa => sa.equipments||[]);
-    const fromDirect = a.equipments || [];
-    return [...fromDirect, ...fromSubs];
-  })).length;
+  return hierarchy.units.flatMap(u =>
+    u.areas.flatMap(a => a.equipments || [])
+  ).length;
 }
 
 function sessStatus(sess) {
@@ -4543,10 +4512,27 @@ function renderFindingsPage() {
   tbody.innerHTML = groups.map(g => {
     const alertCount = g.findings.filter(f=>f.status==='ALERT').length;
     const warnCount  = g.findings.filter(f=>f.status==='WARNING').length;
-    const woBtn = g.hasWO
-      ? `<button class="tbl-btn" style="font-size:10px;background:var(--green-dim);color:var(--green);border:1px solid rgba(74,158,63,.3)" disabled>✅ ${esc(g.woId||'WO Ada')}</button>`
-      : `<button class="tbl-btn" style="font-size:10px;background:var(--blue-dim);color:var(--blue);border:1px solid rgba(43,108,184,.3)"
-           onclick="openWOFromSession('${esc(g.sessId)}')">🔧 Buat WO</button>`;
+   // Cek status WO jika sudah ada
+const existingWO = g.hasWO ? workOrders.find(w => w.id === g.woId) ||
+  sessions.find(s => s.id === g.sessId && s.woId)
+  : null;
+const woStatus   = existingWO?.woStatus || existingWO?.status || 'Open';
+const woDone     = existingWO?.checklistDone  || 0;
+const woTotal    = existingWO?.checklistTotal || 0;
+
+const woBtn = g.hasWO
+  ? `<button class="tbl-btn"
+       style="font-size:10px;background:${woStatus==='Closed'?'var(--green-dim)':'var(--orange-dim)'};
+              color:${woStatus==='Closed'?'var(--green)':'var(--orange)'};
+              border:1px solid ${woStatus==='Closed'?'rgba(74,158,63,.3)':'rgba(251,140,58,.3)'}"
+       onclick="openWODetailModal('${esc(g.woId)}')">
+       ${woStatus==='Closed' ? '✅' : '🔓'} ${esc(g.woId||'WO')}
+       ${woTotal ? `· ${woDone}/${woTotal}` : ''}
+     </button>`
+  : `<button class="tbl-btn"
+       style="font-size:10px;background:var(--blue-dim);color:var(--blue);
+              border:1px solid rgba(43,108,184,.3)"
+       onclick="openWOFromSession('${esc(g.sessId)}')">🔧 Buat WO</button>`;
 
     const detailRows = g.findings.map(f => `
       <tr style="background:${f.status==='ALERT'?'rgba(239,68,68,.04)':'rgba(249,115,22,.03)'}">
@@ -4857,8 +4843,8 @@ async function submitWOFromFinding() {
   const f = _currentWOFinding;
   if (!f) return;
 
-  const titleEl    = document.getElementById('wo-title');
-  const title      = (titleEl?.value || '').trim();
+  const titleEl = document.getElementById('wo-title');
+  const title   = (titleEl?.value || '').trim();
   if (!title) {
     const err = document.getElementById('wo-title-err');
     if (err) err.textContent = 'Judul WO wajib diisi';
@@ -4876,26 +4862,43 @@ async function submitWOFromFinding() {
   const dept     = document.getElementById('wo-dept')?.value     || 'Electrical';
   const estH     = parseFloat(document.getElementById('wo-esthours')?.value) || 2;
 
-  // Finalise WO number — coba ambil dari API (MaintWare) dulu untuk tracking konsisten
-  const seqNum  = incrementWOCounter();
-  let woId = await fetchWOIdFromAPI(f, shift, seqNum);
-  if (!woId) {
-    // Fallback: generate lokal dengan format WO_ORDERS MaintWare
-    woId = generateWONumber(f, shift, seqNum);
-  }
+  // Kumpulkan semua findings yang terlibat
+  const involvedFindings = f._allFindings
+    ? f._allFindings
+    : findings.filter(x => x.id === f.id);
 
-  const now    = new Date().toISOString();
+  // Build checklist array dari findings
+  const checklist = involvedFindings.map((finding, idx) => ({
+    id:          finding.id,
+    seq:         idx + 1,
+    parameter:   finding.parameter,
+    value:       finding.value,
+    unit:        finding.unit_param || '',
+    findStatus:  finding.status,       // ALERT / WARNING
+    closeStatus: 'Open',               // Open / Closed
+    closedBy:    '',
+    closedAt:    '',
+    tindakan:    '',
+    catatan:     '',
+  }));
+
+  // Finalise WO number
+  const seqNum = incrementWOCounter();
+  let woId = await fetchWOIdFromAPI(f, shift, seqNum);
+  if (!woId) woId = generateWONumber(f, shift, seqNum);
+
+  const now      = new Date().toISOString();
   const notesLog = JSON.stringify([{
-    ts: now,
-    by: currentUser?.username || 'system',
-    msg: `WO dibuat otomatis dari Finding monitoring. Finding ID: ${f.id}. Parameter: ${f.parameter} = ${f.value} ${f.unit_param} (${f.status}).`
+    ts:  now,
+    by:  currentUser?.username || 'system',
+    msg: `WO dibuat dari Finding monitoring. ${checklist.length} item checklist. Sesi: ${f.sessId}.`,
   }]);
 
   const woRow = {
     id:             woId,
     title,
     type,
-    status,
+    status,           // 'Open' saat baru dibuat
     priority,
     equipId:        f.equipId    || '',
     techId:         '',
@@ -4913,26 +4916,27 @@ async function submitWOFromFinding() {
     endTime:        '',
     notes,
     closingNote:    '',
-    checklist:      '',
     checklistDone:  0,
-    checklistTotal: 0,
+    checklistTotal: checklist.length,
+    checklist:      checklist,        // array lengkap
     partsUsed:      '',
     partsCount:     0,
     notesLog,
     attachments:    '',
+    sessId:         f.sessId,         // referensi ke sesi monitoring
   };
 
   // UI state
   const btn = document.getElementById('woSendBtn');
   const res = document.getElementById('woSendResult');
   if (btn) { btn.disabled = true; btn.textContent = '↻ Mengirim...'; }
-  if (res) { res.style.display = 'none'; }
+  if (res)   res.style.display = 'none';
 
   try {
     const response = await fetch(WO_API_URL + '?fn=upsert', {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ fn: 'upsert', sheet: 'WO_ORDERS', row: woRow }),
+      method:   'POST',
+      headers:  { 'Content-Type': 'text/plain;charset=utf-8' },
+      body:     JSON.stringify({ fn: 'upsert', sheet: 'WO_ORDERS', row: woRow }),
       redirect: 'follow',
     });
     const text = await response.text();
@@ -4940,48 +4944,410 @@ async function submitWOFromFinding() {
     try { json = JSON.parse(text); } catch(e) { throw new Error('Respons bukan JSON: ' + text.slice(0,100)); }
 
     if (json.ok === true || json.success === true) {
-      // Success
-      if (res) {
-        res.style.display = 'block';
-        res.style.background = 'var(--green-dim)';
-        res.style.border = '1px solid rgba(74,158,63,.3)';
-        res.style.color = 'var(--green-d)';
-        res.innerHTML = `✅ <strong>WO berhasil dibuat!</strong><br>
-          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px">${esc(woId)}</span><br>
-          <span style="font-size:11px;color:var(--text3)">WO telah dikirim ke MaintWare Google Sheets.</span>`;
-      }
-      if (btn) { btn.textContent = '✅ WO Terkirim'; }
-      toast(`✅ WO dibuat: ${woId}`, 'success', 5000);
+      // Simpan WO ke state lokal (embed juga ke session)
+      workOrders.push(woRow);
 
-      // Mark SEMUA findings dalam sesi yang sama sebagai hasWO
-      const targetSessId = f._allFindings ? f.sessId : f.sessId;
+      // Embed woId ke session terkait
+      const sess = sessions.find(s => s.id === f.sessId);
+      if (sess) {
+        sess.woId      = woId;
+        sess.woStatus  = 'Open';
+        sess.checklist = checklist;
+      }
+
+      // Mark semua findings dalam sesi ini
       findings.forEach(finding => {
-        if (finding.sessId === targetSessId) {
+        if (finding.sessId === f.sessId) {
           finding.woId  = woId;
           finding.hasWO = true;
         }
       });
+
+      saveAll();
+
+      if (res) {
+        res.style.display  = 'block';
+        res.style.background = 'var(--green-dim)';
+        res.style.border   = '1px solid rgba(74,158,63,.3)';
+        res.style.color    = 'var(--green-d)';
+        res.innerHTML = `✅ <strong>WO berhasil dibuat!</strong><br>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px">${esc(woId)}</span><br>
+          <span style="font-size:11px;color:var(--text3)">${checklist.length} item checklist · klik tombol di bawah untuk lihat detail</span><br>
+          <button class="btn btn-primary btn-sm" style="margin-top:8px"
+            onclick="closeOverlay('woFromFindingOverlay');openWODetailModal('${esc(woId)}')">
+            📋 Lihat & Close Item WO
+          </button>`;
+      }
+      if (btn) btn.textContent = '✅ WO Terkirim';
+      toast(`✅ WO dibuat: ${woId} · ${checklist.length} item`, 'success', 5000);
       renderFindingsPage();
+
     } else {
       throw new Error(json.message || 'API mengembalikan error');
     }
   } catch(err) {
-    // Roll back counter if failed
     try { localStorage.setItem('ps_wo_counter', String(seqNum - 1)); } catch(e) {}
     if (res) {
-      res.style.display = 'block';
+      res.style.display  = 'block';
       res.style.background = 'var(--red-dim)';
-      res.style.border = '1px solid rgba(192,57,43,.3)';
-      res.style.color = 'var(--red)';
-      res.innerHTML = `✗ <strong>Gagal mengirim WO:</strong> ${esc(err.message)}<br>
-        <span style="font-size:11px;color:var(--text3)">Periksa koneksi dan URL API.</span>`;
+      res.style.border   = '1px solid rgba(192,57,43,.3)';
+      res.style.color    = 'var(--red)';
+      res.innerHTML = `✗ <strong>Gagal mengirim WO:</strong> ${esc(err.message)}`;
     }
     if (btn) { btn.disabled = false; btn.textContent = '🔧 Coba Lagi'; }
     toast('✗ Gagal buat WO: ' + err.message, 'error', 5000);
   }
 }
+// ═══════════════════════════════════════════════════════
+// WO DETAIL & CLOSE ITEMS
+// ═══════════════════════════════════════════════════════
+function openWODetailModal(woId) {
+  const wo = workOrders.find(w => w.id === woId);
+  if (!wo) {
+    // Coba cari dari sessions
+    const sess = sessions.find(s => s.woId === woId);
+    if (sess && sess.checklist) {
+      openWODetailFromSession(sess);
+      return;
+    }
+    toast('WO tidak ditemukan', 'error');
+    return;
+  }
+  renderWODetailModal(wo);
+}
 
+function openWODetailFromSession(sess) {
+  // Reconstruct minimal WO object dari session
+  const wo = {
+    id:             sess.woId,
+    title:          `WO — ${sess.equipName}`,
+    status:         sess.woStatus || 'Open',
+    priority:       '—',
+    equipId:        sess.equipId,
+    unitId:         sess.unitId,
+    areaId:         sess.areaId,
+    createdAt:      sess.createdAt,
+    checklistDone:  (sess.checklist||[]).filter(c=>c.closeStatus==='Closed').length,
+    checklistTotal: (sess.checklist||[]).length,
+    checklist:      sess.checklist || [],
+    sessId:         sess.id,
+    notes:          '',
+    closingNote:    sess.closingNote || '',
+  };
+  renderWODetailModal(wo);
+}
 
+function renderWODetailModal(wo) {
+  document.getElementById('woDetailTitle').textContent = `📋 ${wo.id}`;
+  document.getElementById('woDetailSub').textContent   =
+    `${wo.title} · ${wo.checklistDone}/${wo.checklistTotal} closed · Status: ${wo.status}`;
+
+  const checklist   = wo.checklist || [];
+  const allClosed   = checklist.length > 0 && checklist.every(c => c.closeStatus === 'Closed');
+  const doneCnt     = checklist.filter(c => c.closeStatus === 'Closed').length;
+  const pct         = checklist.length ? Math.round(doneCnt / checklist.length * 100) : 0;
+
+  const statusBadge = wo.status === 'Closed'
+    ? `<span class="badge b-ok" style="font-size:12px">✅ CLOSED</span>`
+    : `<span class="badge b-warn" style="font-size:12px">🔓 OPEN</span>`;
+
+  const progressBar = `
+    <div style="margin:12px 0">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-bottom:4px">
+        <span>Progress Penyelesaian</span>
+        <span style="font-weight:700;color:${pct===100?'var(--green)':'var(--orange)'}">
+          ${doneCnt}/${checklist.length} item · ${pct}%
+        </span>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-bar" style="width:${pct}%;background:${pct===100?'var(--green)':'var(--orange)'}"></div>
+      </div>
+    </div>`;
+
+  const checklistHtml = checklist.length ? `
+    <div style="margin-top:16px">
+      <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;
+                  letter-spacing:.07em;margin-bottom:10px">
+        📌 Checklist Item Finding
+      </div>
+      ${checklist.map((item, idx) => renderWOChecklistItem(wo.id, item, idx)).join('')}
+    </div>` : `<div style="color:var(--text3);font-size:12px;padding:8px">Tidak ada item checklist.</div>`;
+
+  // Closing note
+  const closingNoteHtml = `
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+      <div class="fg">
+        <label class="flabel">📝 Closing Note / Kesimpulan WO</label>
+        <textarea class="ftextarea" id="woClosingNote" placeholder="Rangkuman tindakan keseluruhan..."
+          style="min-height:60px">${esc(wo.closingNote||wo.notes||'')}</textarea>
+      </div>
+    </div>`;
+
+  document.getElementById('woDetailBody').innerHTML = `
+    <!-- Header info -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;
+                padding:12px 16px;background:var(--bg3);border-radius:8px;margin-bottom:16px">
+      ${statusBadge}
+      <span class="badge b-blue">${esc(wo.unitId||'—')}</span>
+      <span class="badge b-gray">📅 ${fmtDate(wo.createdAt?.split('T')[0]||'')}</span>
+      <code style="font-size:10px;color:var(--text3);margin-left:auto">${esc(wo.id)}</code>
+    </div>
+
+    ${progressBar}
+    ${checklistHtml}
+    ${closingNoteHtml}
+
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeOverlay('woDetailOverlay')">Tutup</button>
+      ${!allClosed ? `
+        <button class="btn btn-orange" onclick="closeAllWOItems('${esc(wo.id)}')">
+          ⚡ Close Semua Item
+        </button>` : ''}
+      <button class="btn btn-primary" onclick="saveWOProgress('${esc(wo.id)}')">
+        💾 Simpan Progress
+      </button>
+    </div>`;
+
+  openOverlay('woDetailOverlay');
+}
+
+function renderWOChecklistItem(woId, item, idx) {
+  const isClosed  = item.closeStatus === 'Closed';
+  const rowBg     = isClosed
+    ? 'background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.2)'
+    : item.findStatus === 'ALERT'
+      ? 'background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.15)'
+      : 'background:rgba(249,115,22,.04);border:1px solid rgba(249,115,22,.15)';
+
+  return `
+    <div style="${rowBg};border-radius:8px;padding:12px 14px;margin-bottom:8px"
+         id="wochk-row-${esc(item.id)}">
+      <div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap">
+
+        <!-- Status toggle -->
+        <div style="flex-shrink:0;padding-top:2px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none">
+            <input type="checkbox"
+              id="wochk-cb-${esc(item.id)}"
+              ${isClosed ? 'checked' : ''}
+              onchange="onWOItemToggle('${esc(woId)}','${esc(item.id)}',this.checked)"
+              style="width:16px;height:16px;accent-color:var(--green);cursor:pointer"/>
+            <span style="font-size:11px;font-weight:600;color:${isClosed?'var(--green)':'var(--text3)'}">
+              ${isClosed ? '✅ Closed' : '🔓 Open'}
+            </span>
+          </label>
+        </div>
+
+        <!-- Finding info -->
+        <div style="flex:1;min-width:180px">
+          <div style="font-weight:600;font-size:13px;color:var(--text)">${esc(item.parameter)}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">
+            Nilai:
+            <span style="font-family:'IBM Plex Mono',monospace;font-weight:700;
+                         color:${item.findStatus==='ALERT'?'var(--red)':'var(--orange)'}">
+              ${esc(item.value)} ${esc(item.unit)}
+            </span>
+            &nbsp;·&nbsp;
+            <span class="badge ${item.findStatus==='ALERT'?'b-alert':'b-warn'}"
+                  style="font-size:9px">${esc(item.findStatus)}</span>
+          </div>
+          ${isClosed && item.closedBy ? `
+            <div style="font-size:10px;color:var(--green);margin-top:3px">
+              ✓ Closed by ${esc(item.closedBy)} · ${item.closedAt ? new Date(item.closedAt).toLocaleString('id-ID') : ''}
+            </div>` : ''}
+        </div>
+
+        <!-- Tindakan & Catatan — hanya aktif saat Open atau baru di-close -->
+        <div style="flex:2;min-width:220px;display:flex;flex-direction:column;gap:6px">
+          <div>
+            <div class="param-mini-label">Tindakan yang Dilakukan</div>
+            <input class="param-mini-input"
+              id="wochk-tindakan-${esc(item.id)}"
+              value="${esc(item.tindakan||'')}"
+              placeholder="Contoh: Ganti oli, reset breaker..."
+              ${isClosed ? '' : ''}
+              style="width:100%;font-size:12px;padding:6px 8px"/>
+          </div>
+          <div>
+            <div class="param-mini-label">Catatan</div>
+            <input class="param-mini-input"
+              id="wochk-catatan-${esc(item.id)}"
+              value="${esc(item.catatan||'')}"
+              placeholder="Catatan tambahan..."
+              style="width:100%;font-size:12px;padding:6px 8px"/>
+          </div>
+        </div>
+
+      </div>
+    </div>`;
+}
+
+function onWOItemToggle(woId, itemId, checked) {
+  // Visual feedback langsung
+  const row    = document.getElementById('wochk-row-' + itemId);
+  const label  = document.querySelector(`#wochk-cb-${itemId}`)?.nextElementSibling;
+  if (label) {
+    label.textContent = checked ? '✅ Closed' : '🔓 Open';
+    label.style.color = checked ? 'var(--green)' : 'var(--text3)';
+  }
+  if (row) {
+    row.style.background = checked
+      ? 'rgba(34,197,94,.06)'
+      : 'rgba(249,115,22,.04)';
+    row.style.border = checked
+      ? '1px solid rgba(34,197,94,.2)'
+      : '1px solid rgba(249,115,22,.15)';
+  }
+}
+
+function closeAllWOItems(woId) {
+  if (!confirm('Close semua item sekaligus?')) return;
+  const wo = _getWOById(woId);
+  if (!wo) return;
+  wo.checklist.forEach(item => {
+    const cb = document.getElementById('wochk-cb-' + item.id);
+    if (cb && !cb.checked) {
+      cb.checked = true;
+      onWOItemToggle(woId, item.id, true);
+    }
+  });
+}
+
+async function saveWOProgress(woId) {
+  const wo = _getWOById(woId);
+  if (!wo) { toast('WO tidak ditemukan', 'error'); return; }
+
+  const now = new Date().toISOString();
+
+  // Baca semua nilai dari DOM
+  wo.checklist.forEach(item => {
+    const cb       = document.getElementById('wochk-cb-' + item.id);
+    const tindakan = document.getElementById('wochk-tindakan-' + item.id);
+    const catatan  = document.getElementById('wochk-catatan-'  + item.id);
+
+    const nowClosed = cb?.checked || false;
+
+    // Kalau baru di-close, set closedBy & closedAt
+    if (nowClosed && item.closeStatus !== 'Closed') {
+      item.closedBy = currentUser?.name || currentUser?.username || 'Unknown';
+      item.closedAt = now;
+    }
+    // Kalau di-reopen
+    if (!nowClosed && item.closeStatus === 'Closed') {
+      item.closedBy = '';
+      item.closedAt = '';
+    }
+
+    item.closeStatus = nowClosed ? 'Closed' : 'Open';
+    item.tindakan    = tindakan?.value || item.tindakan || '';
+    item.catatan     = catatan?.value  || item.catatan  || '';
+  });
+
+  // Hitung progress
+  const doneCnt = wo.checklist.filter(c => c.closeStatus === 'Closed').length;
+  wo.checklistDone  = doneCnt;
+  wo.checklistTotal = wo.checklist.length;
+
+  // Auto-close WO jika semua item closed
+  const allClosed = doneCnt === wo.checklist.length;
+  if (allClosed && wo.status !== 'Closed') {
+    wo.status      = 'Closed';
+    wo.closingNote = document.getElementById('woClosingNote')?.value || '';
+    wo.endTime     = now;
+    // Tambah log
+    try {
+      const log = JSON.parse(wo.notesLog || '[]');
+      log.push({
+        ts:  now,
+        by:  currentUser?.username || 'system',
+        msg: `WO di-close otomatis. Semua ${wo.checklist.length} item selesai.`,
+      });
+      wo.notesLog = JSON.stringify(log);
+    } catch(e) {}
+    toast('🎉 Semua item closed — WO otomatis CLOSED!', 'success', 5000);
+  } else {
+    wo.closingNote = document.getElementById('woClosingNote')?.value || '';
+    try {
+      const log = JSON.parse(wo.notesLog || '[]');
+      log.push({
+        ts:  now,
+        by:  currentUser?.username || 'system',
+        msg: `Progress diperbarui: ${doneCnt}/${wo.checklist.length} item closed.`,
+      });
+      wo.notesLog = JSON.stringify(log);
+    } catch(e) {}
+  }
+
+  // Sync ke session terkait
+  const sess = sessions.find(s => s.woId === woId || s.id === wo.sessId);
+  if (sess) {
+    sess.checklist  = wo.checklist;
+    sess.woStatus   = wo.status;
+    sess.closingNote = wo.closingNote;
+  }
+
+  saveAll();
+
+  // Push ke MaintWare
+  const btn = document.querySelector(`#woDetailBody .btn-primary`);
+  if (btn) { btn.disabled = true; btn.textContent = '↻ Menyimpan...'; }
+
+  try {
+    const res = await fetch(WO_API_URL + '?fn=upsert', {
+      method:   'POST',
+      headers:  { 'Content-Type': 'text/plain;charset=utf-8' },
+      body:     JSON.stringify({ fn: 'upsert', sheet: 'WO_ORDERS', row: wo }),
+      redirect: 'follow',
+    }).then(r => r.text()).then(t => { try { return JSON.parse(t); } catch(e) { return { ok: false, message: t.slice(0,100) }; }});
+
+    if (res.ok === true || res.success === true) {
+      toast(`✅ WO ${woId} tersimpan · ${doneCnt}/${wo.checklist.length} closed`, 'success');
+      // Re-render modal dengan data terbaru
+      renderWODetailModal(wo);
+      renderFindingsPage();
+    } else {
+      toast('⚠ Tersimpan lokal tapi gagal sync: ' + (res.message||''), 'error');
+      if (btn) { btn.disabled = false; btn.textContent = '💾 Simpan Progress'; }
+    }
+  } catch(err) {
+    toast('⚠ Tersimpan lokal · offline: ' + err.message, 'info');
+    renderWODetailModal(wo);
+    renderFindingsPage();
+  }
+}
+
+// Helper — cari WO dari workOrders[] atau rekonstruksi dari sessions[]
+function _getWOById(woId) {
+  // Cari di workOrders state dulu
+  let wo = workOrders.find(w => w.id === woId);
+  if (wo) return wo;
+
+  // Fallback: rekonstruksi dari session
+  const sess = sessions.find(s => s.woId === woId);
+  if (!sess) return null;
+
+  const reconstructed = {
+    id:             woId,
+    title:          `WO — ${sess.equipName}`,
+    status:         sess.woStatus || 'Open',
+    priority:       '—',
+    equipId:        sess.equipId,
+    unitId:         sess.unitId,
+    areaId:         sess.areaId,
+    createdAt:      sess.createdAt,
+    checklistDone:  (sess.checklist||[]).filter(c=>c.closeStatus==='Closed').length,
+    checklistTotal: (sess.checklist||[]).length,
+    checklist:      sess.checklist || [],
+    sessId:         sess.id,
+    notes:          '',
+    notesLog:       '[]',
+    closingNote:    sess.closingNote || '',
+  };
+
+  // Tambah ke workOrders agar tidak perlu rekonstruksi lagi
+  workOrders.push(reconstructed);
+  return reconstructed;
+}
 </script>
 
 </body>
