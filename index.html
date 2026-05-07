@@ -4201,9 +4201,7 @@ function regenerateFindings() {
   }
   // Update dashboard sc-alert with finding count
   setText('sc-alert', findings.length);
-}
-   }
-   
+}  
 function renderFindingsPage() {
   regenerateFindings();
 
@@ -4307,6 +4305,7 @@ function renderFindingsPage() {
       </tr>
       ${detailRows}`;
   }).join('');
+}
 // ADD END: FINDING SYSTEM
 
 // ═══════════════════════════════════════════════════════════════════
