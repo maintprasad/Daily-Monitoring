@@ -2502,7 +2502,7 @@ function renderUnitNode(unit) {
       <span class="chevron">▶</span>
       <span class="hier-unit-name">🏭 ${esc(unit.name)}</span>
       <span class="badge b-gray" style="margin-right:8px">${areas.length} area · ${totalEquip} equip</span>
-      <<div style="display:flex;gap:4px" data-uid="${esc(unit.id)}">
+      <div style="display:flex;gap:4px" data-uid="${esc(unit.id)}">
         <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();openAddAreaModal(this.parentElement.dataset.uid)">+ Area</button>
         <button class="btn btn-danger btn-xs" onclick="event.stopPropagation();deleteUnit(this.parentElement.dataset.uid)">✕</button>
       </div>
@@ -2526,9 +2526,9 @@ function renderAreaNode(unitId, area) {
       <span class="chevron" style="font-size:10px;color:var(--text3)">▶</span>
       <span class="hier-area-name">📁 ${esc(area.name)}</span>
       <span class="badge b-gray" style="margin-right:8px;font-size:9px">${countLabel}</span>
-      <div style="display:flex;gap:4px" data-uid="${esc(unit.id)}">
-        <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();openAddAreaModal(this.parentElement.dataset.uid)">+ Area</button>
-        <button class="btn btn-danger btn-xs" onclick="event.stopPropagation();deleteUnit(this.parentElement.dataset.uid)">✕</button>
+      <div style="display:flex;gap:4px" data-uid="${esc(unitId)}" data-aid="${esc(area.id)}">
+        <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();openAddEquipModal(this.parentElement.dataset.uid,this.parentElement.dataset.aid)">+ Equipment</button>
+        <button class="btn btn-danger btn-xs" onclick="event.stopPropagation();deleteArea(this.parentElement.dataset.uid,this.parentElement.dataset.aid)">✕</button>
       </div>
     </div>
     <div class="hier-area-body">
