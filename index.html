@@ -2985,6 +2985,10 @@ function onNSEquipChange() {
   const area2  = findArea(unitId, areaId);
   const allEqs = area2?.equipments || [];
   const eq     = allEqs.find(e => e.id === eqId);
+  const params = eq?.params || [];
+  if (!params.length) { preview.style.display='none'; return; }
+  plist.innerHTML = params.map(p => `<span class="badge b-gray">${esc(p.label)} (${esc(p.unit||'—')})</span>`).join('');
+  preview.style.display = 'block';
 }
    
 function submitNewSession() {
@@ -4291,7 +4295,7 @@ function resetAndSeedUnit(unitName) {
 function findUnit(uid)                           { return hierarchy.units.find(u => u.id === uid); }
 function findArea(uid, aid)                      { return findUnit(uid)?.areas.find(a => a.id === aid); }
 
-function findEquip(uid, aid, sid, eid)           { return findSubArea(uid, aid, sid)?.equipments?.find(e => e.id === eid); }
+// findEquip dihapus — gunakan findEquipFlex
 // findEquipFlex: support saId kosong (equipment langsung di area)
 function findEquipFlex(uid, aid, sid, eid) {
   return findArea(uid, aid)?.equipments?.find(e => e.id === eid) || null;
@@ -5295,17 +5299,9 @@ async function saveWOProgress(woId) {
   if (btn) { btn.disabled = true; btn.textContent = '↻ Menyimpan...'; }
 
   try {
-   // Checklist harus di-stringify sebelum dikirim ke GAS
-    const woPayload = {
-      ...wo,
-      checklist: typeof wo.checklist === 'string'
-        ? wo.checklist
-        : JSON.stringify(wo.checklist || []),
-    };
-
     // Checklist harus di-stringify sebelum dikirim ke GAS
     const woPayload = {
-      ...wo,
+      ...wo,   
       checklist: typeof wo.checklist === 'string'
         ? wo.checklist
         : JSON.stringify(wo.checklist || []),
