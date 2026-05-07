@@ -4021,37 +4021,79 @@ const MASTER_EQUIPMENT = [
 function buildUnitFromMaster(unitName) {
   const unitMeta = MASTER_UNITS[unitName];
   if (!unitMeta) return null;
-  const uid = unitMeta.id;
+  const masterUid = unitMeta.id;
 
-  // Kumpulkan area yang relevan untuk unit ini
+  // Cek apakah unit sudah ada di lokal (match by name atau hardcoded id)
+  const existingUnit = hierarchy.units.find(u =>
+    u.name.toLowerCase() === unitName.toLowerCase() ||
+    u.id === masterUid
+  );
+
+  // Pakai ID existing jika ada, fallback ke hardcoded master ID
+  const uid = existingUnit ? existingUnit.id : masterUid;
+
   const areaMap = {};
   Object.entries(MASTER_AREAS)
-    .filter(([key]) => key.startsWith(uid + '_'))
+    .filter(([key]) => key.startsWith(masterUid + '_'))
     .forEach(([key, a]) => {
-      areaMap[a.id] = { id: a.id, name: a.name, subAreas: [], equipments: [] };
+      // Cek apakah area sudah ada di unit existing (match by name)
+      const existingArea = existingUnit
+        ? (existingUnit.areas || []).find(ea =>
+            ea.name.toLowerCase() === a.name.toLowerCase()
+          )
+        : null;
+
+      // Pakai ID existing jika ada
+      const areaId = existingArea ? existingArea.id : a.id;
+
+      areaMap[a.id] = {
+        id:         areaId,
+        name:       a.name,
+        subAreas:   [],
+        equipments: [],
+        _masterKey: a.id, // simpan master key untuk lookup equipment
+      };
     });
 
-  // Isi equipment ke area masing-masing
   MASTER_EQUIPMENT
-    .filter(eq => eq.areaKey.startsWith(uid + '_'))
+    .filter(eq => eq.areaKey.startsWith(masterUid + '_'))
     .forEach(eq => {
-      const areaId = eq.areaKey.split('_')[1]; // "A-001" dst
-      if (!areaMap[areaId]) return;
-      const tpl = EQUIP_PARAM_TEMPLATES[eq.type] || [];
-      areaMap[areaId].equipments.push({
-        id:     eq.id,
+      const masterAreaId = eq.areaKey.split('_')[1];
+      const areaEntry    = areaMap[masterAreaId];
+      if (!areaEntry) return;
+
+      // Cek apakah equipment sudah ada (match by name atau tag)
+      const existingArea = existingUnit
+        ? (existingUnit.areas || []).find(ea => ea.id === areaEntry.id)
+        : null;
+      const existingEq = existingArea
+        ? (existingArea.equipments || []).find(e =>
+            e.name.toLowerCase() === eq.name.toLowerCase() ||
+            (e.tag && eq.tag && e.tag === eq.tag)
+          )
+        : null;
+
+      // Pakai ID dan params existing jika ada (jaga data monitoring)
+      const eqId     = existingEq ? existingEq.id  : eq.id;
+      const eqParams = existingEq ? existingEq.params : (EQUIP_PARAM_TEMPLATES[eq.type] || []).map(p => ({ ...p, id: genPId() }));
+
+      areaEntry.equipments.push({
+        id:     eqId,
         name:   eq.name,
         tag:    eq.tag,
         type:   eq.type,
-        params: tpl.map(p => ({ ...p, id: genPId() })),
+        params: eqParams,
       });
     });
+
+  // Bersihkan _masterKey sebelum return
+  const areas = Object.values(areaMap).map(({ _masterKey, ...rest }) => rest);
 
   return {
     id:    uid,
     name:  unitName,
-    desc:  `Unit Produksi ${unitName.replace('Unit ','')}`,
-    areas: Object.values(areaMap),
+    desc:  existingUnit ? (existingUnit.desc || '') : `Unit Produksi ${unitName.replace('Unit ','')}`,
+    areas,
   };
 }
 
@@ -4131,11 +4173,13 @@ function seedUnit1() {
   const masterUnit = buildUnitFromMaster('Unit 1');
   if (!masterUnit) { toast('Master data Unit 1 tidak ditemukan', 'error'); return; }
 
-  let localUnit = hierarchy.units.find(u => u.name === 'Unit 1' || u.id === 'U-001');
+  // Di seedUnit1():
+let localUnit = hierarchy.units.find(u =>
+  u.name === 'Unit 1' || u.id === 'U-001' || u.id === masterUnit.id
+);
 
-  if (!localUnit) {
-    // Fresh install
-    hierarchy.units.push(masterUnit);
+if (!localUnit) {
+  hierarchy.units.push(masterUnit);
     localUnit = masterUnit;
     saveAll(); renderHierTree(); populateUnitFilters(); renderDashboard();
     checkSeedBanners();
@@ -4183,11 +4227,12 @@ function seedUnit2() {
   const masterUnit = buildUnitFromMaster('Unit 2');
   if (!masterUnit) { toast('Master data Unit 2 tidak ditemukan', 'error'); return; }
 
-  let localUnit = hierarchy.units.find(u => u.name === 'Unit 2' || u.id === 'U-002');
+ let localUnit = hierarchy.units.find(u =>
+  u.name === 'Unit 2' || u.id === 'U-002' || u.id === masterUnit.id
+);
 
-  if (!localUnit) {
-    // Fresh install
-    hierarchy.units.push(masterUnit);
+if (!localUnit) {
+  hierarchy.units.push(masterUnit);
     localUnit = masterUnit;
     saveAll(); renderHierTree(); populateUnitFilters(); renderDashboard();
     checkSeedBanners();
@@ -4242,7 +4287,11 @@ function resetAndSeedUnit(unitName) {
   )) return;
 
   // Hapus unit dari hierarki lokal
-  hierarchy.units = hierarchy.units.filter(u => u.name !== unitName && u.id !== MASTER_UNITS[unitName]?.id);
+  // Hapus semua unit yang match by name (case-insensitive) ATAU by hardcoded ID
+hierarchy.units = hierarchy.units.filter(u =>
+  u.name.toLowerCase() !== unitName.toLowerCase() &&
+  u.id !== MASTER_UNITS[unitName]?.id
+);
 
   // Generate fresh dari master
   const masterUnit = buildUnitFromMaster(unitName);
