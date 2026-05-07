@@ -987,26 +987,27 @@ body {
     ℹ <strong>Cara penggunaan:</strong> Tambahkan Unit terlebih dahulu, lalu Klik pada Equipment untuk mengatur parameter monitoring-nya.
   </div>
 
-  <!-- QUICK SEED UNIT 1 BANNER -->
+ <!-- QUICK SEED UNIT 1 BANNER -->
   <div id="seedUnit1Banner" style="background:rgba(74,158,63,.08);border:1px solid rgba(74,158,63,.3);border-radius:var(--r);padding:12px 16px;margin-bottom:12px;font-size:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
     <div style="flex:1;min-width:200px">
-      🏭 <strong>Quick Setup Unit 1:</strong> Auto-generate seluruh hierarki Unit 1 beserta semua equipment (Transformer, LVMDP, Capacitor Bank, MCC Panel ×15, Air Compressor ×5, Hydrant, Mini Chamber) lengkap dengan parameter monitoring.
+      🏭 <strong>Quick Setup Unit 1:</strong> Generate / sinkronkan hierarki Unit 1 dari master data (Transformer E-249, LVMDP E-638, Capacitor Bank, MCC ×15, Air Compressor ×7, Hydrant, Mini Chamber, Tripercar Conveyor).
     </div>
-    <button class="btn btn-primary btn-sm" onclick="seedUnit1()">⚡ Generate Unit 1 Otomatis</button>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn btn-primary btn-sm" onclick="seedUnit1()">⚡ Generate / Sync Unit 1</button>
+      <button class="btn btn-danger btn-sm" onclick="resetAndSeedUnit('Unit 1')">🗑 Reset &amp; Generate Ulang</button>
+    </div>
   </div>
 
   <!-- QUICK SEED UNIT 2 BANNER -->
   <div id="seedUnit2Banner" style="background:rgba(30,136,229,.08);border:1px solid rgba(30,136,229,.3);border-radius:var(--r);padding:12px 16px;margin-bottom:20px;font-size:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
     <div style="flex:1;min-width:200px">
-      🏭 <strong>Quick Setup Unit 2:</strong> Auto-generate seluruh hierarki Unit 2 — Transformer, LVMDP, Capacitor Bank, MCC Panel ×23, Air Compressor ×3, Hydrant, Cold Storage (4 unit × mesin) lengkap dengan parameter monitoring.
+      🏭 <strong>Quick Setup Unit 2:</strong> Generate / sinkronkan hierarki Unit 2 dari master data (MCC ×24, Air Compressor ×4, Hydrant, Cold Storage CS1–CS4, Office panels, Truck Tippler).
     </div>
-    <button class="btn btn-blue btn-sm" onclick="seedUnit2()">⚡ Generate Unit 2 Otomatis</button>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn btn-blue btn-sm" onclick="seedUnit2()">⚡ Generate / Sync Unit 2</button>
+      <button class="btn btn-danger btn-sm" onclick="resetAndSeedUnit('Unit 2')">🗑 Reset &amp; Generate Ulang</button>
+    </div>
   </div>
-
-  <div class="hier-tree" id="hierTree">
-    <div class="empty"><div class="empty-ico">🗂</div><div class="empty-msg">Belum ada hierarki. Klik "Tambah Unit" untuk mulai.</div></div>
-  </div>
-</div>
 
 <!-- ════ CONFIG ════ -->
 <div class="page" id="page-config">
@@ -2448,12 +2449,11 @@ function resetHistFilters() {
 // HIERARCHY TREE RENDERER
 // ═══════════════════════════════════════════════════════
    function checkSeedBanners() {
-  const hasUnit1 = hierarchy.units.some(u => u.name === 'Unit 1');
-  const hasUnit2 = hierarchy.units.some(u => u.name === 'Unit 2');
+  // Banner selalu tampil — seed engine sendiri yang handle kondisi fresh vs update
   const b1 = document.getElementById('seedUnit1Banner');
   const b2 = document.getElementById('seedUnit2Banner');
-  if (b1) b1.style.display = hasUnit1 ? 'none' : '';
-  if (b2) b2.style.display = hasUnit2 ? 'none' : '';
+  if (b1) b1.style.display = '';
+  if (b2) b2.style.display = '';
 }
    
 function renderHierTree() {
@@ -2502,9 +2502,9 @@ function renderUnitNode(unit) {
       <span class="chevron">▶</span>
       <span class="hier-unit-name">🏭 ${esc(unit.name)}</span>
       <span class="badge b-gray" style="margin-right:8px">${areas.length} area · ${totalEquip} equip</span>
-      <div style="display:flex;gap:4px">
-        <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();openAddAreaModal('${unit.id}')">+ Area</button>
-        <button class="btn btn-danger btn-xs" onclick="event.stopPropagation();deleteUnit('${unit.id}')">✕</button>
+      <<div style="display:flex;gap:4px" data-uid="${esc(unit.id)}">
+        <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();openAddAreaModal(this.parentElement.dataset.uid)">+ Area</button>
+        <button class="btn btn-danger btn-xs" onclick="event.stopPropagation();deleteUnit(this.parentElement.dataset.uid)">✕</button>
       </div>
     </div>
     <div class="hier-unit-body">
@@ -2526,9 +2526,9 @@ function renderAreaNode(unitId, area) {
       <span class="chevron" style="font-size:10px;color:var(--text3)">▶</span>
       <span class="hier-area-name">📁 ${esc(area.name)}</span>
       <span class="badge b-gray" style="margin-right:8px;font-size:9px">${countLabel}</span>
-      <div style="display:flex;gap:4px">
-        <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();openAddEquipModal('${unitId}','${area.id}')">+ Equipment</button>
-        <button class="btn btn-danger btn-xs" onclick="event.stopPropagation();deleteArea('${unitId}','${area.id}')">✕</button>
+      <div style="display:flex;gap:4px" data-uid="${esc(unit.id)}">
+        <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();openAddAreaModal(this.parentElement.dataset.uid)">+ Area</button>
+        <button class="btn btn-danger btn-xs" onclick="event.stopPropagation();deleteUnit(this.parentElement.dataset.uid)">✕</button>
       </div>
     </div>
     <div class="hier-area-body">
@@ -2562,22 +2562,22 @@ function renderEquipNode(unitId, areaId, subAreaId, eq) {
   const lastSess = getLastSession(unitId, areaId, subAreaId, eq.id);
   const st = lastSess ? sessStatus(lastSess) : 'PENDING';
   const dotCls = {OK:'s-ok',WARNING:'s-warn',ALERT:'s-alert',PENDING:'s-none'}[st]||'s-none';
-  // ADD START: equipment type badge
   const typeLabel = eq.type ? (EQUIP_TYPE_LABELS[eq.type] || eq.type) : '';
   const typeBadge = typeLabel ? `<span class="badge" style="background:var(--blue-dim);color:var(--blue);font-size:9px">${esc(typeLabel)}</span> ` : '';
-  // ADD END
-  return `<div class="hier-equip">
+  // Simpan argumen di data-attr agar tidak ada masalah karakter spesial di onclick
+  const uid = esc(unitId); const aid = esc(areaId); const sid = esc(subAreaId); const eid = esc(eq.id);
+  return `<div class="hier-equip" data-uid="${uid}" data-aid="${aid}" data-sid="${sid}" data-eid="${eid}">
     <div class="hier-equip-status ${dotCls}"></div>
     <span class="hier-equip-name">${typeBadge}${esc(eq.name)}${eq.tag?` <span style="font-size:9px;color:var(--text3)">(${esc(eq.tag)})</span>`:''}</span>
     <span class="hier-equip-params">${paramCount} param</span>
     <div style="display:flex;gap:4px">
-      <button class="btn btn-blue btn-xs" onclick="openParamEditor('${unitId}','${areaId}','${subAreaId}','${eq.id}')">⚙ Parameter</button>
-      <button class="btn btn-primary btn-xs" onclick="openNewSessionModal('${unitId}','${areaId}','${subAreaId}','${eq.id}')">✚ Monitor</button>
-      <button class="btn btn-danger btn-xs" onclick="deleteEquip('${unitId}','${areaId}','${subAreaId}','${eq.id}')">✕</button>
+      <button class="btn btn-blue btn-xs"    onclick="openParamEditor(this.closest('.hier-equip').dataset.uid,this.closest('.hier-equip').dataset.aid,this.closest('.hier-equip').dataset.sid,this.closest('.hier-equip').dataset.eid)">⚙ Parameter</button>
+      <button class="btn btn-primary btn-xs" onclick="openNewSessionModal(this.closest('.hier-equip').dataset.uid,this.closest('.hier-equip').dataset.aid,this.closest('.hier-equip').dataset.sid,this.closest('.hier-equip').dataset.eid)">✚ Monitor</button>
+      <button class="btn btn-danger btn-xs"  onclick="deleteEquip(this.closest('.hier-equip').dataset.uid,this.closest('.hier-equip').dataset.aid,this.closest('.hier-equip').dataset.sid,this.closest('.hier-equip').dataset.eid)">✕</button>
     </div>
   </div>`;
 }
-
+   
 function toggleNode(hdr) {
   const body = hdr.nextElementSibling;
   const chev = hdr.querySelector('.chevron');
@@ -4210,6 +4210,34 @@ function seedUnit2() {
   saveAll(); renderHierTree(); populateUnitFilters(); renderDashboard();
   checkSeedBanners();
   toast(`✅ Unit 2 diperbarui: +${totalAdded} baru, ${totalUpdated} diupdate`, 'success');
+  if (WEBHOOK_URL) syncAll(true);
+}
+ /**
+ * resetAndSeedUnit — hapus unit lokal lalu generate fresh dari master.
+ * Cocok dipakai saat data Sheets sudah di-reset/dihapus.
+ * PERINGATAN: semua sesi monitoring yang terikat unit ini tetap ada,
+ * hanya hierarki (area+equipment) yang di-reset.
+ */
+function resetAndSeedUnit(unitName) {
+  if (!confirm(
+    `⚠ RESET HIERARKI "${unitName}"?\n\n` +
+    `Seluruh area dan equipment "${unitName}" akan dihapus dan di-generate ulang dari master data.\n` +
+    `Data sesi monitoring yang sudah ada TIDAK akan dihapus.\n\n` +
+    `Lanjutkan?`
+  )) return;
+
+  // Hapus unit dari hierarki lokal
+  hierarchy.units = hierarchy.units.filter(u => u.name !== unitName && u.id !== MASTER_UNITS[unitName]?.id);
+
+  // Generate fresh dari master
+  const masterUnit = buildUnitFromMaster(unitName);
+  if (!masterUnit) { toast('Master data tidak ditemukan', 'error'); return; }
+
+  hierarchy.units.push(masterUnit);
+  saveAll(); renderHierTree(); populateUnitFilters(); renderDashboard(); checkSeedBanners();
+
+  const eqCount = masterUnit.areas.reduce((s, a) => s + a.equipments.length, 0);
+  toast(`✅ "${unitName}" di-reset & di-generate ulang: ${masterUnit.areas.length} area, ${eqCount} equipment`, 'success');
   if (WEBHOOK_URL) syncAll(true);
 }
    
