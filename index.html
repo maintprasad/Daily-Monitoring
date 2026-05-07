@@ -2579,10 +2579,9 @@ function renderEquipNode(unitId, areaId, subAreaId, eq) {
     <span class="hier-equip-name">${typeBadge}${esc(eq.name)}${eq.tag?` <span style="font-size:9px;color:var(--text3)">(${esc(eq.tag)})</span>`:''}</span>
     <span class="hier-equip-params">${paramCount} param</span>
     <div style="display:flex;gap:4px">
-      <button class="btn btn-blue btn-xs"    onclick="openParamEditor(this.closest('.hier-equip').dataset.uid,this.closest('.hier-equip').dataset.aid,this.closest('.hier-equip').dataset.sid,this.closest('.hier-equip').dataset.eid)">⚙ Parameter</button>
-      <button class="btn btn-primary btn-xs" onclick="openNewSessionModal(this.closest('.hier-equip').dataset.uid,this.closest('.hier-equip').dataset.aid,this.closest('.hier-equip').dataset.sid,this.closest('.hier-equip').dataset.eid)">✚ Monitor</button>
-      <button class="btn btn-danger btn-xs"  onclick="deleteEquip(this.closest('.hier-equip').dataset.uid,this.closest('.hier-equip').dataset.aid,this.closest('.hier-equip').dataset.sid,this.closest('.hier-equip').dataset.eid)">✕</button>
-    </div>
+      <button class="btn btn-blue btn-xs"    onclick="openParamEditor(this.closest('.hier-equip').dataset.uid,this.closest('.hier-equip').dataset.aid,this.closest('.hier-equip').dataset.eid)">⚙ Parameter</button>
+      <button class="btn btn-primary btn-xs" onclick="openNewSessionModal(this.closest('.hier-equip').dataset.uid,this.closest('.hier-equip').dataset.aid,'',this.closest('.hier-equip').dataset.eid)">✚ Monitor</button>
+      <button class="btn btn-danger btn-xs"  onclick="deleteEquip(this.closest('.hier-equip').dataset.uid,this.closest('.hier-equip').dataset.aid,'',this.closest('.hier-equip').dataset.eid)">✕</button>    </div>
   </div>`;
 }
    
@@ -2762,34 +2761,28 @@ function onEquipTypeChange() {
 // ADD END
 
 function deleteEquip(unitId, areaId, saId, eqId) {
-  let container, eq;
-  if (saId) {
-    container = findSubArea(unitId, areaId, saId);
-  } else {
-    container = findArea(unitId, areaId);
-  }
-  eq = container?.equipments?.find(e => e.id === eqId);
+  const area = findArea(unitId, areaId);
+  const eq   = area?.equipments?.find(e => e.id === eqId);
   if (!eq || !confirm(`Hapus Equipment "${eq.name}"?`)) return;
-  container.equipments = container.equipments.filter(e => e.id !== eqId);
+  area.equipments = area.equipments.filter(e => e.id !== eqId);
   saveAll(); renderHierTree(); setText('sc-equip', countEquipments());
   toast('Equipment dihapus', 'info');
 }
-
+   
 // ═══════════════════════════════════════════════════════
 // PARAMETER EDITOR
 // ═══════════════════════════════════════════════════════
-function openParamEditor(unitId, areaId, saId, eqId) {
-  _editingEquipPath = { unitId, areaId, saId, eqId };
-  const eq = findEquipFlex(unitId, areaId, saId, eqId);
-  if (!eq) return;
+function openParamEditor(unitId, areaId, eqId) {
+  _editingEquipPath = { unitId, areaId, eqId };
+  const eq = findEquipFlex(unitId, areaId, null, eqId);
+  if (!eq) { toast('Equipment tidak ditemukan', 'error'); return; }
   _editingParams = JSON.parse(JSON.stringify(eq.params || []));
 
-  const sa   = findSubArea(unitId, areaId, saId);
   const unit = findUnit(unitId);
   const area = findArea(unitId, areaId);
 
   document.getElementById('paramEditorTitle').textContent = `⚙ Parameter — ${eq.name}`;
-  document.getElementById('paramEditorSub').textContent   = `${unit?.name||''} → ${area?.name||''} → ${sa?.name||''}`;
+  document.getElementById('paramEditorSub').textContent   = `${unit?.name||''} → ${area?.name||''}`;
 
   // Reset add param form
   ['np-label','np-unit','np-section','np-options'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
@@ -2800,7 +2793,7 @@ function openParamEditor(unitId, areaId, saId, eqId) {
   renderParamGroupContainer();
   openOverlay('paramEditorOverlay');
 }
-
+   
 function toggleNewParamType() {
   const t = document.getElementById('np-type')?.value;
   document.getElementById('np-numeric-fields').style.display = t === 'numeric' ? '' : 'none';
@@ -2904,10 +2897,10 @@ function addNewParam() {
 
 function saveParamEdits() {
   if (!_editingEquipPath) return;
-  const { unitId, areaId, saId, eqId } = _editingEquipPath; // saId sesuai openParamEditor
-  const eq = findEquipFlex(unitId, areaId, saId, eqId);
+  const { unitId, areaId, eqId } = _editingEquipPath;
+  const eq = findEquipFlex(unitId, areaId, null, eqId);
   if (!eq) { toast('Equipment tidak ditemukan','error'); return; }
-  eq.params = JSON.parse(JSON.stringify(_editingParams)); // deep copy
+  eq.params = JSON.parse(JSON.stringify(_editingParams));
   saveAll(); renderHierTree();
   closeOverlay('paramEditorOverlay');
   toast(`${_editingParams.length} parameter disimpan ✓`, 'success');
