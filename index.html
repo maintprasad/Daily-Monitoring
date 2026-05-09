@@ -2830,39 +2830,39 @@ function renderParamGroupContainer() {
         <div class="param-row-grid">
           <div>
             <div class="param-mini-label">Label</div>
-            <input class="param-mini-input" value="${esc(p.label)}" oninput="_editingParams[${i}].label=this.value" placeholder="Label parameter"/>
+            <input class="param-mini-input" value="${esc(p.label)}" onchange="_editingParams[${i}].label=this.value" placeholder="Label parameter"/>
           </div>
           <div>
             <div class="param-mini-label">Satuan</div>
-            <input class="param-mini-input" value="${esc(p.unit||'')}" oninput="_editingParams[${i}].unit=this.value" placeholder="°C, V..."/>
+            <input class="param-mini-input" value="${esc(p.unit||'')}" onchange="_editingParams[${i}].unit=this.value" placeholder="°C, V..."/>
           </div>
           <div>
             <div class="param-mini-label">Seksi</div>
-            <input class="param-mini-input" value="${esc(p.section||'')}" oninput="_editingParams[${i}].section=this.value;renderParamGroupContainer()" placeholder="Grup/Seksi"/>
+            <input class="param-mini-input" value="${esc(p.section||'')}" onchange="_editingParams[${i}].section=this.value" placeholder="Grup/Seksi"/>
           </div>
           ${isStatus ? `
           <div>
             <div class="param-mini-label">Opsi (koma)</div>
-            <input class="param-mini-input" value="${esc((p.options||[]).join(', '))}" oninput="_editingParams[${i}].options=this.value.split(',').map(x=>x.trim()).filter(Boolean)" placeholder="BAIK, PERLU PERHATIAN, RUSAK"/>
+            <input class="param-mini-input" value="${esc((p.options||[]).join(', '))}" onchange="_editingParams[${i}].options=this.value.split(',').map(x=>x.trim()).filter(Boolean)" placeholder="BAIK, PERLU PERHATIAN, RUSAK"/>
           </div>
           <div style="grid-column:span 2"></div>
           ` : `
           <div>
             <div class="param-mini-label">Normal Min</div>
-            <input type="number" class="param-mini-input" value="${p.normalMin??''}" oninput="_editingParams[${i}].normalMin=parseFloat(this.value)" placeholder="Min"/>
+            <input type="number" class="param-mini-input" value="${p.normalMin??''}" onchange="_editingParams[${i}].normalMin=parseFloat(this.value)" placeholder="Min"/>
           </div>
           <div>
             <div class="param-mini-label">Normal Max</div>
-            <input type="number" class="param-mini-input" value="${p.normalMax??''}" oninput="_editingParams[${i}].normalMax=parseFloat(this.value)" placeholder="Max"/>
+            <input type="number" class="param-mini-input" value="${p.normalMax??''}" onchange="_editingParams[${i}].normalMax=parseFloat(this.value)" placeholder="Max"/>
           </div>
           <div>
             <div class="param-mini-label">Warn Batas</div>
-            <input type="number" class="param-mini-input" value="${p.warnMax??p.warnMin??''}" oninput="_editingParams[${i}].warnMax=parseFloat(this.value)" placeholder="Warn"/>
+            <input type="number" class="param-mini-input" value="${p.warnMax??p.warnMin??''}" onchange="_editingParams[${i}].warnMax=parseFloat(this.value)" placeholder="Warn"/>
           </div>
           `}
           <div>
             <div class="param-mini-label">Hapus</div>
-            <button class="param-del-btn" onclick="_editingParams.splice(${i},1);renderParamGroupContainer()">✕</button>
+            <button class="param-del-btn" data-delidx="${i}" onclick="(function(btn){var idx=parseInt(btn.dataset.delidx);_editingParams.splice(idx,1);renderParamGroupContainer();})(this)">✕</button>
           </div>
         </div>
       </div>`;
