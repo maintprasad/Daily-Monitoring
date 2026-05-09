@@ -2904,6 +2904,7 @@ function saveParamEdits() {
   saveAll(); renderHierTree();
   closeOverlay('paramEditorOverlay');
   toast(`${_editingParams.length} parameter disimpan ✓`, 'success');
+  if (WEBHOOK_URL) syncAll(true);
 }
 
 // ═══════════════════════════════════════════════════════
