@@ -1145,6 +1145,7 @@ body {
     <div class="sb-item" data-page="hierarchy"><span class="sb-icon">🗂</span>Hierarki</div>
     <div class="sb-item" data-page="config"><span class="sb-icon">⚙</span>Konfigurasi</div>
     <div class="sb-item" data-page="usermgmt" id="sbUserMgmt" style="display:none"><span class="sb-icon">👥</span>User Management</div>
+    <div class="sb-item" id="sbDataRecovery" style="display:none" onclick="openDataRecoveryTool()"><span class="sb-icon">🔧</span>Data Recovery <span class="sb-badge alert">ADMIN</span></div>
   </div>
   <!-- ADD START: Finding menu di sidebar -->
   <div class="sb-section">
@@ -1848,6 +1849,92 @@ body {
         <button class="btn btn-ghost" onclick="closeOverlay('userFormOverlay')">Batal</button>
         <button class="btn btn-primary" id="uf-submit-btn" onclick="submitUserForm()">✚ Simpan User</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ MODAL: DATA RECOVERY TOOL (ADMIN ONLY) ════ -->
+<div class="overlay" id="dataRecoveryOverlay">
+  <div class="modal modal-xl">
+    <div class="modal-hdr">
+      <div>
+        <div class="modal-title">🔧 Data Recovery Tool — Perbaiki Nilai Corrupt</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:3px">
+          Deteksi nilai tanggal corrupt → prediksi nilai asli berdasarkan parameter template
+        </div>
+      </div>
+      <button class="modal-close" onclick="closeOverlay('dataRecoveryOverlay')">×</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Info Banner -->
+      <div style="background:var(--orange-dim);border:1px solid rgba(251,140,58,.3);border-left:4px solid var(--orange);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:var(--text2)">
+        ⚠ <strong>Cara kerja:</strong> Tool ini mendeteksi nilai yang berformat tanggal (corrupt), mengkonversi ke serial number,
+        lalu mencocokkan dengan range parameter yang sudah dikonfigurasi di sistem.
+        Nilai yang diprediksi <strong>perlu dikonfirmasi manual</strong> sebelum disimpan.
+      </div>
+
+      <!-- Controls -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
+        <button class="btn btn-primary" onclick="runDataRecoveryScan()">🔍 Scan Data Corrupt</button>
+        <select class="fsel" id="drUnitFilter" onchange="runDataRecoveryScan()">
+          <option value="">Semua Unit</option>
+        </select>
+        <select class="fsel" id="drStatusFilter">
+          <option value="all">Semua Status Prediksi</option>
+          <option value="confident">✅ Confident (range cocok)</option>
+          <option value="possible">⚠ Possible (perlu review)</option>
+          <option value="unknown">❓ Unknown (tidak bisa diprediksi)</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="renderRecoveryTable()">↻ Filter</button>
+        <span id="drScanSummary" style="font-size:11px;color:var(--text3);margin-left:auto"></span>
+      </div>
+
+      <!-- Stats Row -->
+      <div id="drStatsRow" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px"></div>
+
+      <!-- Table -->
+      <div class="tbl-wrap">
+        <div class="tbl-scroll">
+          <table class="data-table" style="min-width:900px">
+            <thead><tr>
+              <th style="width:30px"><input type="checkbox" id="drSelectAll" onchange="drToggleAll(this.checked)" style="accent-color:var(--green)"/></th>
+              <th>Sesi / Tanggal</th>
+              <th>Equipment</th>
+              <th>Parameter</th>
+              <th>Nilai Corrupt</th>
+              <th>Serial → Kandidat</th>
+              <th>Konfidensial</th>
+              <th>Nilai Koreksi</th>
+              <th>Aksi</th>
+            </tr></thead>
+            <tbody id="drTableBody">
+              <tr><td colspan="9">
+                <div class="empty"><div class="empty-ico">🔍</div><div class="empty-msg">Klik "Scan Data Corrupt" untuk memulai</div></div>
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Bulk Actions -->
+      <div style="margin-top:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 14px;background:var(--bg3);border-radius:8px;border:1px solid var(--border)">
+        <span style="font-size:12px;color:var(--text2);font-weight:600">Aksi Massal:</span>
+        <button class="btn btn-primary btn-sm" onclick="applySelectedRecovery()">
+          ✅ Terapkan yang Dipilih
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="applyConfidentOnly()">
+          ⚡ Terapkan Semua Confident
+        </button>
+        <button class="btn btn-danger btn-sm" onclick="clearCorruptValues()">
+          🗑 Kosongkan yang Dipilih
+        </button>
+        <span id="drSelectedCount" style="font-size:11px;color:var(--text3);margin-left:auto">0 item dipilih</span>
+      </div>
+
+      <!-- Log -->
+      <div id="drLogArea" style="display:none;margin-top:12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;max-height:150px;overflow-y:auto;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text2)"></div>
+
     </div>
   </div>
 </div>
@@ -2691,8 +2778,11 @@ function doLogout() {
 
 function applyRoleRestrictions() {
   const isCrew  = currentUser && currentUser.role === 'crew';
-  // Tampilkan menu user management hanya untuk admin
+  const isAdmin = currentUser && currentUser.role === 'admin';
+  // Tampilkan menu user management dan data recovery hanya untuk admin
   applyUserMgmtVisibility();
+  const sbDR = document.getElementById('sbDataRecovery');
+  if (sbDR) sbDR.style.display = isAdmin ? '' : 'none';
 
   // ── Sembunyikan menu Hierarki & Config dari topbar nav ──
   document.querySelectorAll('.nav-btn[data-page="hierarchy"], .nav-btn[data-page="config"]').forEach(el => {
@@ -2762,10 +2852,23 @@ function startAutoPolling() {
   if (_pollingInterval) clearInterval(_pollingInterval);
   if (!WEBHOOK_URL) return;
   _pollingInterval = setInterval(async () => {
-    if (_pullInProgress) return; // jangan poll saat sedang pull manual
+    // Pause polling saat tab tidak aktif
+    if (document.hidden) return;
+    if (_pullInProgress) return;
     await pullFromSheets({ silent: true, isPolling: true });
-  }, 30000); // 30 detik
+  }, 30000);
+
+  // Resume polling saat tab aktif kembali
+  document.removeEventListener('visibilitychange', _onVisibilityChange);
+  document.addEventListener('visibilitychange', _onVisibilityChange);
   console.log('[Polling] Auto-sync aktif setiap 30 detik');
+}
+
+function _onVisibilityChange() {
+  if (!document.hidden && WEBHOOK_URL && !_pullInProgress) {
+    // Tab aktif lagi — langsung pull sekali
+    pullFromSheets({ silent: true, isPolling: true });
+  }
 }
 
 function stopAutoPolling() {
@@ -2918,10 +3021,35 @@ function loadAll() {
 }
 
 function saveAll() {
-  try { localStorage.setItem('ps_hierarchy',  JSON.stringify(hierarchy));  } catch(e){}
-  try { localStorage.setItem('ps_sessions',   JSON.stringify(sessions));   } catch(e){}
-  try { localStorage.setItem('ps_pic_list',   JSON.stringify(PIC_LIST));   } catch(e){}
-  try { localStorage.setItem('ps_workorders', JSON.stringify(workOrders)); } catch(e){}
+  const saves = [
+    ['ps_hierarchy',  hierarchy],
+    ['ps_sessions',   sessions],
+    ['ps_pic_list',   PIC_LIST],
+    ['ps_workorders', workOrders],
+  ];
+  let totalBytes = 0;
+  saves.forEach(([key, val]) => {
+    try {
+      const str = JSON.stringify(val);
+      localStorage.setItem(key, str);
+      totalBytes += str.length;
+    } catch(e) {
+      if (e.name === 'QuotaExceededError') {
+        toast(`⚠ Storage penuh! Data "${key}" tidak tersimpan. Segera Push ke Sheets.`, 'error', 8000);
+        console.error('[saveAll] QuotaExceeded:', key, e);
+      }
+    }
+  });
+  // Warning jika mendekati limit (5MB = 5,242,880 char)
+  const pct = Math.round(totalBytes / 5242880 * 100);
+  if (pct > 75) {
+    const badge = document.getElementById('syncBadge');
+    if (badge && pct > 90) {
+      badge.textContent = `⚠ Storage ${pct}%`;
+      badge.className = 'sync-pill err';
+    }
+    if (pct > 90) toast(`⚠ LocalStorage ${pct}% penuh! Push ke Sheets sekarang.`, 'error', 6000);
+  }
 }
 
 function setTodayDate() {
@@ -3303,14 +3431,10 @@ function renderMonitorPage() {
 
   // Helper render kartu equip (dipakai untuk subArea maupun equip langsung di area)
   function renderEquipTileGroup(unit, area, sa, equips) {
-    if (!equips.length) return '';
-    const saId    = sa ? sa.id : '';
-    const saName  = sa ? sa.name : '';
-    const titleStr = saName || area.name;
-    const subStr   = saName
-      ? `${esc(unit.name)} → ${esc(area.name)} · ${equips.length} equipment`
-      : `${esc(unit.name)} · ${equips.length} equipment (tanpa sub area)`;
-    const btnOnclick = `openNewSessionModal('${unit.id}','${area.id}','','')`;
+  if (!equips.length) return '';
+  const titleStr = area.name;
+  const subStr   = `${esc(unit.name)} · ${equips.length} equipment`;
+  const btnOnclick = `openNewSessionModal('${unit.id}','${area.id}','','')`;
     return `<div class="card" style="margin-bottom:16px">
       <div class="card-hdr">
         <div>
@@ -3322,18 +3446,20 @@ function renderMonitorPage() {
       <div class="card-body">
         <div class="equip-grid">
           ${equips.map(eq => {
-            const lastSess = getLastSession(unit.id, area.id, saId, eq.id);
+            const lastSess = getLastSession(unit.id, area.id, '', eq.id);
             const st = lastSess ? sessStatus(lastSess) : 'PENDING';
             const tileCls = {OK:'t-ok',WARNING:'t-warn',ALERT:'t-alert',PENDING:'t-pend'}[st]||'t-pend';
             const lastTime = lastSess ? fmtDate(lastSess.tanggal) + ' ' + (lastSess.startTime||'') : 'Belum pernah';
             const tileClick = lastSess
-              ? `openChecklistModal('${lastSess.id}','${unit.id}','${area.id}','${saId}','${eq.id}')`
-              : `openNewSessionModal('${unit.id}','${area.id}','${saId}','${eq.id}')`;
+              ? `openChecklistModal('${lastSess.id}','${unit.id}','${area.id}','','${eq.id}')`
+              : `openNewSessionModal('${unit.id}','${area.id}','','${eq.id}')`;
             return `<div class="equip-tile ${tileCls}" onclick="${tileClick}">
               <div class="equip-tile-name">${esc(eq.name)}${eq.tag?` <span style="font-size:9px;color:var(--text3)">(${esc(eq.tag)})</span>`:''}
               </div>
               <div class="equip-tile-meta">${eq.params?.length||0} param · ${st}</div>
-              <div style="font-size:10px;color:var(--text3);margin-top:4px">Terakhir: ${lastTime}</div>
+  <div style="font-size:10px;color:${!lastSess?'var(--red)':'var(--text3)'};margin-top:4px;font-weight:${!lastSess?'600':'400'}">
+  ${!lastSess ? '⚠ Belum pernah dimonitor!' : 'Terakhir: ' + lastTime}
+</div>
             </div>`;
           }).join('')}
         </div>
@@ -4030,19 +4156,22 @@ function submitNewSession() {
 // CHECKLIST MODAL
 // ═══════════════════════════════════════════════════════
 function openChecklistModal(sessId, unitId, areaId, saId, eqId) {
+  // ── Debug log ──────────────────────────────────────
+  console.log('[Checklist] Open:', { sessId, unitId, areaId, eqId });
+  console.log('[Checklist] Total sessions:', sessions.length);
+
   let sess = sessId ? sessions.find(s => s.id === sessId) : null;
+  console.log('[Checklist] Sess found:', !!sess);
   if (!sess && eqId) {
-    // Fallback: cari sesi terbaru untuk equipment ini (dengan path lengkap jika tersedia)
     sess = sessions.filter(s =>
       s.equipId === eqId &&
       (!unitId || s.unitId === unitId) &&
-      (!areaId || s.areaId === areaId) &&
-      (!saId   || s.subAreaId === saId)
+      (!areaId || s.areaId === areaId)
     ).sort((a,b) => new Date(b.createdAt||0) - new Date(a.createdAt||0))[0];
   }
   if (!sess) { toast('Sesi tidak ditemukan','error'); return; }
 
-  const eq = findEquipFlex(sess.unitId, sess.areaId, sess.subAreaId, sess.equipId);
+  const eq = findEquipFlex(sess.unitId, sess.areaId, '', sess.equipId);
   const params = eq?.params || [];
 
   document.getElementById('chkTitle').textContent = `📋 ${sess.equipName}`;
@@ -4152,6 +4281,7 @@ function openChecklistModal(sessId, unitId, areaId, saId, eqId) {
     </div>`;
 
   openOverlay('checklistOverlay');
+  startChecklistAutoSave(sess.id);
 }
 
 function buildChkRow(p, existing) {
@@ -4269,7 +4399,7 @@ function onChkStatusChange(paramId, sel) {
 function saveChecklist(sessId) {
   const sess = sessions.find(s => s.id === sessId);
   if (!sess) return;
-  const eq = findEquipFlex(sess.unitId, sess.areaId, sess.subAreaId, sess.equipId);
+  const eq = findEquipFlex(sess.unitId, sess.areaId, '', sess.equipId);
   const params = eq?.params || [];
 
   sess.items = params.map(p => {
@@ -4626,7 +4756,7 @@ function buildGASSessionsPayload() {
     items:       (s.items || []).map(i => ({
       paramId: i.paramId || '', label:  i.label  || '',
       unit:    i.unit    || '', section:i.section || '',
-      value:   i.value   || '', status: i.status  || '',
+      value:   (i.value !== '' && i.value !== null && i.value !== undefined && !isNaN(Number(i.value))) ? Number(i.value) : (i.value || ''), status: i.status  || '',
       note:    i.note    || '',
     })),
   }));
@@ -4828,10 +4958,35 @@ async function autoSyncSession(sess) {
     } catch(e) {
       setSyncStatus('error');
       console.error('[autoSync] Error:', e.message);
+      queueRetrySync(sess); // masuk retry queue
     }
   }, 1500);
 }
 
+// Retry queue untuk sesi yang gagal sync
+let _retryQueue = [];
+let _retryTimer = null;
+
+function queueRetrySync(sess) {
+  if (_retryQueue.find(s => s.id === sess.id)) return; // sudah ada
+  _retryQueue.push(sess);
+  scheduleRetry();
+}
+
+function scheduleRetry() {
+  if (_retryTimer) return;
+  _retryTimer = setTimeout(async () => {
+    _retryTimer = null;
+    if (!WEBHOOK_URL || !_retryQueue.length) return;
+    console.log(`[Retry] Mencoba sync ${_retryQueue.length} sesi yang pending...`);
+    const queue = [..._retryQueue];
+    _retryQueue = [];
+    for (const sess of queue) {
+      await autoSyncSession(sess);
+      await new Promise(r => setTimeout(r, 500)); // jeda 500ms antar request
+    }
+  }, 15000); // retry setelah 15 detik
+}
 
 function setSyncStatus(s) {
   const badge = document.getElementById('syncBadge');
@@ -4853,10 +5008,27 @@ function setSyncStatus(s) {
 // ═══════════════════════════════════════════════════════
 function exportCSV() {
   if (!sessions.length) { toast('Tidak ada data untuk diekspor','error'); return; }
-  const cols = ['id','tanggal','unitName','areaName','subAreaName','equipName','pic','startTime','endTime','catatan','tindakan','createdAt'];
-  const hdr  = cols.join(',');
-  const rows = sessions.map(s => cols.map(c => '"' + String(s[c]||'').replace(/"/g,'""') + '"').join(','));
-  const csv  = '\uFEFF' + [hdr,...rows].join('\n');
+  const rows = [];
+  const hdr  = ['ID','Tanggal','Unit','Area','Equipment','PIC','Mulai','Selesai',
+                 'Status','Catatan','Tindakan','Parameter','Nilai','Satuan','Status_Param','Note_Param'];
+  rows.push(hdr.join(','));
+
+  sessions.forEach(s => {
+    const st = sessStatus(s);
+    const base = [s.id, s.tanggal, s.unitName, s.areaName, s.equipName,
+                  s.pic, s.startTime, s.endTime, st, s.catatan, s.tindakan];
+    const items = s.items || [];
+    if (!items.length) {
+      rows.push(base.map(v => '"' + String(v||'').replace(/"/g,'""') + '"').concat(['','','','']).join(','));
+    } else {
+      items.forEach(i => {
+        rows.push([...base, i.label, i.value, i.unit, i.status, i.note]
+          .map(v => '"' + String(v||'').replace(/"/g,'""') + '"').join(','));
+      });
+    }
+  });
+
+  const csv = '\uFEFF' + rows.join('\n');
   const url  = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
   const a    = Object.assign(document.createElement('a'), { href:url, download:`Monitoring_${new Date().toISOString().split('T')[0]}.csv` });
   a.click(); URL.revokeObjectURL(url);
@@ -8134,6 +8306,539 @@ function confirmDeleteUser() {
   renderUserMgmtPage();
   toast(`User "${u?.name || ''}" dihapus ✓`, 'info');
   if (WEBHOOK_URL) syncAll(true);
+}
+
+// ═══════════════════════════════════════════════════════
+// DATA RECOVERY TOOL
+// ═══════════════════════════════════════════════════════
+
+let _recoveryItems = []; // hasil scan
+
+function openDataRecoveryTool() {
+  // Populate unit filter
+  const sel = document.getElementById('drUnitFilter');
+  if (sel) {
+    sel.innerHTML = '<option value="">Semua Unit</option>' +
+      hierarchy.units.map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join('');
+  }
+  document.getElementById('drTableBody').innerHTML = `
+    <tr><td colspan="9"><div class="empty"><div class="empty-ico">🔍</div>
+    <div class="empty-msg">Klik "Scan Data Corrupt" untuk memulai</div></div></td></tr>`;
+  document.getElementById('drStatsRow').innerHTML = '';
+  document.getElementById('drScanSummary').textContent = '';
+  document.getElementById('drLogArea').style.display = 'none';
+  _recoveryItems = [];
+  openOverlay('dataRecoveryOverlay');
+}
+
+/**
+ * Deteksi apakah nilai adalah tanggal corrupt
+ * Tanggal dari Sheets bisa berupa:
+ * - String seperti "Thu Feb 12 2026" atau "Mon May 18 2026"  
+ * - Number (serial Sheets)
+ * - String angka besar > 40000 (serial tanggal modern)
+ */
+function isCorruptDateValue(val) {
+  if (val === '' || val === null || val === undefined) return false;
+  const s = String(val).trim();
+
+  // Pola "Day Mon DD YYYY" atau "Day Mon DD YYYY HH:MM:SS"
+  if (/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s+\d{4}/.test(s)) return true;
+
+  // Pola ISO date string
+  if (/^\d{4}-\d{2}-\d{2}(T|\s)/.test(s)) return true;
+
+  // Angka besar yang merupakan serial tanggal Sheets (> 40000 = setelah 2009)
+  const n = Number(s);
+  if (!isNaN(n) && n > 40000 && n < 60000) return true;
+
+  return false;
+}
+
+/**
+ * Konversi nilai corrupt → kandidat angka
+ * Return array kandidat: [ { value, method, confidence } ]
+ */
+function extractCandidates(val, param) {
+  const s   = String(val).trim();
+  const candidates = [];
+
+  // ── Method 1: Parse tanggal string → ambil hari, bulan, atau tahun ──────────
+  const dateMatch = s.match(/^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})\s+(\d{4})/);
+  if (dateMatch) {
+    const day   = parseInt(dateMatch[2]);
+    const year  = parseInt(dateMatch[3]);
+    const monthMap = { Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12 };
+    const month = monthMap[dateMatch[1]] || 0;
+
+    // Kandidat: tanggal (DD), bulan (MM), tahun mod 100, dll
+    candidates.push({ value: day,            method: 'Tanggal (DD)',     confidence: 0.5 });
+    candidates.push({ value: month,          method: 'Bulan (MM)',       confidence: 0.3 });
+    candidates.push({ value: year % 100,     method: 'Tahun % 100',     confidence: 0.1 });
+    candidates.push({ value: day + month,    method: 'DD + MM',         confidence: 0.2 });
+  }
+
+  // ── Method 2: Serial tanggal → cek apakah serial kecil = angka asli ─────────
+  const n = Number(s.replace(/[^\d]/g, ''));
+  if (!isNaN(n)) {
+    // Serial kecil (< 1000) → kemungkinan angka asli yang terbaca sebagai serial
+    if (n < 1000 && n >= 0) {
+      candidates.push({ value: n, method: 'Serial kecil (nilai asli?)', confidence: 0.7 });
+    }
+    // Untuk string tanggal, coba ambil angka-angka yang muncul
+    const nums = s.match(/\d+/g) || [];
+    nums.forEach(num => {
+      const v = parseInt(num);
+      if (v !== n && v >= 0 && v < 5000) {
+        candidates.push({ value: v, method: `Angka dalam string: ${num}`, confidence: 0.4 });
+      }
+    });
+  }
+
+  // ── Method 3: Google Sheets serial → tanggal asli ───────────────────────────
+  // Sheets serial: hari sejak 1 Jan 1900
+  // Tapi jika nilai asli kecil (misal 17), serial = 17 = 17 Jan 1900
+  // Kita bisa reverse: jika serial < 1000, kemungkinan itu nilai asli
+  const serial = parseInt(s);
+  if (!isNaN(serial) && serial > 0 && serial < 1000) {
+    candidates.push({ value: serial, method: 'Serial Sheets = nilai asli', confidence: 0.8 });
+  }
+
+  // ── Method 4: Deduplikasi dan ranking berdasarkan parameter range ────────────
+  return candidates;
+}
+
+/**
+ * Score kandidat berdasarkan parameter template
+ * Return { bestValue, confidence, reason, allCandidates }
+ */
+function scoreCandidate(candidates, param) {
+  if (!candidates.length) return { bestValue: null, confidence: 0, reason: 'Tidak ada kandidat', allCandidates: [] };
+
+  const nMin = param?.normalMin;
+  const nMax = param?.normalMax;
+  const wMin = param?.warnMin;
+  const wMax = param?.warnMax;
+  const label = (param?.label || '').toLowerCase();
+  const unit  = (param?.unit  || '').toLowerCase();
+
+  // ── Heuristik berdasarkan label/unit ─────────────────────────────────────────
+  let hintMin = null, hintMax = null;
+  if (unit === 'a' || label.includes('arus') || label.includes('ampere') || label.includes('current')) {
+    // Arus listrik: umumnya 0–2000A
+    hintMin = 0; hintMax = 2000;
+  } else if (unit === '°c' || label.includes('suhu') || label.includes('temp')) {
+    hintMin = -30; hintMax = 150;
+  } else if (unit === 'bar' || label.includes('tekanan') || label.includes('pressure')) {
+    hintMin = 0; hintMax = 30;
+  } else if (unit === '%' || label.includes('humidity') || label.includes('level')) {
+    hintMin = 0; hintMax = 100;
+  } else if (unit === 'v' || label.includes('tegangan') || label.includes('voltage')) {
+    hintMin = 0; hintMax = 500;
+  } else if (label.includes('kvar') || label.includes('kva') || label.includes('kw')) {
+    hintMin = 0; hintMax = 5000;
+  } else if (label.includes('jam') || label.includes('hour')) {
+    hintMin = 0; hintMax = 50000;
+  }
+
+  // Tentukan effective range: prioritas normalMin/Max, fallback hint, fallback lebar
+  const effMin = nMin !== undefined ? nMin : (hintMin !== null ? hintMin : 0);
+  const effMax = nMax !== undefined ? nMax : (hintMax !== null ? hintMax : 99999);
+  const warnLo = wMin !== undefined ? wMin : (effMin - Math.abs(effMin) * 0.2);
+  const warnHi = wMax !== undefined ? wMax : (effMax + Math.abs(effMax) * 0.2);
+
+  // Score setiap kandidat
+  const scored = candidates.map(c => {
+    let score = c.confidence;
+    const v   = c.value;
+
+    // Dalam range normal → bonus besar
+    if (v >= effMin && v <= effMax)       score += 0.6;
+    // Dalam range warn → bonus kecil
+    else if (v >= warnLo && v <= warnHi)  score += 0.3;
+    // Di luar range → penalty
+    else                                   score -= 0.4;
+
+    // Bonus jika sesuai hint unit
+    if (hintMin !== null && v >= hintMin && v <= hintMax) score += 0.2;
+
+    return { ...c, score };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  const best = scored[0];
+
+  let confidenceLevel, reason;
+  if (best.score >= 0.9) {
+    confidenceLevel = 'confident';
+    reason = `✅ Sangat cocok dengan range normal (${effMin}–${effMax})`;
+  } else if (best.score >= 0.5) {
+    confidenceLevel = 'possible';
+    reason = `⚠ Kemungkinan cocok — perlu review manual`;
+  } else {
+    confidenceLevel = 'unknown';
+    reason = `❓ Tidak dapat diprediksi dengan yakin`;
+  }
+
+  return {
+    bestValue:    best.value,
+    confidence:   confidenceLevel,
+    reason,
+    score:        best.score,
+    allCandidates: scored,
+  };
+}
+
+/**
+ * Scan semua sesi → temukan nilai corrupt
+ */
+function runDataRecoveryScan() {
+  const unitFilter = document.getElementById('drUnitFilter')?.value || '';
+  _recoveryItems   = [];
+
+  const filtered = sessions.filter(s => !unitFilter || s.unitId === unitFilter);
+
+  filtered.forEach(sess => {
+    // Cari equipment → params
+    const eq = findEquipFlex(sess.unitId, sess.areaId, '', sess.equipId);
+    const paramMap = {};
+    (eq?.params || []).forEach(p => { paramMap[p.id] = p; });
+
+    (sess.items || []).forEach((item, itemIdx) => {
+      if (!isCorruptDateValue(item.value)) return;
+
+      const param      = paramMap[item.paramId] || null;
+      const candidates = extractCandidates(item.value, param);
+      const prediction = scoreCandidate(candidates, param);
+
+      _recoveryItems.push({
+        sessId:     sess.id,
+        itemIdx,
+        tanggal:    sess.tanggal,
+        unitName:   sess.unitName,
+        areaName:   sess.areaName,
+        equipName:  sess.equipName,
+        paramId:    item.paramId,
+        label:      item.label || item.paramId,
+        unit:       item.unit  || '',
+        section:    item.section || '',
+        rawValue:   item.value,
+        currentStatus: item.status || '',
+        param,
+        prediction,
+        selected:   prediction.confidence === 'confident', // auto-select confident
+        overrideValue: prediction.bestValue !== null ? String(prediction.bestValue) : '',
+      });
+    });
+  });
+
+  drLog(`Scan selesai: ${_recoveryItems.length} nilai corrupt ditemukan dari ${filtered.length} sesi`);
+  renderRecoveryStats();
+  renderRecoveryTable();
+}
+
+function renderRecoveryStats() {
+  const total     = _recoveryItems.length;
+  const confident = _recoveryItems.filter(i => i.prediction.confidence === 'confident').length;
+  const possible  = _recoveryItems.filter(i => i.prediction.confidence === 'possible').length;
+  const unknown   = _recoveryItems.filter(i => i.prediction.confidence === 'unknown').length;
+
+  const el = document.getElementById('drStatsRow');
+  if (!el) return;
+  el.innerHTML = `
+    <div style="background:var(--blue-dim);border:1px solid rgba(43,108,184,.25);border-radius:8px;padding:12px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--blue)">${total}</div>
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">Total Corrupt</div>
+    </div>
+    <div style="background:var(--green-dim);border:1px solid rgba(74,158,63,.25);border-radius:8px;padding:12px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--green)">${confident}</div>
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">✅ Confident</div>
+    </div>
+    <div style="background:var(--orange-dim);border:1px solid rgba(251,140,58,.25);border-radius:8px;padding:12px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--orange)">${possible}</div>
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">⚠ Perlu Review</div>
+    </div>
+    <div style="background:var(--red-dim);border:1px solid rgba(192,57,43,.25);border-radius:8px;padding:12px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--red)">${unknown}</div>
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">❓ Unknown</div>
+    </div>`;
+
+  document.getElementById('drScanSummary').textContent =
+    `${total} nilai corrupt ditemukan · ${confident} bisa diprediksi otomatis`;
+}
+
+function renderRecoveryTable() {
+  const statusFilter = document.getElementById('drStatusFilter')?.value || 'all';
+  const filtered = statusFilter === 'all'
+    ? _recoveryItems
+    : _recoveryItems.filter(i => i.prediction.confidence === statusFilter);
+
+  const tbody = document.getElementById('drTableBody');
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty">
+      <div class="empty-ico">${_recoveryItems.length ? '✅' : '🔍'}</div>
+      <div class="empty-msg">${_recoveryItems.length ? 'Tidak ada item dengan filter ini' : 'Klik "Scan Data Corrupt" untuk memulai'}</div>
+    </div></td></tr>`;
+    updateDrSelectedCount();
+    return;
+  }
+
+  tbody.innerHTML = filtered.map((item, fi) => {
+    // Index global di _recoveryItems
+    const gi = _recoveryItems.indexOf(item);
+
+    const confBadge = {
+      confident: '<span class="badge b-ok" style="font-size:9px">✅ Confident</span>',
+      possible:  '<span class="badge b-warn" style="font-size:9px">⚠ Possible</span>',
+      unknown:   '<span class="badge b-alert" style="font-size:9px">❓ Unknown</span>',
+    }[item.prediction.confidence] || '';
+
+    const nMin = item.param?.normalMin;
+    const nMax = item.param?.normalMax;
+    const rangeHint = (nMin !== undefined && nMax !== undefined)
+      ? `<div style="font-size:9px;color:var(--text3);margin-top:2px">Range: ${nMin}–${nMax} ${esc(item.unit)}</div>`
+      : '';
+
+    // Kandidat lain sebagai dropdown
+    const candidateOptions = item.prediction.allCandidates
+      .slice(0, 6)
+      .map(c => `<option value="${c.value}" ${String(item.overrideValue) === String(c.value) ? 'selected' : ''}>
+        ${c.value} ${item.unit} (${c.method}, score:${c.score.toFixed(2)})
+      </option>`).join('');
+
+    return `<tr style="background:${item.prediction.confidence==='confident'?'rgba(34,197,94,.04)':item.prediction.confidence==='possible'?'rgba(249,115,22,.03)':'rgba(239,68,68,.04)'}">
+      <td style="text-align:center">
+        <input type="checkbox" data-gi="${gi}" ${item.selected ? 'checked' : ''}
+          onchange="drToggleItem(${gi}, this.checked)"
+          style="accent-color:var(--green);width:14px;height:14px"/>
+      </td>
+      <td>
+        <div style="font-size:11px;font-weight:600;color:var(--green);font-family:'IBM Plex Mono',monospace">${esc(item.sessId)}</div>
+        <div style="font-size:10px;color:var(--text3)">${fmtDate(item.tanggal)}</div>
+      </td>
+      <td>
+        <div style="font-size:11px;font-weight:600">${esc(item.equipName)}</div>
+        <div style="font-size:10px;color:var(--text3)">${esc(item.unitName)} · ${esc(item.areaName)}</div>
+      </td>
+      <td>
+        <div style="font-size:12px;font-weight:500">${esc(item.label)}</div>
+        <div style="font-size:10px;color:var(--text3)">${esc(item.section)} · ${esc(item.unit)}</div>
+        ${rangeHint}
+      </td>
+      <td>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--red);word-break:break-all;max-width:120px">
+          ${esc(String(item.rawValue).slice(0, 30))}
+        </div>
+        <div style="font-size:9px;color:var(--text3);margin-top:2px">Status: ${esc(item.currentStatus||'—')}</div>
+      </td>
+      <td>
+        <div style="font-size:13px;font-weight:700;color:var(--navy)">
+          ${item.prediction.bestValue !== null ? item.prediction.bestValue + ' ' + esc(item.unit) : '—'}
+        </div>
+        <div style="font-size:9px;color:var(--text3);margin-top:2px">${esc(item.prediction.reason)}</div>
+      </td>
+      <td style="text-align:center">${confBadge}</td>
+      <td>
+        <select class="fsel2" style="font-size:11px;padding:4px 6px;min-width:100px"
+          onchange="_recoveryItems[${gi}].overrideValue=this.value;updateDrSelectedCount()">
+          <option value="" ${!item.overrideValue?'selected':''}>— Kosongkan —</option>
+          ${candidateOptions}
+        </select>
+        <input type="number" step="any"
+          style="margin-top:4px;width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:5px;font-size:11px;outline:none"
+          placeholder="Atau ketik manual..."
+          value="${esc(item.overrideValue)}"
+          oninput="_recoveryItems[${gi}].overrideValue=this.value"/>
+      </td>
+      <td>
+        <button class="btn btn-primary btn-xs" onclick="applySingleRecovery(${gi})">✓ Fix</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  updateDrSelectedCount();
+}
+
+function drToggleAll(checked) {
+  _recoveryItems.forEach(item => { item.selected = checked; });
+  renderRecoveryTable();
+}
+
+function drToggleItem(gi, checked) {
+  if (_recoveryItems[gi]) _recoveryItems[gi].selected = checked;
+  updateDrSelectedCount();
+}
+
+function updateDrSelectedCount() {
+  const cnt = _recoveryItems.filter(i => i.selected).length;
+  const el  = document.getElementById('drSelectedCount');
+  if (el) el.textContent = `${cnt} item dipilih`;
+}
+
+/**
+ * Terapkan recovery ke satu item
+ */
+function applySingleRecovery(gi) {
+  const item = _recoveryItems[gi];
+  if (!item) return;
+  const sess = sessions.find(s => s.id === item.sessId);
+  if (!sess) { toast('Sesi tidak ditemukan', 'error'); return; }
+
+  const newVal = item.overrideValue;
+  const targetItem = sess.items[item.itemIdx];
+  if (!targetItem) { toast('Item tidak ditemukan', 'error'); return; }
+
+  const oldVal = targetItem.value;
+
+  if (newVal === '' || newVal === null || newVal === undefined) {
+    targetItem.value  = '';
+    targetItem.status = '';
+  } else {
+    targetItem.value = newVal;
+    // Recalculate status
+    targetItem.status = recalcItemStatus(parseFloat(newVal), item.param);
+  }
+
+  sess.updatedAt = new Date().toISOString();
+  saveAll();
+
+  // Mark item sebagai sudah di-recover (hapus dari list)
+  _recoveryItems.splice(gi, 1);
+  renderRecoveryStats();
+  renderRecoveryTable();
+
+  drLog(`✅ Fix: ${item.label} @ ${item.sessId} | ${oldVal} → ${newVal || '(kosong)'} [${targetItem.status}]`);
+  toast(`✅ ${item.label} diperbaiki: ${newVal} ${item.unit}`, 'success');
+}
+
+/**
+ * Terapkan semua yang dipilih
+ */
+function applySelectedRecovery() {
+  const selected = _recoveryItems.filter(i => i.selected);
+  if (!selected.length) { toast('Pilih item terlebih dahulu', 'error'); return; }
+  if (!confirm(`Terapkan recovery untuk ${selected.length} item?\nPastikan nilai sudah benar sebelum melanjutkan.`)) return;
+
+  let fixed = 0, skipped = 0;
+  selected.forEach(item => {
+    const sess = sessions.find(s => s.id === item.sessId);
+    if (!sess) { skipped++; return; }
+    const targetItem = sess.items[item.itemIdx];
+    if (!targetItem) { skipped++; return; }
+
+    const newVal = item.overrideValue;
+    if (newVal === '' || newVal === null) {
+      targetItem.value  = '';
+      targetItem.status = '';
+    } else {
+      targetItem.value  = newVal;
+      targetItem.status = recalcItemStatus(parseFloat(newVal), item.param);
+    }
+    sess.updatedAt = new Date().toISOString();
+    drLog(`✅ ${item.label} @ ${item.sessId}: ${item.rawValue} → ${newVal} [${targetItem.status}]`);
+    fixed++;
+  });
+
+  saveAll();
+  regenerateFindings();
+  renderAll();
+
+  // Hapus yang sudah di-fix dari list
+  _recoveryItems = _recoveryItems.filter(i => !i.selected);
+  renderRecoveryStats();
+  renderRecoveryTable();
+
+  toast(`✅ ${fixed} nilai diperbaiki${skipped ? `, ${skipped} dilewati` : ''} ✓`, 'success');
+  if (WEBHOOK_URL) syncAll(true);
+}
+
+function applyConfidentOnly() {
+  _recoveryItems.forEach(i => { i.selected = i.prediction.confidence === 'confident'; });
+  renderRecoveryTable();
+  applySelectedRecovery();
+}
+
+function clearCorruptValues() {
+  const selected = _recoveryItems.filter(i => i.selected);
+  if (!selected.length) { toast('Pilih item terlebih dahulu', 'error'); return; }
+  if (!confirm(`Kosongkan ${selected.length} nilai corrupt? (tidak diisi = status pending)`)) return;
+
+  selected.forEach(item => {
+    const sess = sessions.find(s => s.id === item.sessId);
+    if (!sess) return;
+    const targetItem = sess.items[item.itemIdx];
+    if (!targetItem) return;
+    targetItem.value  = '';
+    targetItem.status = '';
+    sess.updatedAt = new Date().toISOString();
+    drLog(`🗑 Dikosongkan: ${item.label} @ ${item.sessId}`);
+    item.overrideValue = '';
+  });
+
+  saveAll();
+  _recoveryItems = _recoveryItems.filter(i => !i.selected);
+  renderRecoveryStats();
+  renderRecoveryTable();
+  toast('Nilai dikosongkan ✓', 'info');
+}
+
+/**
+ * Recalculate status dari nilai baru berdasarkan parameter
+ */
+function recalcItemStatus(v, param) {
+  if (isNaN(v) || !param) return '';
+  const { normalMin: nMin, normalMax: nMax, warnMin, warnMax } = param;
+
+  const overWarn  = (warnMax !== undefined && !isNaN(warnMax) && v > warnMax);
+  const underWarn = (warnMin !== undefined && !isNaN(warnMin) && v < warnMin);
+  const overNorm  = (nMax    !== undefined && !isNaN(nMax)    && v > nMax);
+  const underNorm = (nMin    !== undefined && !isNaN(nMin)    && v < nMin);
+
+  if      (overWarn || underWarn) return 'ALERT';
+  else if (overNorm || underNorm) return 'WARNING';
+  else                            return 'OK';
+}
+
+function drLog(msg) {
+  const el = document.getElementById('drLogArea');
+  if (!el) return;
+  el.style.display = 'block';
+  el.innerHTML += `<div>[${new Date().toLocaleTimeString('id-ID')}] ${msg}</div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+// Auto-save checklist setiap 30 detik jika modal terbuka
+let _autoSaveTimer = null;
+
+function startChecklistAutoSave(sessId) {
+  if (_autoSaveTimer) clearInterval(_autoSaveTimer);
+  _autoSaveTimer = setInterval(() => {
+    const overlay = document.getElementById('checklistOverlay');
+    if (!overlay?.classList.contains('open')) {
+      clearInterval(_autoSaveTimer);
+      return;
+    }
+    // Silent save — tidak tutup modal
+    const sess = sessions.find(s => s.id === sessId);
+    if (!sess) return;
+    const eq = findEquipFlex(sess.unitId, sess.areaId, '', sess.equipId);
+    const params = eq?.params || [];
+    const draft = params.map(p => {
+      const valEl  = document.getElementById('chk-'+p.id+'-val');
+      const noteEl = document.getElementById('chk-'+p.id+'-note');
+      const badgeEl= document.getElementById('chk-'+p.id+'-badge');
+      return {
+        paramId: p.id, label: p.label, unit: p.unit, section: p.section,
+        value: valEl?.value ?? '',
+        status: (badgeEl?.textContent||'').trim().replace('—',''),
+        note: noteEl?.value || '',
+      };
+    }).filter(i => i.value !== '' || i.note !== '');
+    if (draft.length) {
+      try { sessionStorage.setItem('chk_draft_'+sessId, JSON.stringify(draft)); } catch(e){}
+      console.log(`[AutoSave] Draft ${sessId} disimpan (${draft.length} item)`);
+    }
+  }, 30000);
 }
 
 </script>
