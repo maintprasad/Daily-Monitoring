@@ -1118,6 +1118,7 @@ body {
     <button class="nav-btn" data-page="hierarchy">Hierarki</button>
     <button class="nav-btn" data-page="config">Config</button>
     <button class="nav-btn" data-page="usermgmt" id="navUserMgmt" style="display:none">👥 Users</button>
+    <button class="nav-btn" data-page="usermgmt" id="navUserMgmtMobile" style="display:none">👥 Users</button>
   </div>
   <div class="top-right">
     <span class="sync-pill" id="syncBadge" onclick="syncAll()" title="Klik untuk sync ke Google Sheets">☁ Sync</span>
@@ -1586,12 +1587,30 @@ body {
   </div>
 
   <!-- INFO ROLE -->
-  <div style="background:var(--blue-dim);border:1px solid rgba(43,108,184,.25);border-radius:var(--r);padding:12px 16px;margin-bottom:16px;font-size:12px;color:var(--blue)">
-    ℹ <strong>Role & Akses:</strong>
-    <span class="role-badge role-admin" style="margin:0 4px">admin</span> Akses penuh + User Management ·
-    <span class="role-badge role-spv" style="margin:0 4px">spv</span> Semua fitur kecuali User Management ·
-    <span class="role-badge role-leader" style="margin:0 4px">leader</span> Monitor + History + Finding ·
-    <span class="role-badge role-crew" style="margin:0 4px">crew</span> Hanya Crew Portal (mobile-friendly)
+  <div style="background:var(--blue-dim);border:1px solid rgba(43,108,184,.25);border-radius:var(--r);padding:14px 16px;margin-bottom:16px;font-size:12px;color:var(--blue)">
+    <div style="font-weight:700;margin-bottom:10px">ℹ Panduan Role & Akses</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <span class="role-badge role-admin" style="flex-shrink:0;margin-top:1px">admin</span>
+        <span style="color:var(--text2)">Akses penuh ke semua fitur — termasuk User Management, Config, Hierarki, Data Recovery, dan semua data monitoring.</span>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <span class="role-badge role-spv" style="flex-shrink:0;margin-top:1px">spv</span>
+        <span style="color:var(--text2)">Semua fitur monitoring, riwayat, finding, dan laporan. Tidak bisa mengelola user atau akses Data Recovery.</span>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <span class="role-badge role-leader" style="flex-shrink:0;margin-top:1px">leader</span>
+        <span style="color:var(--text2)">Dashboard, Monitor, Riwayat, Finding, dan Hierarki. Tidak bisa Config dan User Management.</span>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:10px;background:rgba(74,158,63,.1);border:1px solid rgba(74,158,63,.25);border-radius:6px;padding:8px 10px">
+        <span class="role-badge role-crew" style="flex-shrink:0;margin-top:1px">crew</span>
+        <span style="color:var(--text2)">
+          Akses <strong>Crew Portal</strong> — tampilan mobile-friendly untuk teknisi lapangan.<br>
+          <span style="font-size:11px;color:var(--green)">✅ Dapat melihat <strong>seluruh history monitoring</strong> dari semua user/teknisi.</span><br>
+          <span style="font-size:11px;color:var(--text3)">Tidak dapat mengakses Config, Hierarki, Finding, dan fitur admin lainnya.</span>
+        </span>
+      </div>
+    </div>
   </div>
 
   <!-- USER TABLE -->
@@ -1998,7 +2017,7 @@ body {
         <div class="cni-wrap"><span class="cni">📋</span></div>
         <span>Monitor</span>
       </button>
-      <button class="crew-nav-btn" id="crewNavHistory" onclick="crewNavTo('history')">
+      <button class="crew-nav-btn" id="crewNavHistory" onclick="crewShowHistory(false)">
         <div class="cni-wrap"><span class="cni">📊</span></div>
         <span>Riwayat</span>
       </button>
@@ -2686,13 +2705,16 @@ const DEFAULT_USERS = [
   { username: 'iwan',   password: 'mtc123',   role: 'leader', name: 'Iwan-Leader' },
   { username: 'aynur',  password: 'mtc123',   role: 'leader', name: 'Aynur-Leader' },
   { username: 'crew',   password: 'crew123',  role: 'crew',   name: 'Crew' },
-  { username: 'dayat',  password: 'mtc123',  role: 'crew',   name: 'Crew' },
-  { username: 'fireman',  password: 'mtc123',  role: 'crew',   name: 'Crew' },
-  { username: 'yusuf',  password: 'mtc123',  role: 'crew',   name: 'Crew' },
-  { username: 'anang',  password: 'mtc123',  role: 'crew',   name: 'Crew' },
-  { username: 'machfud',  password: 'mtc123',  role: 'crew',   name: 'Crew' },
-  { username: 'sofiudin',  password: 'mtc123',  role: 'crew',   name: 'Crew' },
-  { username: 'tri',  password: 'mtc123',  role: 'crew',   name: 'Crew' },
+  { username: 'dayat',  password: 'mtc123',  role: 'crew',   name: 'Dayat' },
+  { username: 'fireman',  password: 'mtc123',  role: 'crew',   name: 'Firman' },
+  { username: 'yusuf',  password: 'mtc123',  role: 'crew',   name: 'Yusuf' },
+  { username: 'anang',  password: 'mtc123',  role: 'crew',   name: 'Anang' },
+  { username: 'machfud',  password: 'mtc123',  role: 'crew',   name: 'Machfud' },
+  { username: 'sofiudin',  password: 'mtc123',  role: 'crew',   name: 'Sofiudin' },
+  { username: 'tri',  password: 'mtc123',  role: 'crew',   name: 'Tri' },
+  { username: 'catur',  password: 'mtc123',  role: 'crew',   name: 'Catur' },
+  { username: 'viki',  password: 'mtc123',  role: 'crew',   name: 'Viki' },
+  { username: 'angga',  password: 'mtc123',  role: 'crew',   name: 'Angga' },
 ];
 
 function loadUsers() {
@@ -2783,25 +2805,26 @@ function doLogout() {
 }
 
 function applyRoleRestrictions() {
-  const isCrew  = currentUser && currentUser.role === 'crew';
-  const isAdmin = currentUser && currentUser.role === 'admin';
-  // Tampilkan menu user management dan data recovery hanya untuk admin
+  const role    = currentUser?.role || '';
+  const isCrew  = role === 'crew';
+  const isAdmin = role === 'admin';
+  const isSpv   = role === 'spv';
+
+  // ── User Management & Data Recovery: admin only ──
   applyUserMgmtVisibility();
   const sbDR = document.getElementById('sbDataRecovery');
   if (sbDR) sbDR.style.display = isAdmin ? '' : 'none';
 
-  // ── Sembunyikan menu Hierarki & Config dari topbar nav ──
-  document.querySelectorAll('.nav-btn[data-page="hierarchy"], .nav-btn[data-page="config"]').forEach(el => {
-    el.style.display = isCrew ? 'none' : '';
+  // ── Crew: sembunyikan menu yang tidak relevan ──
+  const crewHideNavPages = ['hierarchy','config','findings'];
+  document.querySelectorAll('[data-page]').forEach(el => {
+    const pg = el.dataset.page;
+    if (crewHideNavPages.includes(pg)) {
+      el.style.display = isCrew ? 'none' : '';
+    }
   });
 
-  // ── Sembunyikan menu Hierarki & Config dari sidebar ──
-  document.querySelectorAll('.sb-item[data-page="hierarchy"], .sb-item[data-page="config"]').forEach(el => {
-    el.style.display = isCrew ? 'none' : '';
-  });
-
-  // ── Sembunyikan section "Sheets Sync" di sidebar (Push & Pull manual) ──
-  // Cara: sembunyikan tombol Push dan Pull di sidebar, tapi Auto-sync tetap jalan
+  // ── Sembunyikan section Sheets Sync di sidebar untuk crew ──
   document.querySelectorAll('.sb-section').forEach(section => {
     const label = section.querySelector('.sb-label');
     if (label && label.textContent.trim() === 'Sheets Sync') {
@@ -2809,17 +2832,37 @@ function applyRoleRestrictions() {
     }
   });
 
-  // ── Sembunyikan tombol Sync di topbar dan icon webhook ──
-  const syncBadge = document.getElementById('syncBadge');
+  // ── Sembunyikan tombol Sync & Webhook di topbar untuk crew ──
+  const syncBadge  = document.getElementById('syncBadge');
   const webhookBtn = document.querySelector('.icon-btn[onclick*="openWebhookModal"]');
   if (syncBadge)  syncBadge.style.display  = isCrew ? 'none' : '';
   if (webhookBtn) webhookBtn.style.display = isCrew ? 'none' : '';
 
-  // ── Sembunyikan tombol "Tambah Unit" di halaman Hierarki ──
-  // (jaga-jaga jika crew bisa akses via URL)
+  // ── Crew tidak bisa edit hierarki ──
   if (isCrew) {
     const addUnitBtn = document.querySelector('#page-hierarchy .btn-primary');
     if (addUnitBtn) addUnitBtn.style.display = 'none';
+  }
+
+  // ── Admin: tampilkan badge khusus di topbar ──
+  if (isAdmin) {
+    const existingBadge = document.getElementById('adminTopbarBadge');
+    if (!existingBadge) {
+      const topRight = document.querySelector('.top-right');
+      if (topRight) {
+        const badge = document.createElement('span');
+        badge.id = 'adminTopbarBadge';
+        badge.style.cssText = `
+          font-size:9px;font-family:'IBM Plex Mono',monospace;
+          padding:3px 8px;border-radius:10px;
+          background:rgba(192,57,43,.2);border:1px solid rgba(192,57,43,.35);
+          color:#e07070;letter-spacing:.05em;font-weight:700;white-space:nowrap;
+        `;
+        badge.textContent = '👑 ADMIN';
+        badge.title = 'Anda login sebagai Administrator';
+        topRight.insertBefore(badge, topRight.firstChild);
+      }
+    }
   }
 }
    
@@ -4109,6 +4152,9 @@ function onNSEquipChange() {
   preview.style.display = 'block';
 }
    
+// ── Sesi draft sementara (belum disimpan ke sessions[]) ──────────
+let _draftSession = null;
+
 function submitNewSession() {
   let ok = true;
   const unitId  = getVal('ns-unit');
@@ -4121,41 +4167,41 @@ function submitNewSession() {
   if (!start)   { setErr('ne-start','Waktu mulai wajib diisi'); ok=false; }
   if (!unitId)  { setErr('ne-unit','Pilih unit'); ok=false; }
   if (!areaId)  { setErr('ne-area','Pilih area'); ok=false; }
-  // saId opsional — tidak divalidasi
   if (!eqId)    { setErr('ne-equip','Pilih equipment'); ok=false; }
 
   const pics = getSelectedPICs('nsPICGrid');
   if (!pics.length) { setErr('ne-pic','Pilih minimal satu PIC'); ok=false; }
   if (!ok) return;
 
- const unit = findUnit(unitId);
+  const unit = findUnit(unitId);
   const area = findArea(unitId, areaId);
   const eq   = (area?.equipments || []).find(e => e.id === eqId);
 
-  const id = genId();
-  const session = {
-    id, tanggal, startTime: start, endTime: getVal('ns-end'),
-    unitId, unitName: unit?.name||'',
-    areaId, areaName: area?.name||'',
-    subAreaId: '', subAreaName: '',
-    equipId: eqId, equipName: eq?.name||'',
-    pic: pics.join(', '),
-    catatan: '', tindakan: '',
-    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-    items: []
+  // ── Buat objek sesi SEMENTARA — belum masuk sessions[] ──
+  _draftSession = {
+    id:          genId(),
+    tanggal,
+    startTime:   start,
+    endTime:     getVal('ns-end'),
+    unitId,      unitName:    unit?.name || '',
+    areaId,      areaName:    area?.name || '',
+    subAreaId:   '',
+    subAreaName: '',
+    equipId:     eqId,
+    equipName:   eq?.name || '',
+    pic:         pics.join(', '),
+    catatan:     '',
+    tindakan:    '',
+    createdAt:   new Date().toISOString(),
+    updatedAt:   new Date().toISOString(),
+    items:       [],
+    _isDraft:    true,   // flag: belum tersimpan
   };
-   
-  sessions.unshift(session);
-  saveAll(); renderAll();
+
   closeOverlay('newSessionOverlay');
-  toast('Sesi ' + id + ' dibuat. Isi parameter di bawah ↓', 'success');
 
-  if (WEBHOOK_URL) {
-    setSyncStatus('syncing');
-    autoSyncSession(session);
-  }
-
-  openChecklistModal(id, unitId, areaId, '', eqId);
+  // Langsung buka checklist dengan draft — TANPA simpan dulu
+  openChecklistModalDraft(_draftSession);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -4247,16 +4293,94 @@ function openChecklistModal(sessId, unitId, areaId, saId, eqId) {
       </div>
     </details>` : '';
 
+  // ── Ambil riwayat pengecekan equipment ini (selain sesi sekarang) ──
+  const equipPrevHistory = getEquipHistory(sess.unitId, sess.areaId, sess.equipId, 6)
+    .filter(s => s.id !== sess.id);
+
+  // ── Render riwayat pengecekan ──
+  const histBanner = equipPrevHistory.length ? (() => {
+    const rows = equipPrevHistory.map((hs, idx) => {
+      const hst  = sessStatus(hs);
+      const hbdg = stBadge(hst);
+      const okH  = (hs.items||[]).filter(i=>i.status==='OK').length;
+      const wH   = (hs.items||[]).filter(i=>i.status==='WARNING').length;
+      const aH   = (hs.items||[]).filter(i=>i.status==='ALERT').length;
+      return `<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:6px 10px;font-size:11px;color:var(--text3);white-space:nowrap">
+          ${fmtDate(hs.tanggal)} ${esc(hs.startTime||'')}
+        </td>
+        <td style="padding:6px 10px;font-size:11px">
+          <span class="badge ${hbdg}" style="font-size:9px">${hst}</span>
+        </td>
+        <td style="padding:6px 10px;font-size:11px;font-family:'IBM Plex Mono',monospace">
+          <span style="color:var(--green)">✓${okH}</span>
+          ${wH ? `<span style="color:var(--orange);margin-left:4px">⚠${wH}</span>` : ''}
+          ${aH ? `<span style="color:var(--red);margin-left:4px">✗${aH}</span>` : ''}
+        </td>
+        <td style="padding:6px 10px;font-size:11px;color:var(--text3)">
+          ${esc(hs.pic||'—')}
+        </td>
+        <td style="padding:6px 10px">
+          <button class="tbl-btn" style="font-size:10px;padding:2px 7px"
+            onclick="viewSession('${esc(hs.id)}')">👁</button>
+        </td>
+      </tr>`;
+    }).join('');
+    return `
+      <details style="margin-bottom:14px" ${equipPrevHistory.length <= 2 ? 'open' : ''}>
+        <summary style="cursor:pointer;font-size:11px;font-weight:700;color:var(--blue);
+          text-transform:uppercase;letter-spacing:.07em;padding:7px 12px;
+          background:var(--blue-dim);border-left:3px solid var(--blue);
+          border-radius:0 5px 5px 0;user-select:none">
+          📋 Riwayat Pengecekan Sebelumnya — ${equipPrevHistory.length} sesi terakhir
+        </summary>
+        <div style="margin-top:8px;background:var(--bg2);border:1px solid var(--border);
+                    border-radius:8px;overflow:hidden">
+          <table style="width:100%;border-collapse:collapse">
+            <thead>
+              <tr style="background:var(--bg3)">
+                <th style="padding:6px 10px;font-size:9px;color:var(--text3);text-align:left;
+                    font-family:'IBM Plex Mono',monospace;letter-spacing:.07em">TANGGAL</th>
+                <th style="padding:6px 10px;font-size:9px;color:var(--text3);text-align:left;
+                    font-family:'IBM Plex Mono',monospace;letter-spacing:.07em">STATUS</th>
+                <th style="padding:6px 10px;font-size:9px;color:var(--text3);text-align:left;
+                    font-family:'IBM Plex Mono',monospace;letter-spacing:.07em">HASIL</th>
+                <th style="padding:6px 10px;font-size:9px;color:var(--text3);text-align:left;
+                    font-family:'IBM Plex Mono',monospace;letter-spacing:.07em">PIC</th>
+                <th style="padding:6px 10px;font-size:9px;color:var(--text3);text-align:left;
+                    font-family:'IBM Plex Mono',monospace;letter-spacing:.07em">DETAIL</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </details>`;
+  })() : '';
+
   document.getElementById('chkBody').innerHTML = `
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;align-items:center">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;padding:10px 14px;
+                background:var(--bg3);border:1px solid var(--border);border-radius:8px;align-items:center">
       <span class="badge b-blue">⏱ Mulai: ${esc(sess.startTime||'—')}</span>
       ${sess.endTime ? `<span class="badge b-ok">✓ Selesai: ${esc(sess.endTime)}</span>` : ''}
       <span class="badge b-gray">👷 ${esc(sess.pic||'—')}</span>
+      <span class="badge b-gray" style="font-size:9px">
+        Pengecekan ke-${getEquipHistory(sess.unitId,sess.areaId,sess.equipId).findIndex(s=>s.id===sess.id)+1}
+        dari ${getEquipHistory(sess.unitId,sess.areaId,sess.equipId).length} total
+      </span>
       <code style="margin-left:auto;font-size:9px;color:var(--text3)">${esc(sess.id)}</code>
     </div>
-    ${isNew ? `<div style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-left:4px solid var(--green);border-radius:8px;padding:9px 14px;margin-bottom:14px;font-size:12px;color:var(--green)">
-      ✅ Isi semua nilai parameter di bawah, lalu klik Simpan.
-    </div>` : ''}
+    ${isNew ? `
+      <div style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);
+                  border-left:4px solid var(--green);border-radius:8px;padding:9px 14px;
+                  margin-bottom:14px;font-size:12px;color:var(--green)">
+        ✅ Sesi monitoring baru — isi semua nilai parameter di bawah, lalu klik Simpan.
+      </div>` : `
+      <div style="background:var(--orange-dim);border:1px solid rgba(251,140,58,.3);
+                  border-left:4px solid var(--orange);border-radius:8px;padding:9px 14px;
+                  margin-bottom:14px;font-size:12px;color:var(--orange)">
+        ✏ Sesi sudah pernah diisi — perubahan akan menimpa data sebelumnya.
+      </div>`}
+    ${histBanner}
     ${refBanner}
     ${paramHtml}
     <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -4288,6 +4412,286 @@ function openChecklistModal(sessId, unitId, areaId, saId, eqId) {
 
   openOverlay('checklistOverlay');
   startChecklistAutoSave(sess.id);
+}
+
+/**
+ * openChecklistModalDraft — buka checklist untuk sesi DRAFT (belum tersimpan).
+ * Data baru disimpan ke sessions[] hanya setelah user klik "Simpan Data Monitoring".
+ */
+function openChecklistModalDraft(draft) {
+  const eq     = findEquipFlex(draft.unitId, draft.areaId, '', draft.equipId);
+  const params = eq?.params || [];
+
+  document.getElementById('chkTitle').textContent = `📋 ${draft.equipName}`;
+  document.getElementById('chkSub').textContent   =
+    `${draft.unitName} → ${draft.areaName} · SESI BARU · ${fmtDate(draft.tanggal)} ${draft.startTime}`;
+
+  if (!params.length) {
+    document.getElementById('chkBody').innerHTML = `
+      <div class="empty">
+        <div class="empty-ico">⚙</div>
+        <div class="empty-msg">Equipment ini belum punya parameter monitoring.<br>
+          Setup parameter dulu di halaman Hierarki.</div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-ghost" onclick="closeOverlay('checklistOverlay')">Tutup</button>
+      </div>`;
+    openOverlay('checklistOverlay');
+    return;
+  }
+
+  // Group params by section
+  const groups = {};
+  params.forEach(p => {
+    const sec = p.section || 'Umum';
+    if (!groups[sec]) groups[sec] = [];
+    groups[sec].push(p);
+  });
+
+  const secColors = {
+    'Umum':'var(--cyan)', 'Power Quality':'var(--purple)',
+    'Kondisi Panel':'var(--blue)', 'Kondisi Trafo':'var(--orange)',
+  };
+
+  let paramHtml = '';
+  Object.entries(groups).forEach(([sec, ps]) => {
+    const col = secColors[sec] || 'var(--text2)';
+    paramHtml += `
+      <div class="section-group" style="margin-bottom:14px">
+        <div class="section-group-hdr" style="color:${col};background:${col}15;
+             border-bottom:1px solid ${col}33">📌 ${esc(sec)}</div>
+        <div class="tbl-scroll">
+          <table class="chk-table">
+            <thead><tr>
+              <th style="min-width:160px">Parameter</th>
+              <th style="width:70px;text-align:center">Satuan</th>
+              <th style="min-width:150px">Nilai / Kondisi</th>
+              <th style="width:90px;text-align:center">Status</th>
+              <th style="min-width:120px">Catatan</th>
+            </tr></thead>
+            <tbody>
+              ${ps.map(p => buildChkRow(p, {})).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+  });
+
+  // Riwayat pengecekan sebelumnya
+  const prevHistory = getEquipHistory(draft.unitId, draft.areaId, draft.equipId, 5);
+  const histBanner = prevHistory.length ? (() => {
+    const rows = prevHistory.map(hs => {
+      const hst = sessStatus(hs);
+      const okH = (hs.items||[]).filter(i=>i.status==='OK').length;
+      const wH  = (hs.items||[]).filter(i=>i.status==='WARNING').length;
+      const aH  = (hs.items||[]).filter(i=>i.status==='ALERT').length;
+      return `<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:6px 10px;font-size:11px;color:var(--text3);white-space:nowrap">
+          ${fmtDate(hs.tanggal)} ${esc(hs.startTime||'')}
+        </td>
+        <td style="padding:6px 10px">
+          <span class="badge ${stBadge(hst)}" style="font-size:9px">${hst}</span>
+        </td>
+        <td style="padding:6px 10px;font-size:11px;font-family:'IBM Plex Mono',monospace">
+          <span style="color:var(--green)">✓${okH}</span>
+          ${wH?`<span style="color:var(--orange);margin-left:4px">⚠${wH}</span>`:''}
+          ${aH?`<span style="color:var(--red);margin-left:4px">✗${aH}</span>`:''}
+        </td>
+        <td style="padding:6px 10px;font-size:11px;color:var(--text3)">${esc(hs.pic||'—')}</td>
+        <td style="padding:6px 10px">
+          <button class="tbl-btn" style="font-size:10px;padding:2px 7px"
+            onclick="viewSession('${esc(hs.id)}')">👁</button>
+        </td>
+      </tr>`;
+    }).join('');
+    return `
+      <details style="margin-bottom:14px" open>
+        <summary style="cursor:pointer;font-size:11px;font-weight:700;color:var(--blue);
+          text-transform:uppercase;letter-spacing:.07em;padding:7px 12px;
+          background:var(--blue-dim);border-left:3px solid var(--blue);
+          border-radius:0 5px 5px 0;user-select:none">
+          📋 Riwayat Pengecekan — ${prevHistory.length} sesi terakhir
+        </summary>
+        <div style="margin-top:8px;background:var(--bg2);border:1px solid var(--border);
+                    border-radius:8px;overflow:hidden">
+          <table style="width:100%;border-collapse:collapse">
+            <thead><tr style="background:var(--bg3)">
+              <th style="padding:6px 10px;font-size:9px;color:var(--text3);text-align:left;
+                  font-family:'IBM Plex Mono',monospace;letter-spacing:.07em">TANGGAL</th>
+              <th style="padding:6px 10px;font-size:9px;color:var(--text3);text-align:left;
+                  font-family:'IBM Plex Mono',monospace;letter-spacing:.07em">STATUS</th>
+              <th style="padding:6px 10px;font-size:9px;color:var(--text3);text-align:left;
+                  font-family:'IBM Plex Mono',monospace;letter-spacing:.07em">HASIL</th>
+              <th style="padding:6px 10px;font-size:9px;color:var(--text3);text-align:left;
+                  font-family:'IBM Plex Mono',monospace;letter-spacing:.07em">PIC</th>
+              <th style="padding:6px 10px;font-size:9px;color:var(--text3);text-align:left;
+                  font-family:'IBM Plex Mono',monospace;letter-spacing:.07em">DETAIL</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </details>`;
+  })() : '';
+
+  // Referensi nilai normal
+  const eqType   = eq?.type || '';
+  const refItems = EQUIP_REFERENSI[eqType] || [];
+  const refBanner = refItems.length ? `
+    <details style="margin-bottom:14px">
+      <summary style="cursor:pointer;font-size:11px;font-weight:700;color:var(--blue);
+        text-transform:uppercase;letter-spacing:.07em;padding:6px 12px;
+        background:var(--blue-dim);border-left:3px solid var(--blue);
+        border-radius:0 5px 5px 0;user-select:none">
+        📖 Referensi Nilai Normal — ${esc(EQUIP_TYPE_LABELS[eqType]||eqType)}
+      </summary>
+      <div style="margin-top:8px;background:var(--blue-dim);border:1px solid rgba(43,108,184,.2);
+                  border-radius:8px;padding:10px 14px">
+        <ul style="margin:0;padding-left:18px;font-size:12px;color:var(--text2);line-height:1.8">
+          ${refItems.map(r=>`<li>${r}</li>`).join('')}
+        </ul>
+      </div>
+    </details>` : '';
+
+  document.getElementById('chkBody').innerHTML = `
+    <!-- Info sesi baru -->
+    <div style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);
+                border-left:4px solid var(--green);border-radius:8px;
+                padding:10px 14px;margin-bottom:14px;
+                display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:13px">✅</span>
+      <div style="flex:1;font-size:12px;color:var(--green)">
+        <strong>Sesi Baru</strong> — isi semua parameter lalu klik
+        <strong>Simpan Data Monitoring</strong>.
+        Data <strong>belum tersimpan</strong> sampai kamu klik simpan.
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <span class="badge b-blue">⏱ ${esc(draft.startTime||'—')}</span>
+        <span class="badge b-gray">👷 ${esc(draft.pic||'—')}</span>
+        <code style="font-size:9px;color:var(--text3);align-self:center">${esc(draft.id)}</code>
+      </div>
+    </div>
+
+    ${histBanner}
+    ${refBanner}
+    ${paramHtml}
+
+    <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="fg">
+        <label class="flabel">⏱ Waktu Selesai</label>
+        <input type="time" class="finput" id="chkEndTime" value="${esc(draft.endTime||'')}"/>
+      </div>
+      <div class="fg"></div>
+    </div>
+    <details style="margin-top:12px" open>
+      <summary style="cursor:pointer;font-size:11px;font-weight:700;color:var(--orange);
+        text-transform:uppercase;letter-spacing:.07em;padding:6px 10px;
+        background:var(--orange-dim);border-left:3px solid var(--orange);
+        border-radius:0 5px 5px 0;user-select:none">
+        📋 Temuan & Tindakan (opsional)
+      </summary>
+      <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="fg">
+          <label class="flabel">Temuan / Catatan</label>
+          <textarea class="ftextarea" id="chkCatatan"></textarea>
+        </div>
+        <div class="fg">
+          <label class="flabel">Tindakan Korektif</label>
+          <textarea class="ftextarea" id="chkTindakan"></textarea>
+        </div>
+      </div>
+    </details>
+
+    <div class="form-actions">
+      <button class="btn btn-danger" onclick="cancelDraftSession()">✕ Batalkan Sesi</button>
+      <button class="btn btn-primary" onclick="saveDraftSession()">
+        💾 Simpan Data Monitoring
+      </button>
+    </div>`;
+
+  openOverlay('checklistOverlay');
+}
+
+/**
+ * saveDraftSession — baca semua input checklist, simpan ke sessions[], lalu sync.
+ * Dipanggil saat user klik "Simpan Data Monitoring" pada sesi DRAFT.
+ */
+function saveDraftSession() {
+  if (!_draftSession) { toast('Tidak ada sesi aktif','error'); return; }
+
+  const eq     = findEquipFlex(_draftSession.unitId, _draftSession.areaId, '', _draftSession.equipId);
+  const params = eq?.params || [];
+
+  // Baca semua nilai dari DOM
+  const items = params.map(p => {
+    const valEl   = document.getElementById('chk-'+p.id+'-val');
+    const noteEl  = document.getElementById('chk-'+p.id+'-note');
+    const badgeEl = document.getElementById('chk-'+p.id+'-badge');
+    const rawSt   = (badgeEl?.textContent||'').trim();
+    const val     = valEl?.value ?? '';
+    const st      = (rawSt === '—' || rawSt === '') ? '' : rawSt;
+    return { paramId:p.id, label:p.label, unit:p.unit, section:p.section, value:val, status:st, note:noteEl?.value||'' };
+  }).filter(i => i.value !== '' || i.status !== '' || i.note !== '');
+
+  // Validasi: minimal 1 parameter harus diisi
+  if (!items.length) {
+    toast('⚠ Isi minimal satu parameter sebelum menyimpan', 'error');
+    return;
+  }
+
+  // Finalisasi draft → sesi nyata
+  _draftSession._isDraft  = false;
+  _draftSession.items     = items;
+  _draftSession.endTime   = document.getElementById('chkEndTime')?.value || '';
+  _draftSession.catatan   = document.getElementById('chkCatatan')?.value || '';
+  _draftSession.tindakan  = document.getElementById('chkTindakan')?.value || '';
+  _draftSession.updatedAt = new Date().toISOString();
+
+  // Simpan ke sessions[]
+  sessions.unshift(_draftSession);
+
+  const sess = _draftSession;
+  _draftSession = null;
+
+  saveAll();
+  regenerateFindings();
+  closeOverlay('checklistOverlay');
+  renderAll();
+
+  // Ringkasan hasil
+  const okC   = items.filter(i=>i.status==='OK').length;
+  const warnC = items.filter(i=>i.status==='WARNING').length;
+  const alrtC = items.filter(i=>i.status==='ALERT').length;
+  const stFin = sessStatus(sess);
+  const stMsg = stFin==='ALERT' ? '🚨 Ada ALERT!' : stFin==='WARNING' ? '⚠ Ada Warning' : '✅ Semua Normal';
+  toast(`${stMsg} — Sesi ${sess.id} tersimpan · ${okC} OK · ${warnC} Warn · ${alrtC} Alert`, 'success', 5000);
+
+  // Sync ke Sheets
+  if (WEBHOOK_URL) {
+    setSyncStatus('syncing');
+    autoSyncSession(sess);
+  }
+
+  // Refresh tampilan crew jika aktif
+  if (currentUser?.role === 'crew') {
+    const crewActive = document.getElementById('crewPortal')?.classList.contains('active');
+    if (crewActive) {
+      setTimeout(() => {
+        if (crewNav.screen === 'history') _renderCrewHistory();
+        else if (crewNav.screen === 'equip' && crewNav.areaId) crewSelectArea(crewNav.areaId, crewNav.areaName);
+        else crewShowHome();
+      }, 400);
+    }
+  }
+}
+
+/**
+ * cancelDraftSession — buang draft tanpa menyimpan
+ */
+function cancelDraftSession() {
+  if (_draftSession && !confirm('Batalkan sesi ini? Data yang sudah diisi akan hilang.')) return;
+  _draftSession = null;
+  closeOverlay('checklistOverlay');
+  toast('Sesi dibatalkan — tidak ada data yang tersimpan', 'info');
 }
 
 function buildChkRow(p, existing) {
@@ -4403,6 +4807,11 @@ function onChkStatusChange(paramId, sel) {
 }
 
 function saveChecklist(sessId) {
+  // Jika ini sesi draft yang belum tersimpan, arahkan ke saveDraftSession
+  if (_draftSession && _draftSession.id === sessId) {
+    saveDraftSession();
+    return;
+  }
   const sess = sessions.find(s => s.id === sessId);
   if (!sess) return;
   const eq = findEquipFlex(sess.unitId, sess.areaId, '', sess.equipId);
@@ -4433,17 +4842,41 @@ function saveChecklist(sessId) {
   sess.updatedAt = new Date().toISOString();
 
   saveAll();
+  regenerateFindings();
   closeOverlay('checklistOverlay');
   renderAll();
-  toast('Data monitoring disimpan ✓', 'success');
 
-  // Sync ke Google Sheets — crew langsung full_sync, role lain pakai autoSyncSession
+  // Hitung ringkasan hasil
+  const okC2   = sess.items.filter(i => i.status === 'OK').length;
+  const warnC2 = sess.items.filter(i => i.status === 'WARNING').length;
+  const alrtC2 = sess.items.filter(i => i.status === 'ALERT').length;
+  const stFinal = sessStatus(sess);
+  const stMsg   = stFinal === 'ALERT'   ? '🚨 Ada ALERT!'
+                : stFinal === 'WARNING'  ? '⚠ Ada Warning'
+                : stFinal === 'OK'       ? '✅ Semua Normal'
+                : '📋 Tersimpan';
+  toast(`${stMsg} — ${okC2} OK · ${warnC2} Warn · ${alrtC2} Alert`, 'success', 4500);
+
+  // Sync ke Google Sheets — semua role pakai autoSyncSession (targeted, tidak boros)
   if (WEBHOOK_URL) {
     setSyncStatus('syncing');
-    if (currentUser && currentUser.role === 'crew') {
-      syncAll(true); // silent full sync
-    } else {
-      autoSyncSession(sess);
+    autoSyncSession(sess);
+  }
+
+  // Jika crew portal aktif, refresh tampilan crew
+  if (currentUser?.role === 'crew') {
+    const crewPortalActive = document.getElementById('crewPortal')?.classList.contains('active');
+    if (crewPortalActive) {
+      setTimeout(() => {
+        // Jika sedang di tab history, refresh
+        if (crewNav.screen === 'history') {
+          _renderCrewHistory();
+        }
+        // Jika sedang di equipment list, refresh
+        else if (crewNav.screen === 'equip' && crewNav.areaId) {
+          crewSelectArea(crewNav.areaId, crewNav.areaName);
+        }
+      }, 400);
     }
   }
 }
@@ -5494,6 +5927,19 @@ function getLastSession(uid, aid, sid, eid) {
     .sort((a,b) => new Date(b.createdAt||0) - new Date(a.createdAt||0))[0] || null;
 }
 
+/**
+ * getEquipHistory — ambil semua sesi monitoring untuk satu equipment
+ * diurutkan dari terbaru ke terlama
+ */
+function getEquipHistory(uid, aid, eid, limit) {
+  return sessions
+    .filter(s => s.equipId === eid &&
+      (!uid || s.unitId === uid) &&
+      (!aid || s.areaId === aid))
+    .sort((a,b) => new Date(b.createdAt||0) - new Date(a.createdAt||0))
+    .slice(0, limit || 999);
+}
+
 function countEquipments() {
   return hierarchy.units.flatMap(u =>
     u.areas.flatMap(a => a.equipments || [])
@@ -5511,6 +5957,90 @@ function sessStatus(sess) {
 
 function stBadge(st) {
   return {OK:'b-ok',WARNING:'b-warn',ALERT:'b-alert',PENDING:'b-pend'}[st]||'b-gray';
+}
+
+/**
+ * buildMonthDropdownHTML — buat HTML select dropdown pilih bulan
+ * dari bulan pertama ada data sampai bulan sekarang
+ */
+function buildMonthDropdownHTML(selectId, selectedMonth, onchangeStr) {
+  // Kumpulkan semua bulan yang ada datanya
+  const monthSet = new Set();
+  sessions.forEach(s => {
+    if (s.tanggal && s.tanggal.length >= 7) monthSet.add(s.tanggal.slice(0,7));
+  });
+  // Tambahkan bulan sekarang selalu ada
+  const now = new Date();
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    monthSet.add(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'));
+  }
+  // Urutkan descending
+  const months = [...monthSet].sort((a,b) => b.localeCompare(a));
+  const opts = months.map(m =>
+    `<option value="${m}" ${m === selectedMonth ? 'selected' : ''}>${formatMonthLabel(m)}</option>`
+  ).join('');
+  return `<select id="${selectId}" onchange="${onchangeStr}"
+    style="width:100%;background:var(--bg2);border:1.5px solid var(--border);
+           color:var(--text);font-family:'IBM Plex Sans',sans-serif;font-size:13px;
+           padding:9px 12px;border-radius:8px;outline:none;cursor:pointer;
+           transition:border-color .15s;appearance:none;
+           background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 12 12%22><path fill=%22%237A9A7A%22 d=%22M6 8L1 3h10z%22/></svg>');
+           background-repeat:no-repeat;background-position:right 12px center;
+           padding-right:32px">
+    ${opts}
+  </select>`;
+}
+
+function formatMonthLabel(ym) {
+  if (!ym) return '—';
+  const months = ['Januari','Februari','Maret','April','Mei','Juni',
+                  'Juli','Agustus','September','Oktober','November','Desember'];
+  try {
+    const [y, m] = ym.split('-');
+    const now = new Date();
+    const isThisMonth = parseInt(y) === now.getFullYear() && parseInt(m)-1 === now.getMonth();
+    return `${months[parseInt(m)-1]} ${y}${isThisMonth ? ' (Bulan Ini)' : ''}`;
+  } catch(e) { return ym; }
+}
+
+function onCrewHomeMonthChange(ym) {
+  const sess  = sessions.filter(s => (s.tanggal||'').startsWith(ym));
+  const items = sess.flatMap(s => s.items || []);
+  const warn  = items.filter(i => i.status==='WARNING').length;
+  const alert = items.filter(i => i.status==='ALERT').length;
+
+  const labelEl = document.getElementById('crewHomeStatLabel');
+  const sesiEl  = document.getElementById('crewStatSesi');
+  const warnEl  = document.getElementById('crewStatWarn');
+  const alertEl = document.getElementById('crewStatAlert');
+  if (labelEl) labelEl.textContent = `📊 Statistik ${formatMonthLabel(ym)}`;
+  if (sesiEl)  sesiEl.textContent  = sess.length;
+  if (warnEl)  warnEl.textContent  = warn;
+  if (alertEl) alertEl.textContent = alert;
+
+  // Update recent list juga
+  const recentEl = document.getElementById('crewHomeRecentList');
+  if (!recentEl) return;
+  const recent = sess.sort((a,b) => new Date(b.createdAt||0)-new Date(a.createdAt||0)).slice(0,6);
+  if (!recent.length) {
+    recentEl.innerHTML = `<div style="padding:16px;font-size:12px;color:var(--text3);text-align:center">
+      Tidak ada sesi di bulan ini.</div>`;
+    return;
+  }
+  recentEl.innerHTML = recent.map(s => {
+    const st  = sessStatus(s);
+    const dot = {OK:'var(--green)',WARNING:'var(--orange)',ALERT:'var(--red)',PENDING:'var(--text3)'}[st]||'var(--text3)';
+    return `<div class="crew-recent-item" onclick="crewOpenSession('${esc(s.id)}')">
+      <div class="crew-recent-dot" style="background:${dot}"></div>
+      <div class="crew-recent-info">
+        <div class="crew-recent-equip">${esc(s.equipName||'—')}</div>
+        <div class="crew-recent-meta">${esc(s.areaName||'')} · 👤 ${esc(s.pic||'—')}</div>
+        <div class="crew-recent-meta">${fmtDate(s.tanggal)} ${esc(s.startTime||'')}</div>
+      </div>
+      <span class="badge ${stBadge(st)}">${st}</span>
+    </div>`;
+  }).join('');
 }
 
 function fmtDate(d) {
@@ -7528,37 +8058,43 @@ function crewShowHome() {
   document.querySelectorAll('.crew-nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('crewNavHome')?.classList.add('active');
 
-  const today     = new Date().toISOString().split('T')[0];
-  const todaySess = sessions.filter(s => (s.tanggal||'').startsWith(today));
-  const myName    = currentUser?.name || currentUser?.username || '';
+  const today      = new Date().toISOString().split('T')[0];
+  const thisMonth  = today.slice(0, 7);
+  const myName     = currentUser?.name || currentUser?.username || '';
 
-  // Stat hari ini
-  const todayItems  = todaySess.flatMap(s => s.items || []);
-  const todayOK     = todayItems.filter(i => i.status==='OK').length;
-  const todayWarn   = todayItems.filter(i => i.status==='WARNING').length;
-  const todayAlert  = todayItems.filter(i => i.status==='ALERT').length;
+  // Stat bulan ini
+  const monthSess  = sessions.filter(s => (s.tanggal||'').startsWith(thisMonth));
+  const monthItems = monthSess.flatMap(s => s.items || []);
+  const monthOK    = monthItems.filter(i => i.status==='OK').length;
+  const monthWarn  = monthItems.filter(i => i.status==='WARNING').length;
+  const monthAlert = monthItems.filter(i => i.status==='ALERT').length;
 
-  // Recent 3 sesi oleh user ini
-  const mySess = sessions
-    .filter(s => s.pic && s.pic.toLowerCase().includes(myName.split('-').pop()?.toLowerCase() || ''))
+  // Sesi bulan ini dari SEMUA teknisi
+  const recentAll = [...sessions]
+    .filter(s => (s.tanggal||'').startsWith(thisMonth))
     .sort((a,b) => new Date(b.createdAt||0) - new Date(a.createdAt||0))
-    .slice(0, 4);
+    .slice(0, 6);
 
-  const recentHtml = mySess.length
-    ? mySess.map(s => {
-        const st   = sessStatus(s);
-        const dot  = {OK:'var(--green)',WARNING:'var(--orange)',ALERT:'var(--red)',PENDING:'var(--text3)'}[st]||'var(--text3)';
-        const bd   = stBadge(st);
+  const recentHtml = recentAll.length
+    ? recentAll.map(s => {
+        const st  = sessStatus(s);
+        const dot = {OK:'var(--green)',WARNING:'var(--orange)',ALERT:'var(--red)',PENDING:'var(--text3)'}[st]||'var(--text3)';
+        const bd  = stBadge(st);
         return `<div class="crew-recent-item" onclick="crewOpenSession('${esc(s.id)}')">
           <div class="crew-recent-dot" style="background:${dot}"></div>
           <div class="crew-recent-info">
             <div class="crew-recent-equip">${esc(s.equipName||'—')}</div>
-            <div class="crew-recent-meta">${esc(s.areaName||'')} · ${fmtDate(s.tanggal)} ${esc(s.startTime||'')}</div>
+            <div class="crew-recent-meta">
+              ${esc(s.areaName||'')} · 👤 ${esc(s.pic||'—')}
+            </div>
+            <div class="crew-recent-meta">${fmtDate(s.tanggal)} ${esc(s.startTime||'')}</div>
           </div>
           <span class="badge ${bd} crew-recent-badge">${st}</span>
         </div>`;
       }).join('')
-    : `<div style="padding:16px 16px;font-size:12px;color:var(--text3);text-align:center">Belum ada sesi monitoring hari ini</div>`;
+    : `<div style="padding:16px;font-size:12px;color:var(--text3);text-align:center">
+        Belum ada sesi monitoring.
+       </div>`;
 
   // Quick stats
   const totalEquip = countEquipments();
@@ -7578,19 +8114,24 @@ function crewShowHome() {
       <div class="crew-welcome-date">📅 ${nowDate}</div>
     </div>
 
-    <!-- Quick Stats Hari Ini -->
-    <div class="crew-sec-label">📊 Statistik Hari Ini</div>
-    <div class="crew-stats-row" style="margin-bottom:20px">
+    <!-- Dropdown bulan -->
+    <div style="margin-bottom:12px">
+      ${buildMonthDropdownHTML('crewHomeMonthSel', thisMonth, 'onCrewHomeMonthChange(this.value)')}
+    </div>
+
+    <!-- Quick Stats Bulan Ini -->
+    <div class="crew-sec-label" id="crewHomeStatLabel">📊 Statistik ${formatMonthLabel(thisMonth)}</div>
+    <div class="crew-stats-row" style="margin-bottom:20px" id="crewHomeStatRow">
       <div class="crew-stat">
-        <div class="crew-stat-val" style="color:var(--blue)">${todaySess.length}</div>
+        <div class="crew-stat-val" style="color:var(--blue)" id="crewStatSesi">${monthSess.length}</div>
         <div class="crew-stat-lbl">Total Sesi</div>
       </div>
       <div class="crew-stat">
-        <div class="crew-stat-val" style="color:var(--orange)">${todayWarn}</div>
+        <div class="crew-stat-val" style="color:var(--orange)" id="crewStatWarn">${monthWarn}</div>
         <div class="crew-stat-lbl">Warning</div>
       </div>
       <div class="crew-stat">
-        <div class="crew-stat-val" style="color:var(--red)">${todayAlert}</div>
+        <div class="crew-stat-val" style="color:var(--red)" id="crewStatAlert">${monthAlert}</div>
         <div class="crew-stat-lbl">Alert</div>
       </div>
     </div>
@@ -7614,11 +8155,11 @@ function crewShowHome() {
     <div class="crew-sec-label">⏱ Sesi Terbaru</div>
     <div class="crew-recent" style="margin-bottom:20px">
       <div class="crew-recent-hdr">
-        <div class="crew-recent-title">Riwayat Monitoring Saya</div>
-        <button onclick="crewNavTo('history')" style="background:none;border:none;color:var(--blue);font-size:12px;cursor:pointer;font-family:'IBM Plex Sans',sans-serif">Lihat Semua →</button>
+          <div class="crew-recent-title">Sesi Terbaru Bulan Ini</div>
+          <button onclick="crewShowHistory(false)" style="background:none;border:none;color:var(--blue);font-size:12px;cursor:pointer;font-family:'IBM Plex Sans',sans-serif">Lihat Semua →</button>
+        </div>
+        <div id="crewHomeRecentList">${recentHtml}</div>
       </div>
-      ${recentHtml}
-    </div>
 
     <!-- Info sistem -->
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;font-size:12px;color:var(--text3)">
@@ -7787,27 +8328,56 @@ function crewSelectArea(areaId, areaName) {
     const typePill = eq.type
       ? `<span class="crew-type-pill">${esc((EQUIP_TYPE_LABELS[eq.type]||eq.type).replace(/^[^\s]+ /,''))}</span>`
       : '';
+    const equipAllSess = getEquipHistory(crewNav.unitId, areaId, eq.id);
+    const sessCount    = equipAllSess.length;
+    const todaySess    = equipAllSess.filter(s =>
+      (s.tanggal||'') === new Date().toISOString().split('T')[0]
+    );
     const lastStr = last
       ? `Terakhir: ${fmtDate(last.tanggal)} ${last.startTime||''}`
-      : 'Belum pernah dimonitoring';
+      : '⚠ Belum pernah dimonitoring';
     const badgeCls = stBadge(st);
+    const sessInfo = sessCount > 0
+      ? `${sessCount}× dicek${todaySess.length > 0 ? ` · ✅ ${todaySess.length}× hari ini` : ''}`
+      : '';
 
     return `<div class="crew-equip-item"
-      onclick="crewStartSession('${esc(crewNav.unitId)}','${esc(areaId)}','${esc(eq.id)}')">
-      <div class="crew-equip-dot" style="background:${dot}"></div>
-      <div class="crew-equip-info">
-        <div class="crew-equip-name">${esc(eq.name)}</div>
-        <div class="crew-equip-meta">
-          ${typePill}
-          ${eq.tag ? `<span style="color:var(--text3)">${esc(eq.tag)}</span> · ` : ''}
-          ${eq.params?.length||0} parameter
-        </div>
-        <div style="margin-top:4px">
-          <span class="badge ${badgeCls}" style="font-size:9px">${st}</span>
-          <span style="font-size:10px;color:var(--text3);margin-left:6px">${lastStr}</span>
+      style="flex-direction:column;align-items:stretch;gap:8px;cursor:default;
+             ${todaySess.length>0?'border-color:var(--green);background:var(--green-dim);':''}">
+      <div style="display:flex;align-items:center;gap:14px">
+        <div class="crew-equip-dot" style="background:${dot};flex-shrink:0"></div>
+        <div class="crew-equip-info" style="flex:1;min-width:0">
+          <div class="crew-equip-name">${esc(eq.name)}</div>
+          <div class="crew-equip-meta" style="margin-top:3px">
+            ${typePill}
+            ${eq.tag ? `<span style="color:var(--text3)">${esc(eq.tag)}</span> · ` : ''}
+            ${eq.params?.length||0} param
+          </div>
+          <div style="margin-top:5px;display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+            <span class="badge ${badgeCls}" style="font-size:9px">${st}</span>
+            ${sessInfo ? `<span style="font-size:9px;color:var(--green);background:var(--green-dim);
+              padding:1px 6px;border-radius:4px;border:1px solid rgba(74,158,63,.25)">${sessInfo}</span>` : ''}
+          </div>
+          <div style="margin-top:4px;font-size:10px;
+            color:${!last?'var(--red)':'var(--text3)'};
+            font-weight:${!last?'600':'400'}">
+            ${lastStr}
+          </div>
         </div>
       </div>
-      <div class="crew-equip-arrow">›</div>
+      <div style="display:flex;gap:6px">
+        ${last ? `
+          <button class="btn btn-ghost btn-sm" style="flex:1;font-size:11px"
+            onclick="crewOpenSession('${esc(last.id)}')">
+            👁 Lihat (${sessCount}×)
+          </button>` : ''}
+        <button class="btn btn-primary btn-sm"
+          style="flex:${last?'1':'2'};font-size:11px;
+            ${todaySess.length>0?'background:var(--green-d);':''}"
+          onclick="crewStartSession('${esc(crewNav.unitId)}','${esc(areaId)}','${esc(eq.id)}')">
+          ✚ ${!last ? 'Mulai Monitor' : todaySess.length>0 ? 'Monitor Lagi (Hari Ini)' : 'Monitor Lagi'}
+        </button>
+      </div>
     </div>`;
   }).join('');
 
@@ -7827,15 +8397,25 @@ function crewSelectArea(areaId, areaName) {
 
 // ── START SESSION FROM CREW PORTAL ───────────────────────────
 function crewStartSession(unitId, areaId, eqId) {
-  // Reset breadcrumb state
   crewNav.screen = 'equip';
-
-  // Buka modal sesi baru dengan pre-fill
   openNewSessionModal(unitId, areaId, '', eqId);
 
-  // Override onclose: kembali ke equipment list setelah sesi dibuat
-  // (modal akan kembali ke crew portal secara otomatis karena crew portal
-  //  tetap di belakang overlay)
+  // Fallback: pastikan dropdown equip terisi benar
+  setTimeout(() => {
+    const nsEquip = document.getElementById('ns-equip');
+    if (nsEquip && eqId && nsEquip.value !== eqId) {
+      setVal('ns-unit', unitId);
+      onNSUnitChange();
+      setTimeout(() => {
+        setVal('ns-area', areaId);
+        onNSAreaChange();
+        setTimeout(() => {
+          setVal('ns-equip', eqId);
+          onNSEquipChange();
+        }, 80);
+      }, 80);
+    }
+  }, 350);
 }
 
 // ── OPEN / VIEW SESSION ───────────────────────────────────────
@@ -7844,63 +8424,210 @@ function crewOpenSession(sessId) {
 }
 
 // ── HISTORY SCREEN ────────────────────────────────────────────
-function crewShowHistory() {
+// ── State filter crew history ──────────────────────────────────────
+const crewHistState = {
+  search:   '',
+  unitId:   '',
+  status:   '',
+  month:    new Date().toISOString().slice(0,7), // default bulan ini
+  page:     1,
+  pageSize: 20,
+};
+
+function crewShowHistory(resetFilter) {
   crewNav.screen = 'history';
+  if (resetFilter) {
+    crewHistState.search = '';
+    crewHistState.unitId = '';
+    crewHistState.status = '';
+    crewHistState.page   = 1;
+  }
 
-  const myName  = currentUser?.name || currentUser?.username || '';
-// Cek semua segmen nama (pisah '-'), cocokkan ke field pic
-const nameParts = myName.split('-').map(p => p.trim().toLowerCase()).filter(Boolean);
-const mySess  = sessions
-  .filter(s => {
-    if (!nameParts.length) return true;
-    const picLower = (s.pic || '').toLowerCase();
-    // Lolos jika salah satu segmen nama cocok di field pic
-    return nameParts.some(part => picLower.includes(part));
-  })
-    .sort((a,b) => new Date(b.createdAt||0) - new Date(a.createdAt||0))
-    .slice(0, 30);
+  document.querySelectorAll('.crew-nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('crewNavHistory')?.classList.add('active');
 
+  _renderCrewHistory();
+}
+
+function _renderCrewHistory() {
+  const q      = crewHistState.search.toLowerCase();
+  const unitId = crewHistState.unitId;
+  const stFil  = crewHistState.status;
+  const pg     = crewHistState.page;
+  const pgSize = crewHistState.pageSize;
+
+  const monthFil = crewHistState.month || '';
+
+  // ── Crew selalu lihat SEMUA sesi dari semua user ──
+  let allSess = [...sessions].sort((a,b) =>
+    new Date(b.createdAt||0) - new Date(a.createdAt||0)
+  );
+
+  // Filter bulan
+  if (monthFil) allSess = allSess.filter(s => (s.tanggal||'').startsWith(monthFil));
+  // Filter search
+  if (q) allSess = allSess.filter(s =>
+    (s.equipName||'').toLowerCase().includes(q) ||
+    (s.areaName||'').toLowerCase().includes(q)  ||
+    (s.unitName||'').toLowerCase().includes(q)  ||
+    (s.pic||'').toLowerCase().includes(q)        ||
+    (s.id||'').toLowerCase().includes(q)
+  );
+  if (unitId) allSess = allSess.filter(s => s.unitId === unitId);
+  if (stFil)  allSess = allSess.filter(s => sessStatus(s) === stFil);
+
+  const total  = allSess.length;
+  const pages  = Math.max(1, Math.ceil(total / pgSize));
+  if (crewHistState.page > pages) crewHistState.page = pages;
+  const slice  = allSess.slice((pg-1)*pgSize, pg*pgSize);
+
+  // Grup per tanggal
   const today = new Date().toISOString().split('T')[0];
   const groups = {};
-  mySess.forEach(s => {
+  slice.forEach(s => {
     const key = s.tanggal || 'Tanpa Tanggal';
     if (!groups[key]) groups[key] = [];
     groups[key].push(s);
   });
 
-  const histHtml = Object.entries(groups).length
+  const histHtml = Object.keys(groups).length
     ? Object.entries(groups).map(([date, list]) => {
         const isToday = date === today;
         const rows = list.map(s => {
-          const st = sessStatus(s);
-          const dot = {OK:'var(--green)',WARNING:'var(--orange)',ALERT:'var(--red)',PENDING:'var(--text3)'}[st];
-          return `<div class="crew-recent-item" onclick="crewOpenSession('${esc(s.id)}')">
-            <div class="crew-recent-dot" style="background:${dot}"></div>
-            <div class="crew-recent-info">
-              <div class="crew-recent-equip">${esc(s.equipName||'—')}</div>
-              <div class="crew-recent-meta">${esc(s.unitName||'')} · ${esc(s.areaName||'')} · ${esc(s.startTime||'')}${s.endTime?' – '+esc(s.endTime):''}</div>
-            </div>
-            <span class="badge ${stBadge(st)}">${st}</span>
-          </div>`;
+          const st  = sessStatus(s);
+          const dot = {OK:'var(--green)',WARNING:'var(--orange)',ALERT:'var(--red)',PENDING:'var(--text3)'}[st]||'var(--text3)';
+          return `
+            <div style="border-bottom:1px solid var(--border)">
+              <div class="crew-recent-item" onclick="crewOpenSession('${esc(s.id)}')"
+                   style="padding-bottom:4px">
+                <div class="crew-recent-dot" style="background:${dot}"></div>
+                <div class="crew-recent-info">
+                  <div class="crew-recent-equip">${esc(s.equipName||'—')}</div>
+                  <div class="crew-recent-meta" style="margin-top:2px">
+                    🏭 ${esc(s.unitName||'')} · 📁 ${esc(s.areaName||'')}
+                  </div>
+                  <div class="crew-recent-meta" style="margin-top:1px">
+                    👤 ${esc(s.pic||'—')} · ⏱ ${esc(s.startTime||'—')}${s.endTime?' – '+esc(s.endTime):''}
+                  </div>
+                  <div style="font-size:9px;color:var(--text3);margin-top:2px;font-family:'IBM Plex Mono',monospace">${esc(s.id)}</div>
+                </div>
+                <span class="badge ${stBadge(st)}" style="flex-shrink:0;align-self:flex-start;margin-top:4px">${st}</span>
+              </div>
+              <div style="display:flex;gap:6px;padding:0 16px 10px">
+                <button class="btn btn-ghost btn-xs" style="flex:1"
+                  onclick="crewOpenSession('${esc(s.id)}')">👁 Lihat</button>
+                <button class="btn btn-primary btn-xs" style="flex:1"
+                  onclick="crewStartSession('${esc(s.unitId)}','${esc(s.areaId)}','${esc(s.equipId)}')">✚ Monitor Lagi</button>
+              </div>
+            </div>`;
         }).join('');
-
-        return `<div style="margin-bottom:16px">
-          <div class="crew-sec-label">
-            ${isToday ? '📅 Hari Ini' : '📅 ' + fmtDate(date)}
-          </div>
-          <div class="crew-recent" style="margin-bottom:0">${rows}</div>
-        </div>`;
+        return `
+          <div style="margin-bottom:14px">
+            <div class="crew-sec-label">
+              ${isToday ? '📅 Hari Ini' : '📅 ' + fmtDate(date)}
+              <span style="font-size:10px;font-weight:400;color:var(--text3);margin-left:4px">(${list.length} sesi)</span>
+            </div>
+            <div class="crew-recent" style="margin-bottom:0">${rows}</div>
+          </div>`;
       }).join('')
-    : `<div class="crew-empty">
+    : `<div class="crew-empty" style="margin-top:16px">
         <div class="crew-empty-ico">📋</div>
-        <div class="crew-empty-msg">Belum ada riwayat monitoring.</div>
+        <div class="crew-empty-msg">Tidak ada riwayat monitoring${q||unitId||stFil?' dengan filter ini':''}.</div>
        </div>`;
 
+  // Pagination html
+  const pagHtml = pages > 1 ? `
+    <div style="display:flex;align-items:center;justify-content:space-between;
+                padding:10px 0;margin-top:8px;border-top:1px solid var(--border)">
+      <button class="btn btn-ghost btn-sm" style="font-size:11px"
+        onclick="crewHistGo(${pg-1})" ${pg<=1?'disabled':''}>← Prev</button>
+      <span style="font-size:11px;color:var(--text3);font-family:'IBM Plex Mono',monospace">
+        ${pg} / ${pages} (${total} sesi)
+      </span>
+      <button class="btn btn-ghost btn-sm" style="font-size:11px"
+        onclick="crewHistGo(${pg+1})" ${pg>=pages?'disabled':''}>Next →</button>
+    </div>` : `
+    <div style="text-align:center;font-size:11px;color:var(--text3);padding:8px 0;border-top:1px solid var(--border);margin-top:4px">
+      ${total} sesi ditemukan
+    </div>`;
+
+  // Unit options untuk filter
+  const unitOpts = hierarchy.units.map(u =>
+    `<option value="${u.id}" ${unitId===u.id?'selected':''}>${esc(u.name)}</option>`
+  ).join('');
+
   document.getElementById('crewBody').innerHTML = `
-    <div style="font-size:18px;font-weight:700;color:var(--navy);margin-bottom:4px">Riwayat Monitoring</div>
-    <div style="font-size:12px;color:var(--text3);margin-bottom:20px">${mySess.length} sesi terakhir</div>
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;
+                margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-size:18px;font-weight:700;color:var(--navy)">📋 Riwayat Monitoring</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">
+          Seluruh history monitoring semua teknisi
+        </div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="crewShowHistory(true)">✕ Reset</button>
+    </div>
+
+    <!-- Filter bar -->
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;
+                padding:12px 14px;margin-bottom:16px;display:flex;flex-direction:column;gap:8px">
+
+      <!-- Dropdown Bulan -->
+      <div>
+        <div style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--text3);
+                    letter-spacing:.07em;text-transform:uppercase;margin-bottom:5px">📅 Filter Bulan</div>
+        ${buildMonthDropdownHTML('crewHistMonthSel', crewHistState.month||'',
+          'crewHistState.month=this.value;crewHistState.page=1;_renderCrewHistory()')}
+      </div>
+
+      <!-- Search -->
+      <div style="display:flex;align-items:center;gap:8px;background:var(--bg3);
+                  border:1px solid var(--border);border-radius:7px;padding:7px 10px">
+        <span style="color:var(--text3);font-size:14px">🔍</span>
+        <input type="text"
+          style="background:none;border:none;outline:none;font-size:13px;color:var(--text);
+                 font-family:'IBM Plex Sans',sans-serif;width:100%"
+          placeholder="Cari equipment, area, PIC, ID sesi..."
+          value="${esc(crewHistState.search)}"
+          oninput="crewHistState.search=this.value;crewHistState.page=1;_renderCrewHistory()"/>
+      </div>
+
+      <!-- Filter row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <select style="background:var(--bg3);border:1px solid var(--border);color:var(--text);
+                       font-family:'IBM Plex Sans',sans-serif;font-size:12px;
+                       padding:7px 8px;border-radius:7px;outline:none"
+          onchange="crewHistState.unitId=this.value;crewHistState.page=1;_renderCrewHistory()">
+          <option value="">Semua Unit</option>
+          ${unitOpts}
+        </select>
+        <select style="background:var(--bg3);border:1px solid var(--border);color:var(--text);
+                       font-family:'IBM Plex Sans',sans-serif;font-size:12px;
+                       padding:7px 8px;border-radius:7px;outline:none"
+          onchange="crewHistState.status=this.value;crewHistState.page=1;_renderCrewHistory()">
+          <option value="">Semua Status</option>
+          <option value="OK"      ${stFil==='OK'     ?'selected':''}>✅ Normal</option>
+          <option value="WARNING" ${stFil==='WARNING' ?'selected':''}>⚠ Warning</option>
+          <option value="ALERT"   ${stFil==='ALERT'   ?'selected':''}>🚨 Alert</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- History list -->
     ${histHtml}
+
+    <!-- Pagination -->
+    ${pagHtml}
   `;
+}
+
+function crewHistGo(page) {
+  crewHistState.page = page;
+  _renderCrewHistory();
+  // Scroll ke atas
+  const body = document.getElementById('crewBody');
+  if (body) body.scrollTop = 0;
 }
 
 // ── BREADCRUMB HELPER ─────────────────────────────────────────
@@ -7970,10 +8697,28 @@ function getInitials(name) {
 // ── Tampilkan / sembunyikan menu User Management ──────
 function applyUserMgmtVisibility() {
   const isAdmin = currentUser && currentUser.role === 'admin';
-  const sbEl  = document.getElementById('sbUserMgmt');
+
+  // Sidebar
+  const sbEl = document.getElementById('sbUserMgmt');
+  if (sbEl) sbEl.style.display = isAdmin ? '' : 'none';
+
+  // Topbar nav
   const navEl = document.getElementById('navUserMgmt');
-  if (sbEl)  sbEl.style.display  = isAdmin ? '' : 'none';
   if (navEl) navEl.style.display = isAdmin ? '' : 'none';
+
+  // Tambah shortcut User Management di sidebar admin jika belum ada
+  if (isAdmin) {
+    const sbSection = document.querySelector('.sb-section');
+    if (sbSection && !document.getElementById('sbUserMgmtShortcut')) {
+      const shortcut = document.createElement('div');
+      shortcut.id = 'sbUserMgmtShortcut';
+      shortcut.className = 'sb-item';
+      shortcut.dataset.page = 'usermgmt';
+      shortcut.innerHTML = `<span class="sb-icon">👥</span>User Management`;
+      shortcut.addEventListener('click', () => navigateTo('usermgmt'));
+      sbSection.appendChild(shortcut);
+    }
+  }
 }
 
 // ── Render tabel user ─────────────────────────────────
