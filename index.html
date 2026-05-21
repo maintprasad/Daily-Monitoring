@@ -2699,30 +2699,17 @@ let _pullInProgress = false; // flag: hindari auto-sync loop saat pull
 // ═══════════════════════════════════════════════════════
 // USERS sekarang diload dari localStorage agar bisa diedit admin
 // Default users jika belum ada di storage
-const DEFAULT_USERS = [
-  { username: 'admin',  password: 'admin123', role: 'admin',  name: 'Bintang-Administrator' },
-  { username: 'spv',    password: 'spv123',   role: 'spv',    name: 'Krisna-Supervisor' },
-  { username: 'iwan',   password: 'mtc123',   role: 'leader', name: 'Iwan-Leader' },
-  { username: 'aynur',  password: 'mtc123',   role: 'leader', name: 'Aynur-Leader' },
-  { username: 'crew',   password: 'crew123',  role: 'crew',   name: 'Crew' },
-  { username: 'dayat',  password: 'mtc123',  role: 'crew',   name: 'Dayat' },
-  { username: 'fireman',  password: 'mtc123',  role: 'crew',   name: 'Firman' },
-  { username: 'yusuf',  password: 'mtc123',  role: 'crew',   name: 'Yusuf' },
-  { username: 'anang',  password: 'mtc123',  role: 'crew',   name: 'Anang' },
-  { username: 'machfud',  password: 'mtc123',  role: 'crew',   name: 'Machfud' },
-  { username: 'sofiudin',  password: 'mtc123',  role: 'crew',   name: 'Sofiudin' },
-  { username: 'tri',  password: 'mtc123',  role: 'crew',   name: 'Tri' },
-  { username: 'catur',  password: 'mtc123',  role: 'crew',   name: 'Catur' },
-  { username: 'viki',  password: 'mtc123',  role: 'crew',   name: 'Viki' },
-  { username: 'angga',  password: 'mtc123',  role: 'crew',   name: 'Angga' },
-];
+const DEFAULT_USERS = [];
 
 function loadUsers() {
   try {
     const d = localStorage.getItem('ps_users');
-    if (d) return JSON.parse(d);
+    if (d) {
+      const parsed = JSON.parse(d);
+      if (parsed && parsed.length > 0) return parsed;
+    }
   } catch(e) {}
-  return JSON.parse(JSON.stringify(DEFAULT_USERS));
+  return [];
 }
 
 function saveUsers(list) {
@@ -2733,10 +2720,11 @@ let USERS = loadUsers();
 
 let currentUser = null;
 
-function doLogin() {
+async function doLogin() {
   const userEl = document.getElementById('loginUser');
   const passEl = document.getElementById('loginPass');
   const errEl  = document.getElementById('loginErr');
+  const btn    = document.querySelector('.login-btn');
 
   const username = (userEl?.value || '').trim().toLowerCase();
   const password = (passEl?.value || '').trim();
@@ -2748,7 +2736,43 @@ function doLogin() {
     return;
   }
 
-  const user = USERS.find(u => u.username === username && u.password === password);
+  // Coba login dari cache lokal dulu (offline support)
+  const cachedUser = USERS.find(u => u.username === username && u.password === password);
+
+  if (btn) { btn.disabled = true; btn.textContent = '↻ Memeriksa...'; }
+
+  // Ambil data user terbaru dari Sheets
+  let sheetsUsers = [];
+  if (WEBHOOK_URL) {
+    try {
+      const raw = await fetch(
+        WEBHOOK_URL + '?action=pull&key=' + encodeURIComponent(WEBHOOK_KEY),
+        { redirect: 'follow' }
+      ).then(r => r.text());
+      const res = JSON.parse(raw);
+      if ((res.status === 'ok' || res.ok) && Array.isArray(res.users) && res.users.length > 0) {
+        sheetsUsers = res.users.map(u => ({
+          username: String(u.username || '').trim().toLowerCase(),
+          password: String(u.password || '').trim(),
+          role:     String(u.role     || 'crew').trim(),
+          name:     String(u.nama     || u.name || '').trim(),
+          active:   true,
+        }));
+        // Update cache lokal
+        USERS = sheetsUsers;
+        saveUsers(USERS);
+      }
+    } catch(e) {
+      console.warn('[Login] Gagal fetch users dari Sheets, pakai cache:', e.message);
+    }
+  }
+
+  if (btn) { btn.disabled = false; btn.textContent = '🔐 Masuk'; }
+
+  // Cari user dari Sheets, fallback ke cache
+  const allUsers = sheetsUsers.length > 0 ? sheetsUsers : USERS;
+  const user = allUsers.find(u => u.username === username && u.password === password);
+
   if (!user) {
     if (errEl) errEl.textContent = '✗ Username atau password salah.';
     return;
@@ -2774,7 +2798,6 @@ function doLogin() {
     initApp();
   } catch(e) {
     console.error('initApp error setelah login:', e);
-    // Tetap lanjut — jangan balik ke login screen hanya karena render error
     toast('Peringatan: sebagian fitur mungkin tidak tampil. Coba refresh.', 'error');
   }
 }
@@ -6302,7 +6325,7 @@ const woBtn = g.hasWO
 // WORK ORDER FROM FINDING
 // ═══════════════════════════════════════════════════════════════════
 
-const WO_API_URL = 'https://script.google.com/macros/s/AKfycbxWC3esNUKacXKDx1cGqzrtaaH0vKW4pbsVV6_zmUj5jSXBTP2aZLJ73X6M9vW9W3ro/exec';
+const WO_API_URL = 'https://script.google.com/macros/s/AKfycbz8fxSTFIGqCmpMwbPGKgr36_aAP0b8_3EpzaoPkGgHW6obmZS_j8IGhuERCnUySRWTpA/exec';
 
 // Counter WO — localStorage agar tidak reset saat browser ditutup
 // key: 'ps_wo_counter'  value: number (global sequential counter)
