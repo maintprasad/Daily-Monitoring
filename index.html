@@ -2784,10 +2784,12 @@ async function doLogin() {
 
   currentUser = user;
   try {
-    sessionStorage.setItem('ps_session', JSON.stringify({
+    localStorage.setItem('ps_session', JSON.stringify({
       username: user.username,
       role: user.role,
-      name: user.name
+      name: user.name,
+      savedAt: Date.now(),
+      expiryDays: 7,
     }));
   } catch(e) {}
 
@@ -2803,7 +2805,7 @@ async function doLogin() {
 }
 function doLogout() {
   currentUser = null;
-  try { sessionStorage.removeItem('ps_session'); } catch(e){}
+  try { localStorage.removeItem('ps_session'); } catch(e){}
 
   // Sembunyikan crew portal jika aktif
   const crewPortal = document.getElementById('crewPortal');
@@ -3051,23 +3053,42 @@ async function fetchAndSyncHierarchyIds(opts) {
 
 document.addEventListener('DOMContentLoaded', () => {
   applyTheme();
-  // Cek session login yang tersimpan
+  // Cek session login yang tersimpan di localStorage (persisten)
   try {
-    const saved = sessionStorage.getItem('ps_session');
+    const saved = localStorage.getItem('ps_session');
     if (saved) {
       const parsed = JSON.parse(saved);
-      const user = USERS.find(u => u.username === parsed.username);
-      if (user) {
+      // Cek expiry (default 7 hari)
+      const expiryMs = (parsed.expiryDays || 7) * 24 * 60 * 60 * 1000;
+      const isExpired = parsed.savedAt && (Date.now() - parsed.savedAt) > expiryMs;
+      if (isExpired) {
+        localStorage.removeItem('ps_session');
+        throw new Error('Session expired');
+      }
+      // Cari user dari USERS cache, atau buat objek minimal dari session tersimpan
+      let user = USERS.find(u => u.username === parsed.username);
+      if (!user && parsed.username) {
+        // User belum ada di cache lokal (misal setelah clear) — buat dari session tersimpan
+        user = { username: parsed.username, role: parsed.role || 'crew', name: parsed.name || parsed.username, active: true };
+      }
+      if (user && user.active !== false) {
         currentUser = user;
+        // Perbarui savedAt agar session diperpanjang setiap kali dibuka
+        localStorage.setItem('ps_session', JSON.stringify({
+          username: user.username,
+          role: user.role,
+          name: user.name,
+          savedAt: Date.now(),
+          expiryDays: 7,
+        }));
         const loginScreen = document.getElementById('loginScreen');
         if (loginScreen) loginScreen.classList.add('hidden');
         try {
           initApp();
         } catch(e) {
           console.error('initApp error:', e);
-          // Jika initApp gagal, reset ke login screen
           currentUser = null;
-          sessionStorage.removeItem('ps_session');
+          localStorage.removeItem('ps_session');
           const ls = document.getElementById('loginScreen');
           if (ls) ls.classList.remove('hidden');
         }
@@ -3075,8 +3096,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   } catch(e) {
-    // Session corrupt — bersihkan
-    try { sessionStorage.removeItem('ps_session'); } catch(e2) {}
+    // Session corrupt atau expired — bersihkan
+    try { localStorage.removeItem('ps_session'); } catch(e2) {}
   }
   // Tampilkan login screen
   const loginUser = document.getElementById('loginUser');
@@ -6233,20 +6254,227 @@ function setVal(id, val)  { const el = document.getElementById(id); if (el) el.v
 function setErr(id, msg)  { const el = document.getElementById(id); if (el) el.textContent = msg; }
 
 // ── OVERLAY CONTROL ────────────────────────────────────
+// ── OVERLAY HISTORY STACK ─────────────────────────────────────────
+// Lacak overlay yang sedang terbuka untuk back-button handling
+let _overlayStack = [];
+
 function openOverlay(id) {
   const el = document.getElementById(id);
-  if (el) { el.classList.add('open'); document.body.style.overflow='hidden'; }
+  if (!el) return;
+  el.classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  // Push state ke browser history agar tombol back ditangkap di sini
+  // bukan menutup browser / navigate away
+  const stateKey = 'overlay_' + id + '_' + Date.now();
+  _overlayStack.push({ id, stateKey });
+  history.pushState({ overlayId: id, stateKey }, '', window.location.href);
 }
+
 function closeOverlay(id) {
   const el = document.getElementById(id);
   if (el) el.classList.remove('open');
-  // Only restore scroll if no other overlays open
-  if (!document.querySelector('.overlay.open')) document.body.style.overflow='';
+
+  // Hapus dari stack
+  const idx = _overlayStack.findIndex(o => o.id === id);
+  if (idx !== -1) _overlayStack.splice(idx, 1);
+
+  // Restore scroll hanya jika tidak ada overlay lain yang terbuka
+  if (!document.querySelector('.overlay.open')) {
+    document.body.style.overflow = '';
+  }
+
+  // Jika state history kita yang teratas, go back untuk sinkronisasi
+  // Tapi hanya jika history state kita (bukan navigasi organik)
+  if (history.state && history.state.overlayId === id) {
+    // Gunakan replaceState agar tidak double-pop
+    history.replaceState(null, '', window.location.href);
+  }
 }
+
 function overlayDismiss() {
   document.querySelectorAll('.overlay').forEach(ov => {
     ov.addEventListener('click', e => { if (e.target === ov) closeOverlay(ov.id); });
   });
+
+  // ── INTERCEPT tombol back browser / Android ──────────────────────
+  window.addEventListener('popstate', function(e) {
+    // Cek apakah ada overlay yang terbuka
+    const openOverlays = document.querySelectorAll('.overlay.open');
+    if (openOverlays.length > 0) {
+      // Ambil overlay paling atas (terakhir dibuka)
+      const topOverlay = _overlayStack[_overlayStack.length - 1];
+      if (topOverlay) {
+        // Cegah navigasi — re-push state agar URL tidak berubah
+        history.pushState({ overlayId: topOverlay.id, stateKey: topOverlay.stateKey }, '', window.location.href);
+
+        // Khusus checklist: tanya konfirmasi dulu sebelum tutup
+        if (topOverlay.id === 'checklistOverlay') {
+          _handleChecklistBackButton();
+          return;
+        }
+
+        // Overlay lain: langsung tutup
+        closeOverlay(topOverlay.id);
+        return;
+      }
+    }
+
+    // Tidak ada overlay terbuka — biarkan navigasi normal
+    // (tidak ada yang perlu dilakukan)
+  });
+}
+
+// ── Tangani back button khusus untuk checklist ────────────────────
+function _handleChecklistBackButton() {
+  // Cek apakah ada data yang sudah diinput
+  const inputs = document.querySelectorAll('#chkBody .val-input, #chkBody .status-sel');
+  let hasInput = false;
+  inputs.forEach(inp => {
+    if (inp.value && inp.value.trim() !== '') hasInput = true;
+  });
+
+  if (!hasInput) {
+    // Belum ada input — langsung tutup tanpa konfirmasi
+    if (_draftSession) {
+      _draftSession = null;
+    }
+    closeOverlay('checklistOverlay');
+    return;
+  }
+
+  // Ada input — tampilkan dialog konfirmasi custom (non-blocking)
+  _showBackConfirmDialog();
+}
+
+// ── Dialog konfirmasi back button (mobile-friendly) ───────────────
+function _showBackConfirmDialog() {
+  // Hapus dialog lama kalau ada
+  const existing = document.getElementById('backConfirmDialog');
+  if (existing) existing.remove();
+
+  const dialog = document.createElement('div');
+  dialog.id = 'backConfirmDialog';
+  dialog.style.cssText = `
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0,0,0,0.65);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0;
+    backdrop-filter: blur(3px);
+    animation: fadeInBg .2s ease;
+  `;
+
+  dialog.innerHTML = `
+    <div style="
+      background: var(--bg2);
+      border-radius: 20px 20px 0 0;
+      padding: 28px 24px 36px;
+      width: 100%;
+      max-width: 500px;
+      box-shadow: 0 -8px 32px rgba(0,0,0,.3);
+      animation: slideUpDialog .25s cubic-bezier(.34,1.56,.64,1);
+    ">
+      <div style="
+        width: 40px; height: 4px;
+        background: var(--border2);
+        border-radius: 2px;
+        margin: 0 auto 20px;
+      "></div>
+      <div style="font-size:24px;text-align:center;margin-bottom:10px">⚠️</div>
+      <div style="font-size:16px;font-weight:700;color:var(--navy);text-align:center;margin-bottom:8px">
+        Data Belum Tersimpan
+      </div>
+      <div style="font-size:13px;color:var(--text3);text-align:center;line-height:1.6;margin-bottom:24px">
+        Kamu sedang mengisi data monitoring.<br>
+        Jika keluar sekarang, data yang sudah diinput <strong style="color:var(--red)">akan hilang</strong>.
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button onclick="_backConfirmSave()" style="
+          background: var(--green);
+          color: #fff;
+          border: none;
+          border-radius: 10px;
+          padding: 14px;
+          font-size:14px;
+          font-weight:700;
+          font-family:'IBM Plex Sans',sans-serif;
+          cursor:pointer;
+          width:100%;
+        ">💾 Simpan Data Sekarang</button>
+        <button onclick="_backConfirmDiscard()" style="
+          background: var(--red-dim);
+          color: var(--red);
+          border: 1px solid rgba(192,57,43,.3);
+          border-radius: 10px;
+          padding: 14px;
+          font-size:14px;
+          font-weight:600;
+          font-family:'IBM Plex Sans',sans-serif;
+          cursor:pointer;
+          width:100%;
+        ">🗑 Buang Data & Keluar</button>
+        <button onclick="_backConfirmCancel()" style="
+          background: none;
+          color: var(--text3);
+          border: 1px solid var(--border);
+          border-radius: 10px;
+          padding: 12px;
+          font-size:13px;
+          font-family:'IBM Plex Sans',sans-serif;
+          cursor:pointer;
+          width:100%;
+        ">← Kembali ke Form</button>
+      </div>
+    </div>
+    <style>
+      @keyframes fadeInBg { from{opacity:0} to{opacity:1} }
+      @keyframes slideUpDialog {
+        from { transform: translateY(100%); opacity:0; }
+        to   { transform: translateY(0);    opacity:1; }
+      }
+    </style>
+  `;
+
+  document.body.appendChild(dialog);
+}
+
+function _backConfirmSave() {
+  document.getElementById('backConfirmDialog')?.remove();
+  // Jalankan save sesuai mode (draft atau existing)
+  const chkOverlay = document.getElementById('checklistOverlay');
+  if (!chkOverlay?.classList.contains('open')) return;
+
+  if (_draftSession) {
+    saveDraftSession();
+  } else {
+    // Cari sessId dari subtitle
+    const sub = document.getElementById('chkSub')?.textContent || '';
+    const match = sub.match(/\b(M[A-Z0-9]{5,})\b/);
+    if (match) saveChecklist(match[1]);
+  }
+}
+
+function _backConfirmDiscard() {
+  document.getElementById('backConfirmDialog')?.remove();
+  if (_draftSession) {
+    _draftSession = null;
+  }
+  // Tutup overlay paksa tanpa konfirmasi lagi
+  const el = document.getElementById('checklistOverlay');
+  if (el) el.classList.remove('open');
+  const idx = _overlayStack.findIndex(o => o.id === 'checklistOverlay');
+  if (idx !== -1) _overlayStack.splice(idx, 1);
+  if (!document.querySelector('.overlay.open')) document.body.style.overflow = '';
+  toast('Data dibuang — sesi tidak tersimpan', 'info');
+}
+
+function _backConfirmCancel() {
+  document.getElementById('backConfirmDialog')?.remove();
+  // Tidak melakukan apa-apa — user kembali ke form
 }
 
 // ── TOAST ──────────────────────────────────────────────
@@ -9136,7 +9364,13 @@ function submitUserForm() {
     if (currentUser && currentUser.username === username) {
       currentUser.name = name;
       currentUser.role = role;
-      try { sessionStorage.setItem('ps_session', JSON.stringify({ username, role, name })); } catch(e) {}
+      try {
+        localStorage.setItem('ps_session', JSON.stringify({
+          username, role, name,
+          savedAt: Date.now(),
+          expiryDays: 7,
+        }));
+      } catch(e) {}
     }
 
     saveUsers(USERS);
