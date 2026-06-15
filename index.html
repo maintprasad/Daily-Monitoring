@@ -2949,14 +2949,6 @@ function stopAutoPolling() {
   if (_pollingInterval) { clearInterval(_pollingInterval); _pollingInterval = null; }
 }
 
-/**
- * fetchAndSyncHierarchyIds — ambil unitId, areaId, equipId dari WO_API_URL
- * GET ?fn=getHierarchy&key=...
- * Response: { ok:true, units:[{ id, name, areas:[{ id, name, subAreas:[...], equipments:[...] }] }] }
- *
- * Fungsi ini HANYA memperbarui ID yang sudah ada di hierarki lokal (match by name),
- * tidak menghapus atau mengubah struktur. Jika API tidak tersedia, hierarki lokal tetap dipakai.
- */
 async function fetchAndSyncHierarchyIds(opts) {
   const silent = opts && opts.silent;
   try {
@@ -3156,9 +3148,6 @@ function setTodayDate() {
   if (el) el.textContent = 'Data per ' + new Date().toLocaleDateString('id-ID', {weekday:'long',year:'numeric',month:'long',day:'numeric'});
 }
 
-// ═══════════════════════════════════════════════════════
-// NAV
-// ═══════════════════════════════════════════════════════
 function initNav() {
   document.querySelectorAll('[data-page]').forEach(el => {
     el.addEventListener('click', () => navigateTo(el.dataset.page));
@@ -3220,8 +3209,6 @@ function renderAll() {
   }
 }
 
-// ── DASHBOARD ──────────────────────────────────────────
-// Chart instance refs — supaya bisa di-destroy sebelum re-render
 let _dashUnitChart  = null;
 let _dashDonutChart = null;
 let _dashTrendChart = null;
@@ -10960,9 +10947,6 @@ async function generatePPTReport() {
       });
     }
 
-    // ════════════════════════════════════════════════════════════
-    // SLIDE 8 — REKOMENDASI TINDAK LANJUT
-    // ════════════════════════════════════════════════════════════
     if (inclRekom) {
       const s = pres.addSlide();
       s.background = { color: C.offWhite };
@@ -11025,9 +11009,6 @@ async function generatePPTReport() {
       }
     }
 
-    // ════════════════════════════════════════════════════════════
-    // SLIDE PENUTUP — selalu ada
-    // ════════════════════════════════════════════════════════════
     const sc = pres.addSlide();
     sc.background = { color: C.navy };
     // Decorative
