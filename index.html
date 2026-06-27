@@ -4805,11 +4805,12 @@ function buildChkRow(p, existing) {
     const wMax = p.warnMax   !== undefined && p.warnMax   !== null ? p.warnMax   : 'null';
 
     inputHtml = `<div>
-      <input type="number" class="val-input ${cls}" id="chk-${p.id}-val"
+      <input type="text" inputmode="decimal" class="val-input ${cls}" id="chk-${p.id}-val"
         name="chk_${p.id}_val"
-        value="${esc(isCorrupt ? dispVal : rawVal)}" placeholder="—" step="any"
+        value="${esc(isCorrupt ? dispVal : rawVal)}" placeholder="—"
         autocomplete="off"
-        oninput="onChkNumChange('${p.id}',this.value,${nMin},${nMax},${wMin},${wMax})"/>
+        oninput="onChkNumChange('${p.id}',this.value,${nMin},${nMax},${wMin},${wMax})"
+        onblur="onChkNumBlur('${p.id}')"/>
       ${isCorrupt ? `<div style="font-size:9px;color:var(--red);margin-top:2px">⚠ corrupt — dikonversi dari: <em>${esc(String(rawVal).slice(0,25))}</em></div>` : ''}
       ${hint && !isCorrupt ? `<div style="font-size:9px;color:var(--text3);margin-top:2px">${esc(hint)}</div>` : ''}
     </div>`;
@@ -4835,9 +4836,14 @@ function onChkNumChange(paramId, value, nMin, nMax, wMin, wMax) {
     return;
   }
 
-  // Normalisasi: ganti koma desimal → titik, lalu parse
-  const normalized = String(value).trim().replace(/,/g, '.');
+  // Normalisasi: ganti koma desimal → titik, hapus karakter non-numerik
+  const normalized = String(value).trim()
+    .replace(/[^\d,.\-]/g, '')   // hapus karakter aneh
+    .replace(/,/g, '.');          // koma → titik
   const v      = parseFloat(normalized);
+
+  // (normalisasi tampilan dilakukan saat onblur)
+
   let status   = '';
 
   if (!isNaN(v)) {
@@ -4865,6 +4871,20 @@ function onChkNumChange(paramId, value, nMin, nMax, wMin, wMax) {
       (status === 'OK'      ? 'b-ok'   :
        status === 'WARNING' ? 'b-warn' :
        status === 'ALERT'   ? 'b-alert': 'b-gray');
+  }
+}
+
+function onChkNumBlur(paramId) {
+  // Saat user selesai input, normalisasi tampilan nilai di field
+  const inputEl = document.getElementById('chk-'+paramId+'-val');
+  if (!inputEl) return;
+  const raw = inputEl.value.trim();
+  if (raw === '') return;
+  // Normalisasi koma → titik
+  const normalized = raw.replace(/[^\d,.\-]/g, '').replace(',', '.');
+  const v = parseFloat(normalized);
+  if (!isNaN(v)) {
+    inputEl.value = String(v); // tampilkan nilai bersih: "28.7" bukan "28,7"
   }
 }
 
@@ -4902,17 +4922,35 @@ function normalizeNumericValue(val, paramType) {
   if (val === null || val === undefined) return '';
   const s = String(val).trim();
   if (s === '') return '';
-  // Deteksi format angka Indonesia: 1.234,56 → 1234.56
-  // Jika ada titik ribuan DAN koma desimal
-  if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) {
-    return s.replace(/\./g, '').replace(',', '.');
+
+  // Jika sudah berupa number (dari JSON parse), langsung stringify
+  if (typeof val === 'number') return String(val);
+
+  // Hapus semua karakter selain digit, koma, titik, dan minus
+  let clean = s.replace(/[^\d,.\-]/g, '');
+
+  // Format Indonesia dengan titik ribuan DAN koma desimal: 1.234,56 → 1234.56
+  if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(clean)) {
+    return clean.replace(/\./g, '').replace(',', '.');
   }
-  // Koma sebagai desimal saja: "12,6" → "12.6"
-  if (/^\d+,\d+$/.test(s)) {
-    return s.replace(',', '.');
+
+  // Koma sebagai desimal saja: 28,7 → 28.7
+  if (/^-?\d+,\d+$/.test(clean)) {
+    return clean.replace(',', '.');
   }
-  // Sudah pakai titik atau bilangan bulat — kembalikan apa adanya
-  return s;
+
+  // Titik sebagai desimal (sudah benar): 28.7 → 28.7
+  if (/^-?\d+\.\d+$/.test(clean)) {
+    return clean;
+  }
+
+  // Bilangan bulat
+  if (/^-?\d+$/.test(clean)) {
+    return clean;
+  }
+
+  // Fallback — kembalikan string bersih
+  return clean;
 }
 
 function saveChecklist(sessId) {
@@ -5303,15 +5341,27 @@ function buildGASSessionsPayload() {
     tindakan:    s.tindakan    || '',
     createdAt:   s.createdAt   || '',
     updatedAt:   s.updatedAt   || '',
-    woId:        s.woId      || '',
-    woStatus:    s.woStatus  || '',
+    woId:        s.woId        || '',
+    woStatus:    s.woStatus    || '',
     checklist:   s.checklist ? JSON.stringify(s.checklist) : '',
-    items:       (s.items || []).map(i => ({
-      paramId: i.paramId || '', label:  i.label  || '',
-      unit:    i.unit    || '', section:i.section || '',
-      value:   (i.value !== '' && i.value !== null && i.value !== undefined && !isNaN(Number(i.value))) ? Number(i.value) : (i.value || ''), status: i.status  || '',
-      note:    i.note    || '',
-    })),
+    items:       (s.items || []).map(i => {
+      // Normalisasi nilai sebelum kirim ke Sheets
+      // Paksa jadi number jika bisa, agar Sheets tidak salah baca sebagai tanggal
+      const rawVal  = normalizeNumericValue(i.value, 'numeric');
+      const numVal  = parseFloat(rawVal);
+      const safeVal = (!isNaN(numVal) && rawVal !== '')
+        ? numVal          // kirim sebagai number — Sheets tidak bisa corrupt number
+        : (i.value || ''); // status dropdown atau kosong — kirim sebagai string
+      return {
+        paramId: i.paramId || '',
+        label:   i.label   || '',
+        unit:    i.unit    || '',
+        section: i.section || '',
+        value:   safeVal,
+        status:  i.status  || '',
+        note:    i.note    || '',
+      };
+    }),
   }));
 }
 
@@ -9612,90 +9662,64 @@ function runDataRecoveryScan() {
   const unitFilter = document.getElementById('drUnitFilter')?.value || '';
   _recoveryItems   = [];
 
-  // Bersihkan dulu data lokal dari nilai corrupt sebelum scan
-  // Ini sinkronkan localStorage dengan tampilan yang sudah benar
-  sessions.forEach(sess => {
-    let changed = false;
-    (sess.items || []).forEach(item => {
-      if (isValueCorrupt(item.value)) {
-        const cleaned = sanitizeDisplayValue(item.value);
-        if (cleaned !== '⚠ corrupt' && cleaned !== '' && cleaned !== item.value) {
-          console.log(`[AutoClean] ${sess.id} / ${item.label}: "${item.value}" → "${cleaned}"`);
-          item.value = cleaned;
-          changed = true;
-        }
-      }
-    });
-    if (changed) sess.updatedAt = new Date().toISOString();
-  });
-  // Simpan hasil cleaning ke localStorage
-  saveAll();
+  // Update tombol scan jadi loading state
+  const scanBtn = document.querySelector('#dataRecoveryOverlay .btn-primary');
+  if (scanBtn) { scanBtn.disabled = true; scanBtn.textContent = '⏳ Scanning...'; }
 
-  // Paksa pull dari Sheets dulu sebelum scan, agar data lokal fresh
-  const doScan = () => {
+  try {
     const filtered = sessions.filter(s => !unitFilter || s.unitId === unitFilter);
-    // Debug: log sample nilai untuk cek format
-    const sampleCorrupt = [];
+
     filtered.forEach(sess => {
-      (sess.items || []).forEach(item => {
-        if (isValueCorrupt(item.value) && sampleCorrupt.length < 3) {
-          sampleCorrupt.push({ sess: sess.id, label: item.label, value: item.value, type: typeof item.value });
-        }
+      // Cari equipment → params
+      const eq = findEquipFlex(sess.unitId, sess.areaId, '', sess.equipId);
+      const paramMap = {};
+      (eq?.params || []).forEach(p => { paramMap[p.id] = p; });
+
+      (sess.items || []).forEach((item, itemIdx) => {
+        if (!isCorruptDateValue(item.value)) return;
+
+        const param      = paramMap[item.paramId] || null;
+        const candidates = extractCandidates(item.value, param);
+        const prediction = scoreCandidate(candidates, param);
+
+        _recoveryItems.push({
+          sessId:        sess.id,
+          itemIdx,
+          tanggal:       sess.tanggal,
+          unitName:      sess.unitName,
+          areaName:      sess.areaName,
+          equipName:     sess.equipName,
+          paramId:       item.paramId,
+          label:         item.label || item.paramId,
+          unit:          item.unit  || '',
+          section:       item.section || '',
+          rawValue:      item.value,
+          currentStatus: item.status || '',
+          param,
+          prediction,
+          selected:      prediction.confidence === 'confident',
+          overrideValue: prediction.bestValue !== null ? String(prediction.bestValue) : '',
+        });
       });
     });
-    if (sampleCorrupt.length) {
-      console.log('[Recovery Scan] Sample nilai corrupt:', JSON.stringify(sampleCorrupt));
+
+    drLog(`Scan selesai: ${_recoveryItems.length} nilai corrupt ditemukan dari ${filtered.length} sesi`);
+    renderRecoveryStats();
+    renderRecoveryTable();
+
+    if (_recoveryItems.length === 0) {
+      toast('✅ Tidak ada nilai corrupt ditemukan', 'success');
+    } else {
+      toast(`⚠ ${_recoveryItems.length} nilai corrupt ditemukan`, 'info');
     }
 
-    filtered.forEach(sess => {
-      (sess.items || []).forEach(item => {
-        if (isValueCorrupt(item.value) && sampleCorrupt.length < 3) {
-          sampleCorrupt.push({ sess: sess.id, label: item.label, value: item.value, type: typeof item.value });
-        }
-      });
-    });
-    if (sampleCorrupt.length) {
-      console.log('[Recovery Scan] Sample nilai corrupt:', JSON.stringify(sampleCorrupt));
-    }
-
-    filtered.forEach(sess => {
-    // Cari equipment → params
-    const eq = findEquipFlex(sess.unitId, sess.areaId, '', sess.equipId);
-    const paramMap = {};
-    (eq?.params || []).forEach(p => { paramMap[p.id] = p; });
-
-    (sess.items || []).forEach((item, itemIdx) => {
-      if (!isCorruptDateValue(item.value)) return;
-
-      const param      = paramMap[item.paramId] || null;
-      const candidates = extractCandidates(item.value, param);
-      const prediction = scoreCandidate(candidates, param);
-
-      _recoveryItems.push({
-        sessId:     sess.id,
-        itemIdx,
-        tanggal:    sess.tanggal,
-        unitName:   sess.unitName,
-        areaName:   sess.areaName,
-        equipName:  sess.equipName,
-        paramId:    item.paramId,
-        label:      item.label || item.paramId,
-        unit:       item.unit  || '',
-        section:    item.section || '',
-        rawValue:   item.value,
-        currentStatus: item.status || '',
-        param,
-        prediction,
-        selected:   prediction.confidence === 'confident', // auto-select confident
-        overrideValue: prediction.bestValue !== null ? String(prediction.bestValue) : '',
-      });
-    });
-  });
-
-  drLog(`Scan selesai: ${_recoveryItems.length} nilai corrupt ditemukan dari ${filtered.length} sesi`);
-  renderRecoveryStats();
-  renderRecoveryTable();
-   }
+  } catch(e) {
+    console.error('[DataRecovery] Scan error:', e);
+    drLog('✗ Error saat scan: ' + e.message);
+    toast('✗ Scan gagal: ' + e.message, 'error');
+  } finally {
+    if (scanBtn) { scanBtn.disabled = false; scanBtn.textContent = '🔍 Scan Data Corrupt'; }
+  }
 }
 function renderRecoveryStats() {
   const total     = _recoveryItems.length;
