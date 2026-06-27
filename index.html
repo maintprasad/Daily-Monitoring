@@ -1147,6 +1147,7 @@ body {
     <div class="sb-item" data-page="config"><span class="sb-icon">⚙</span>Konfigurasi</div>
     <div class="sb-item" data-page="usermgmt" id="sbUserMgmt" style="display:none"><span class="sb-icon">👥</span>User Management</div>
     <div class="sb-item" id="sbDataRecovery" style="display:none" onclick="openDataRecoveryTool()"><span class="sb-icon">🔧</span>Data Recovery <span class="sb-badge alert">ADMIN</span></div>
+    <div class="sb-item" id="sbBigErrorScan" style="display:none" onclick="openBigErrorScanTool()"><span class="sb-icon">🧨</span>Scan Big Error <span class="sb-badge alert">ADMIN</span></div>
   </div>
   <!-- ADD START: Finding menu di sidebar -->
   <div class="sb-section">
@@ -1953,6 +1954,93 @@ body {
 
       <!-- Log -->
       <div id="drLogArea" style="display:none;margin-top:12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;max-height:150px;overflow-y:auto;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text2)"></div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ════ MODAL: SCAN BIG ERROR (ADMIN ONLY) ════ -->
+<div class="overlay" id="bigErrorScanOverlay">
+  <div class="modal modal-xl">
+    <div class="modal-hdr">
+      <div>
+        <div class="modal-title">🧨 Scan Big Error — Nilai Numerik Tidak Wajar</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:3px">
+          Deteksi nilai yang ketinggalan fragmen tanggal/timestamp akibat bug input (misal 1120260000000700 → 11)
+        </div>
+      </div>
+      <button class="modal-close" onclick="closeOverlay('bigErrorScanOverlay')">×</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Info Banner -->
+      <div style="background:var(--orange-dim);border:1px solid rgba(251,140,58,.3);border-left:4px solid var(--orange);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:var(--text2)">
+        ⚠ <strong>Cara kerja:</strong> Tool ini mendeteksi nilai numerik yang sangat panjang (≥ 10 digit) — biasanya akibat
+        fragmen tanggal/timestamp ikut nyangkut di nilai parameter. Sistem mencari posisi fragmen tahun (contoh "2026")
+        di dalam angka, lalu mengambil digit <strong>sebelum</strong> fragmen itu sebagai kandidat nilai asli.
+        Nilai prediksi <strong>perlu dikonfirmasi manual</strong> sebelum disimpan.
+      </div>
+
+      <!-- Controls -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
+        <button class="btn btn-primary" onclick="runBigErrorScan()">🔍 Scan Nilai Tidak Wajar</button>
+        <select class="fsel" id="beUnitFilter" onchange="runBigErrorScan()">
+          <option value="">Semua Unit</option>
+        </select>
+        <select class="fsel" id="beStatusFilter">
+          <option value="all">Semua Status Prediksi</option>
+          <option value="confident">✅ Confident (range cocok)</option>
+          <option value="possible">⚠ Possible (perlu review)</option>
+          <option value="unknown">❓ Unknown (tidak bisa diprediksi)</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="renderBigErrorTable()">↻ Filter</button>
+        <span id="beScanSummary" style="font-size:11px;color:var(--text3);margin-left:auto"></span>
+      </div>
+
+      <!-- Stats Row -->
+      <div id="beStatsRow" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px"></div>
+
+      <!-- Table -->
+      <div class="tbl-wrap">
+        <div class="tbl-scroll">
+          <table class="data-table" style="min-width:920px">
+            <thead><tr>
+              <th style="width:30px"><input type="checkbox" id="beSelectAll" onchange="beToggleAll(this.checked)" style="accent-color:var(--green)"/></th>
+              <th>Sesi / Tanggal</th>
+              <th>Equipment</th>
+              <th>Parameter</th>
+              <th>Nilai Error (panjang)</th>
+              <th>Kandidat Nilai Asli</th>
+              <th>Konfidensial</th>
+              <th>Nilai Koreksi</th>
+              <th>Aksi</th>
+            </tr></thead>
+            <tbody id="beTableBody">
+              <tr><td colspan="9">
+                <div class="empty"><div class="empty-ico">🧨</div><div class="empty-msg">Klik "Scan Nilai Tidak Wajar" untuk memulai</div></div>
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Bulk Actions -->
+      <div style="margin-top:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 14px;background:var(--bg3);border-radius:8px;border:1px solid var(--border)">
+        <span style="font-size:12px;color:var(--text2);font-weight:600">Aksi Massal:</span>
+        <button class="btn btn-primary btn-sm" onclick="applySelectedBigErrorFix()">
+          ✅ Terapkan yang Dipilih
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="applyConfidentBigErrorOnly()">
+          ⚡ Terapkan Semua Confident
+        </button>
+        <button class="btn btn-danger btn-sm" onclick="clearBigErrorValues()">
+          🗑 Kosongkan yang Dipilih
+        </button>
+        <span id="beSelectedCount" style="font-size:11px;color:var(--text3);margin-left:auto">0 item dipilih</span>
+      </div>
+
+      <!-- Log -->
+      <div id="beLogArea" style="display:none;margin-top:12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;max-height:150px;overflow-y:auto;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text2)"></div>
 
     </div>
   </div>
@@ -2839,6 +2927,8 @@ function applyRoleRestrictions() {
   applyUserMgmtVisibility();
   const sbDR = document.getElementById('sbDataRecovery');
   if (sbDR) sbDR.style.display = isAdmin ? '' : 'none';
+  const sbBE = document.getElementById('sbBigErrorScan');
+  if (sbBE) sbBE.style.display = isAdmin ? '' : 'none';
 
   // ── Crew: sembunyikan menu yang tidak relevan ──
   const crewHideNavPages = ['hierarchy','config','findings'];
@@ -4755,6 +4845,44 @@ function sanitizeDisplayValue(val) {
     }
     return '⚠ corrupt';
   }
+
+  // Format DD/MM/YYYY (umum dari Sheets yang format kolom sebagai tanggal locale ID)
+  // Konversi balik ke serial — kalau tahunnya 1899/1900-an, hampir pasti hasil
+  // dari angka parameter kecil yang ke-misinterpretasi sebagai serial date.
+  const slashMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashMatch) {
+    const dd = parseInt(slashMatch[1]);
+    const mm = parseInt(slashMatch[2]);
+    const yyyy = parseInt(slashMatch[3]);
+    if (yyyy <= 1905) {
+      try {
+        const d = new Date(yyyy, mm - 1, dd);
+        const base = new Date(1899, 11, 30);
+        const serial = Math.round((d - base) / 86400000);
+        if (serial >= 0 && serial <= 9999) return serial.toString();
+      } catch(e) {}
+    }
+    return '⚠ corrupt';
+  }
+
+  // Format DD-MM-YYYY / YYYY-MM-DD tanpa waktu, tahun 1899/1900-an
+  const dashMatch1 = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  const dashMatch2 = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (dashMatch1 || dashMatch2) {
+    let dd, mm, yyyy;
+    if (dashMatch1) { dd = parseInt(dashMatch1[1]); mm = parseInt(dashMatch1[2]); yyyy = parseInt(dashMatch1[3]); }
+    else            { yyyy = parseInt(dashMatch2[1]); mm = parseInt(dashMatch2[2]); dd = parseInt(dashMatch2[3]); }
+    if (yyyy <= 1905) {
+      try {
+        const d = new Date(yyyy, mm - 1, dd);
+        const base = new Date(1899, 11, 30);
+        const serial = Math.round((d - base) / 86400000);
+        if (serial >= 0 && serial <= 9999) return serial.toString();
+      } catch(e) {}
+    }
+    return '⚠ corrupt';
+  }
+
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
     const day = parseInt(s.split('-')[2]);
     if (day >= 0 && day <= 999) return day.toString();
@@ -4770,6 +4898,11 @@ function isValueCorrupt(val) {
   const s = String(val).trim();
   if (/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/.test(s)) return true;
   if (/^\d{4}-\d{2}-\d{2}T/.test(s)) return true;
+  // Format DD/MM/YYYY atau MM/DD/YYYY — Sheets format ulang kolom sebagai tanggal
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) return true;
+  // Format DD-MM-YYYY atau YYYY-MM-DD tanpa komponen waktu
+  if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(s)) return true;
+  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(s)) return true;
   const n = Number(s);
   if (!isNaN(n) && n > 40000 && n < 60000) return true;
   return false;
@@ -4836,10 +4969,9 @@ function onChkNumChange(paramId, value, nMin, nMax, wMin, wMax) {
     return;
   }
 
-  // Normalisasi: ganti koma desimal → titik, hapus karakter non-numerik
-  const normalized = String(value).trim()
-    .replace(/[^\d,.\-]/g, '')   // hapus karakter aneh
-    .replace(/,/g, '.');          // koma → titik
+  // Normalisasi pakai fungsi yang sama dengan saat simpan, agar preview
+  // status saat mengetik konsisten dengan nilai yang benar-benar tersimpan.
+  const normalized = normalizeNumericValue(value, 'numeric');
   const v      = parseFloat(normalized);
 
   // (normalisasi tampilan dilakukan saat onblur)
@@ -4880,8 +5012,8 @@ function onChkNumBlur(paramId) {
   if (!inputEl) return;
   const raw = inputEl.value.trim();
   if (raw === '') return;
-  // Normalisasi koma → titik
-  const normalized = raw.replace(/[^\d,.\-]/g, '').replace(',', '.');
+  // Pakai fungsi normalisasi yang sama persis dengan saat simpan
+  const normalized = normalizeNumericValue(raw, 'numeric');
   const v = parseFloat(normalized);
   if (!isNaN(v)) {
     inputEl.value = String(v); // tampilkan nilai bersih: "28.7" bukan "28,7"
@@ -4929,9 +5061,25 @@ function normalizeNumericValue(val, paramType) {
   // Hapus semua karakter selain digit, koma, titik, dan minus
   let clean = s.replace(/[^\d,.\-]/g, '');
 
-  // Format Indonesia dengan titik ribuan DAN koma desimal: 1.234,56 → 1234.56
-  if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(clean)) {
-    return clean.replace(/\./g, '').replace(',', '.');
+  // CATATAN: Untuk parameter monitoring (arus, suhu, tekanan, dll), titik dan
+  // koma SELALU dianggap sebagai pemisah DESIMAL — bukan pemisah ribuan.
+  // Nilai seperti arus/suhu/tekanan di lapangan tidak pernah butuh pemisah ribuan,
+  // jadi logika "format Indonesia 1.234,56" DIHAPUS karena menyebabkan input
+  // seperti "11.20" atau input dengan banyak titik salah dibaca jadi angka raksasa
+  // (misal "1120260000000700"). Jika ada lebih dari satu titik/koma dalam input,
+  // hanya ambil yang TERAKHIR sebagai pemisah desimal, sisanya dianggap typo dan dibuang.
+
+  // Hitung jumlah pemisah (titik + koma) yang ada
+  const sepMatches = clean.match(/[,.]/g) || [];
+
+  if (sepMatches.length > 1) {
+    // Lebih dari 1 pemisah — kemungkinan salah ketik / multi-titik.
+    // Ambil pemisah TERAKHIR sebagai desimal, hapus semua pemisah sebelumnya.
+    const lastSepIdx = Math.max(clean.lastIndexOf('.'), clean.lastIndexOf(','));
+    const intPart = clean.slice(0, lastSepIdx).replace(/[,.]/g, '');
+    const decPart = clean.slice(lastSepIdx + 1).replace(/[,.]/g, '');
+    clean = decPart ? `${intPart}.${decPart}` : intPart;
+    return clean.replace(/^-?\./, m => m); // jaga minus di depan jika ada
   }
 
   // Koma sebagai desimal saja: 28,7 → 28.7
@@ -5345,13 +5493,18 @@ function buildGASSessionsPayload() {
     woStatus:    s.woStatus    || '',
     checklist:   s.checklist ? JSON.stringify(s.checklist) : '',
     items:       (s.items || []).map(i => {
-      // Normalisasi nilai sebelum kirim ke Sheets
-      // Paksa jadi number jika bisa, agar Sheets tidak salah baca sebagai tanggal
+      // Normalisasi nilai sebelum kirim ke Sheets.
+      // PENTING: nilai dikirim sebagai STRING TEKS, bukan number murni.
+      // Alasan: kalau kolom di Sheets sudah pernah ke-format sebagai "Date"
+      // (manual atau otomatis), angka murni APAPUN yang masuk ke kolom itu akan
+      // otomatis ditampilkan sebagai tanggal oleh Sheets — terlepas dari apa yang
+      // dikirim aplikasi. Mengirim sebagai string memaksa Sheets memperlakukannya
+      // sebagai teks polos, bukan reinterpretasi ulang sebagai Date.
       const rawVal  = normalizeNumericValue(i.value, 'numeric');
       const numVal  = parseFloat(rawVal);
       const safeVal = (!isNaN(numVal) && rawVal !== '')
-        ? numVal          // kirim sebagai number — Sheets tidak bisa corrupt number
-        : (i.value || ''); // status dropdown atau kosong — kirim sebagai string
+        ? String(numVal)   // kirim sebagai STRING angka — bukan number — agar Sheets tidak reformat jadi tanggal
+        : (i.value || '');  // status dropdown atau kosong — kirim sebagai string
       return {
         paramId: i.paramId || '',
         label:   i.label   || '',
@@ -5480,6 +5633,11 @@ async function pullFromSheets(opts) {
       if (Array.isArray(res.sessions) && res.sessions.length > 0) {
         // Parse nilai numerik yang dikirim Sheets sebagai string
         res.sessions.forEach(s => {
+          // Cari equipment terkait agar status bisa di-recalculate dengan param yang benar
+          const eqForSess = findEquipFlex(s.unitId, s.areaId, '', s.equipId);
+          const paramMapForSess = {};
+          (eqForSess?.params || []).forEach(p => { paramMapForSess[p.id] = p; });
+
           (s.items || []).forEach(item => {
             // Jika value adalah angka valid yang tersimpan sebagai string angka, biarkan
             // Jika value adalah tanggal corrupt, bersihkan langsung saat pull
@@ -5487,11 +5645,11 @@ async function pullFromSheets(opts) {
               const cleaned = sanitizeDisplayValue(item.value);
               if (cleaned !== '⚠ corrupt' && cleaned !== '') {
                 item.value = cleaned;
-                // Recalculate status berdasarkan nilai bersih
+                // Recalculate status berdasarkan nilai bersih & param aslinya
                 const numVal = parseFloat(cleaned);
-                if (!isNaN(numVal)) {
-                  // Cari param untuk recalc status — gunakan status existing jika tidak bisa recalc
-                  // Status tetap dipertahankan dari Sheets karena sudah benar
+                const param  = paramMapForSess[item.paramId];
+                if (!isNaN(numVal) && param) {
+                  item.status = recalcItemStatus(numVal, param);
                 }
               }
             }
@@ -9514,6 +9672,15 @@ function isCorruptDateValue(val) {
   // Pola ISO date string
   if (/^\d{4}-\d{2}-\d{2}(T|\s)/.test(s)) return true;
 
+  // Pola DD/MM/YYYY atau MM/DD/YYYY (Sheets sering format ulang serial date
+  // jadi string ini jika kolom diset format Tanggal — kasus paling umum
+  // untuk angka parameter kecil yang ke-detect sebagai serial Sheets ~1900-an)
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) return true;
+
+  // Pola DD-MM-YYYY / YYYY-MM-DD (tanpa waktu)
+  if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(s)) return true;
+  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(s)) return true;
+
   // Angka besar yang merupakan serial tanggal Sheets (> 40000 = setelah 2009)
   const n = Number(s);
   if (!isNaN(n) && n > 40000 && n < 60000) return true;
@@ -9528,6 +9695,53 @@ function isCorruptDateValue(val) {
 function extractCandidates(val, param) {
   const s   = String(val).trim();
   const candidates = [];
+
+  // ── Method 0: Parse format DD/MM/YYYY → konversi balik ke serial Sheets ────
+  // Ini kasus PALING UMUM: Sheets format ulang kolom jadi tanggal, lalu kirim
+  // sebagai string "10/01/1900" yang sebenarnya serial date dari nilai kecil asli.
+  const slashMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashMatch) {
+    const dd = parseInt(slashMatch[1]);
+    const mm = parseInt(slashMatch[2]);
+    const yyyy = parseInt(slashMatch[3]);
+    // Coba interpretasi sebagai DD/MM/YYYY (umum di Indonesia & Sheets locale ID)
+    try {
+      const dateObjDMY = new Date(yyyy, mm - 1, dd);
+      const base = new Date(1899, 11, 30);
+      const serialDMY = Math.round((dateObjDMY - base) / 86400000);
+      if (serialDMY >= 0 && serialDMY <= 99999) {
+        candidates.push({ value: serialDMY, method: `Serial dari DD/MM/YYYY (${s})`, confidence: 0.9 });
+      }
+    } catch(e) {}
+    // Coba juga interpretasi sebagai MM/DD/YYYY (kalau locale Sheets US)
+    if (dd <= 12 && mm !== dd) {
+      try {
+        const dateObjMDY = new Date(yyyy, dd - 1, mm);
+        const base = new Date(1899, 11, 30);
+        const serialMDY = Math.round((dateObjMDY - base) / 86400000);
+        if (serialMDY >= 0 && serialMDY <= 99999) {
+          candidates.push({ value: serialMDY, method: `Serial dari MM/DD/YYYY (${s})`, confidence: 0.5 });
+        }
+      } catch(e) {}
+    }
+  }
+
+  // ── Method 0b: Parse format DD-MM-YYYY atau YYYY-MM-DD tanpa waktu ──────────
+  const dashMatch1 = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  const dashMatch2 = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (dashMatch1 || dashMatch2) {
+    let dd, mm, yyyy;
+    if (dashMatch1) { dd = parseInt(dashMatch1[1]); mm = parseInt(dashMatch1[2]); yyyy = parseInt(dashMatch1[3]); }
+    else            { yyyy = parseInt(dashMatch2[1]); mm = parseInt(dashMatch2[2]); dd = parseInt(dashMatch2[3]); }
+    try {
+      const dateObj = new Date(yyyy, mm - 1, dd);
+      const base = new Date(1899, 11, 30);
+      const serial = Math.round((dateObj - base) / 86400000);
+      if (serial >= 0 && serial <= 99999) {
+        candidates.push({ value: serial, method: `Serial dari tanggal (${s})`, confidence: 0.85 });
+      }
+    } catch(e) {}
+  }
 
   // ── Method 1: Parse tanggal string → ambil hari, bulan, atau tahun ──────────
   const dateMatch = s.match(/^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})\s+(\d{4})/);
@@ -9893,6 +10107,13 @@ function applySingleRecovery(gi) {
 
   drLog(`✅ Fix: ${item.label} @ ${item.sessId} | ${oldVal} → ${newVal || '(kosong)'} [${targetItem.status}]`);
   toast(`✅ ${item.label} diperbaiki: ${newVal} ${item.unit}`, 'success');
+
+  // PENTING: push sesi yang sudah di-fix ke Sheets, supaya nilai bersih
+  // menimpa baris corrupt di Sheets — bukan cuma bersih di local storage app.
+  if (WEBHOOK_URL) {
+    setSyncStatus('syncing');
+    autoSyncSession(sess);
+  }
 }
 
 /**
@@ -9904,6 +10125,8 @@ function applySelectedRecovery() {
   if (!confirm(`Terapkan recovery untuk ${selected.length} item?\nPastikan nilai sudah benar sebelum melanjutkan.`)) return;
 
   let fixed = 0, skipped = 0;
+  const affectedSessions = new Map(); // dedup sesi yang perlu di-push ulang
+
   selected.forEach(item => {
     const sess = sessions.find(s => s.id === item.sessId);
     if (!sess) { skipped++; return; }
@@ -9920,6 +10143,7 @@ function applySelectedRecovery() {
     }
     sess.updatedAt = new Date().toISOString();
     drLog(`✅ ${item.label} @ ${item.sessId}: ${item.rawValue} → ${newVal} [${targetItem.status}]`);
+    affectedSessions.set(sess.id, sess);
     fixed++;
   });
 
@@ -9933,7 +10157,14 @@ function applySelectedRecovery() {
   renderRecoveryTable();
 
   toast(`✅ ${fixed} nilai diperbaiki${skipped ? `, ${skipped} dilewati` : ''} ✓`, 'success');
-  if (WEBHOOK_URL) syncAll(true);
+
+  // PENTING: push tiap sesi yang terpengaruh ke Sheets satu per satu,
+  // supaya nilai bersih menimpa baris-baris corrupt di Sheets secara nyata.
+  if (WEBHOOK_URL && affectedSessions.size > 0) {
+    setSyncStatus('syncing');
+    drLog(`📤 Mengirim ${affectedSessions.size} sesi yang diperbaiki ke Sheets...`);
+    affectedSessions.forEach(sess => autoSyncSession(sess));
+  }
 }
 
 function applyConfidentOnly() {
@@ -9947,6 +10178,7 @@ function clearCorruptValues() {
   if (!selected.length) { toast('Pilih item terlebih dahulu', 'error'); return; }
   if (!confirm(`Kosongkan ${selected.length} nilai corrupt? (tidak diisi = status pending)`)) return;
 
+  const affectedSessions = new Map();
   selected.forEach(item => {
     const sess = sessions.find(s => s.id === item.sessId);
     if (!sess) return;
@@ -9957,6 +10189,7 @@ function clearCorruptValues() {
     sess.updatedAt = new Date().toISOString();
     drLog(`🗑 Dikosongkan: ${item.label} @ ${item.sessId}`);
     item.overrideValue = '';
+    affectedSessions.set(sess.id, sess);
   });
 
   saveAll();
@@ -9964,6 +10197,11 @@ function clearCorruptValues() {
   renderRecoveryStats();
   renderRecoveryTable();
   toast('Nilai dikosongkan ✓', 'info');
+
+  if (WEBHOOK_URL && affectedSessions.size > 0) {
+    setSyncStatus('syncing');
+    affectedSessions.forEach(sess => autoSyncSession(sess));
+  }
 }
 
 /**
@@ -9985,6 +10223,485 @@ function recalcItemStatus(v, param) {
 
 function drLog(msg) {
   const el = document.getElementById('drLogArea');
+  if (!el) return;
+  el.style.display = 'block';
+  el.innerHTML += `<div>[${new Date().toLocaleTimeString('id-ID')}] ${msg}</div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+// ═══════════════════════════════════════════════════════
+// SCAN BIG ERROR TOOL — recovery untuk nilai numerik yang
+// ketinggalan fragmen tanggal/timestamp (bug titik-ribuan)
+// Contoh: "1120260000000700" → nilai asli "11"
+// ═══════════════════════════════════════════════════════
+
+let _bigErrorItems = []; // hasil scan
+
+function openBigErrorScanTool() {
+  const sel = document.getElementById('beUnitFilter');
+  if (sel) {
+    sel.innerHTML = '<option value="">Semua Unit</option>' +
+      hierarchy.units.map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join('');
+  }
+  document.getElementById('beTableBody').innerHTML = `
+    <tr><td colspan="9"><div class="empty"><div class="empty-ico">🧨</div>
+    <div class="empty-msg">Klik "Scan Nilai Tidak Wajar" untuk memulai</div></div></td></tr>`;
+  document.getElementById('beStatsRow').innerHTML = '';
+  document.getElementById('beScanSummary').textContent = '';
+  document.getElementById('beLogArea').style.display = 'none';
+  _bigErrorItems = [];
+  openOverlay('bigErrorScanOverlay');
+}
+
+/**
+ * isBigErrorValue — deteksi nilai numerik yang panjangnya tidak wajar.
+ * Parameter monitoring (arus, suhu, tekanan, dll) normalnya 1-6 digit
+ * termasuk desimal. ≥10 digit murni angka = hampir pasti bug timestamp.
+ */
+function isBigErrorValue(val) {
+  if (val === '' || val === null || val === undefined) return false;
+  const s = String(val).trim();
+  // Hanya digit (boleh ada minus di depan), tanpa titik/koma — karena bug ini
+  // muncul SETELAH normalisasi (titik sudah terhapus jadi angka polos panjang)
+  if (!/^-?\d+$/.test(s)) return false;
+  const digits = s.replace('-', '');
+  return digits.length >= 10;
+}
+
+/**
+ * extractBigErrorCandidates — cari kandidat nilai asli dari angka yang kepanjangan.
+ * Strategi utama: cari fragmen tahun (20xx atau 19xx) di dalam string,
+ * potong tepat sebelum fragmen itu sebagai kandidat paling kuat.
+ * Strategi cadangan: coba semua panjang prefix 1-6 digit.
+ */
+function extractBigErrorCandidates(val, param) {
+  const s = String(val).trim().replace('-', '');
+  const candidates = [];
+
+  // ── Strategi 1: cari fragmen tahun (paling andal) ──────────────────
+  const yearMatch = s.match(/(19|20)\d{2}/);
+  if (yearMatch && yearMatch.index > 0) {
+    const prefix = s.slice(0, yearMatch.index);
+    if (prefix.length > 0 && prefix.length <= 6) {
+      candidates.push({
+        value: parseFloat(prefix),
+        method: `Potong sebelum fragmen tahun "${yearMatch[0]}"`,
+        confidence: 0.85,
+      });
+    }
+  }
+
+  // ── Strategi 2: coba semua panjang prefix masuk akal (1-6 digit) ───
+  for (let cut = 1; cut <= Math.min(s.length - 1, 6); cut++) {
+    const prefix = s.slice(0, cut);
+    const suffix = s.slice(cut);
+    const num    = parseFloat(prefix);
+    if (isNaN(num)) continue;
+
+    // Suffix dianggap "junk" kalau banyak nol atau mengandung fragmen tahun
+    const zeroRatio   = (suffix.match(/0/g) || []).length / Math.max(suffix.length, 1);
+    const hasYearFrag = /(19|20)\d{2}/.test(suffix);
+    const looksJunk    = zeroRatio >= 0.4 || hasYearFrag;
+
+    if (looksJunk) {
+      candidates.push({
+        value: num,
+        method: `Prefix ${cut} digit (sisa terlihat seperti timestamp)`,
+        confidence: hasYearFrag ? 0.6 : 0.35,
+      });
+    }
+  }
+
+  // Dedup berdasarkan value
+  const seen = new Set();
+  return candidates.filter(c => {
+    if (seen.has(c.value)) return false;
+    seen.add(c.value);
+    return true;
+  });
+}
+
+/**
+ * scoreBigErrorCandidate — sama prinsipnya dengan scoreCandidate() di Data Recovery,
+ * tapi disesuaikan supaya kandidat dari fragmen-tahun dapat bonus lebih besar.
+ */
+function scoreBigErrorCandidate(candidates, param) {
+  if (!candidates.length) return { bestValue: null, confidence: 'unknown', reason: 'Tidak ada kandidat', allCandidates: [] };
+
+  const nMin  = param?.normalMin;
+  const nMax  = param?.normalMax;
+  const wMin  = param?.warnMin;
+  const wMax  = param?.warnMax;
+  const label = (param?.label || '').toLowerCase();
+  const unit  = (param?.unit  || '').toLowerCase();
+
+  let hintMin = null, hintMax = null;
+  if (unit === 'a' || label.includes('arus') || label.includes('ampere')) { hintMin = 0; hintMax = 2000; }
+  else if (unit === '°c' || label.includes('suhu')) { hintMin = -30; hintMax = 150; }
+  else if (unit === 'bar' || label.includes('tekanan')) { hintMin = 0; hintMax = 30; }
+  else if (unit === '%') { hintMin = 0; hintMax = 100; }
+  else if (unit === 'v' || label.includes('tegangan')) { hintMin = 0; hintMax = 500; }
+  else if (label.includes('kvar') || label.includes('kva') || label.includes('kw')) { hintMin = 0; hintMax = 5000; }
+  else if (label.includes('jam')) { hintMin = 0; hintMax = 50000; }
+
+  const effMin = nMin !== undefined ? nMin : (hintMin !== null ? hintMin : 0);
+  const effMax = nMax !== undefined ? nMax : (hintMax !== null ? hintMax : 9999);
+  const warnLo = wMin !== undefined ? wMin : (effMin - Math.abs(effMin) * 0.2);
+  const warnHi = wMax !== undefined ? wMax : (effMax + Math.abs(effMax) * 0.2);
+
+  const scored = candidates.map(c => {
+    let score = c.confidence;
+    const v = c.value;
+    if (v >= effMin && v <= effMax)      score += 0.5;
+    else if (v >= warnLo && v <= warnHi) score += 0.25;
+    else                                  score -= 0.3;
+    if (hintMin !== null && v >= hintMin && v <= hintMax) score += 0.15;
+    return { ...c, score };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  const best = scored[0];
+
+  let confidenceLevel, reason;
+  if (best.score >= 0.85) {
+    confidenceLevel = 'confident';
+    reason = `✅ Cocok dengan range normal (${effMin}–${effMax}) & fragmen tahun terdeteksi`;
+  } else if (best.score >= 0.45) {
+    confidenceLevel = 'possible';
+    reason = `⚠ Kemungkinan cocok — perlu review manual`;
+  } else {
+    confidenceLevel = 'unknown';
+    reason = `❓ Tidak dapat diprediksi dengan yakin`;
+  }
+
+  return { bestValue: best.value, confidence: confidenceLevel, reason, score: best.score, allCandidates: scored };
+}
+
+function runBigErrorScan() {
+  const unitFilter = document.getElementById('beUnitFilter')?.value || '';
+  _bigErrorItems   = [];
+
+  const scanBtn = document.querySelector('#bigErrorScanOverlay .btn-primary');
+  if (scanBtn) { scanBtn.disabled = true; scanBtn.textContent = '⏳ Scanning...'; }
+
+  try {
+    const filtered = sessions.filter(s => !unitFilter || s.unitId === unitFilter);
+
+    filtered.forEach(sess => {
+      const eq = findEquipFlex(sess.unitId, sess.areaId, '', sess.equipId);
+      const paramMap = {};
+      (eq?.params || []).forEach(p => { paramMap[p.id] = p; });
+
+      (sess.items || []).forEach((item, itemIdx) => {
+        if (!isBigErrorValue(item.value)) return;
+
+        const param      = paramMap[item.paramId] || null;
+        const candidates = extractBigErrorCandidates(item.value, param);
+        const prediction = scoreBigErrorCandidate(candidates, param);
+
+        _bigErrorItems.push({
+          sessId:        sess.id,
+          itemIdx,
+          tanggal:       sess.tanggal,
+          unitName:      sess.unitName,
+          areaName:      sess.areaName,
+          equipName:     sess.equipName,
+          paramId:       item.paramId,
+          label:         item.label || item.paramId,
+          unit:          item.unit  || '',
+          section:       item.section || '',
+          rawValue:      item.value,
+          currentStatus: item.status || '',
+          param,
+          prediction,
+          selected:      prediction.confidence === 'confident',
+          overrideValue: prediction.bestValue !== null ? String(prediction.bestValue) : '',
+        });
+      });
+    });
+
+    beLog(`Scan selesai: ${_bigErrorItems.length} nilai tidak wajar ditemukan dari ${filtered.length} sesi`);
+    renderBigErrorStats();
+    renderBigErrorTable();
+
+    if (_bigErrorItems.length === 0) {
+      toast('✅ Tidak ada nilai tidak wajar ditemukan', 'success');
+    } else {
+      toast(`⚠ ${_bigErrorItems.length} nilai tidak wajar ditemukan`, 'info');
+    }
+  } catch(e) {
+    console.error('[BigErrorScan] Scan error:', e);
+    beLog('✗ Error saat scan: ' + e.message);
+    toast('✗ Scan gagal: ' + e.message, 'error');
+  } finally {
+    if (scanBtn) { scanBtn.disabled = false; scanBtn.textContent = '🔍 Scan Nilai Tidak Wajar'; }
+  }
+}
+
+function renderBigErrorStats() {
+  const total     = _bigErrorItems.length;
+  const confident = _bigErrorItems.filter(i => i.prediction.confidence === 'confident').length;
+  const possible  = _bigErrorItems.filter(i => i.prediction.confidence === 'possible').length;
+  const unknown   = _bigErrorItems.filter(i => i.prediction.confidence === 'unknown').length;
+
+  const el = document.getElementById('beStatsRow');
+  if (!el) return;
+  el.innerHTML = `
+    <div style="background:var(--blue-dim);border:1px solid rgba(43,108,184,.25);border-radius:8px;padding:12px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--blue)">${total}</div>
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">Total Tidak Wajar</div>
+    </div>
+    <div style="background:var(--green-dim);border:1px solid rgba(74,158,63,.25);border-radius:8px;padding:12px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--green)">${confident}</div>
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">✅ Confident</div>
+    </div>
+    <div style="background:var(--orange-dim);border:1px solid rgba(251,140,58,.25);border-radius:8px;padding:12px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--orange)">${possible}</div>
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">⚠ Perlu Review</div>
+    </div>
+    <div style="background:var(--red-dim);border:1px solid rgba(192,57,43,.25);border-radius:8px;padding:12px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:var(--red)">${unknown}</div>
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">❓ Unknown</div>
+    </div>`;
+
+  document.getElementById('beScanSummary').textContent =
+    `${total} nilai tidak wajar ditemukan · ${confident} bisa diprediksi otomatis`;
+}
+
+function renderBigErrorTable() {
+  const statusFilter = document.getElementById('beStatusFilter')?.value || 'all';
+  const filtered = statusFilter === 'all'
+    ? _bigErrorItems
+    : _bigErrorItems.filter(i => i.prediction.confidence === statusFilter);
+
+  const tbody = document.getElementById('beTableBody');
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty">
+      <div class="empty-ico">${_bigErrorItems.length ? '✅' : '🧨'}</div>
+      <div class="empty-msg">${_bigErrorItems.length ? 'Tidak ada item dengan filter ini' : 'Klik "Scan Nilai Tidak Wajar" untuk memulai'}</div>
+    </div></td></tr>`;
+    updateBeSelectedCount();
+    return;
+  }
+
+  tbody.innerHTML = filtered.map((item) => {
+    const gi = _bigErrorItems.indexOf(item);
+
+    const confBadge = {
+      confident: '<span class="badge b-ok" style="font-size:9px">✅ Confident</span>',
+      possible:  '<span class="badge b-warn" style="font-size:9px">⚠ Possible</span>',
+      unknown:   '<span class="badge b-alert" style="font-size:9px">❓ Unknown</span>',
+    }[item.prediction.confidence] || '';
+
+    const nMin = item.param?.normalMin;
+    const nMax = item.param?.normalMax;
+    const rangeHint = (nMin !== undefined && nMax !== undefined)
+      ? `<div style="font-size:9px;color:var(--text3);margin-top:2px">Range: ${nMin}–${nMax} ${esc(item.unit)}</div>`
+      : '';
+
+    const candidateOptions = item.prediction.allCandidates
+      .slice(0, 6)
+      .map(c => `<option value="${c.value}" ${String(item.overrideValue) === String(c.value) ? 'selected' : ''}>
+        ${c.value} ${item.unit} (${c.method}, score:${c.score.toFixed(2)})
+      </option>`).join('');
+
+    return `<tr style="background:${item.prediction.confidence==='confident'?'rgba(34,197,94,.04)':item.prediction.confidence==='possible'?'rgba(249,115,22,.03)':'rgba(239,68,68,.04)'}">
+      <td style="text-align:center">
+        <input type="checkbox" data-gi="${gi}" ${item.selected ? 'checked' : ''}
+          onchange="beToggleItem(${gi}, this.checked)"
+          style="accent-color:var(--green);width:14px;height:14px"/>
+      </td>
+      <td>
+        <div style="font-size:11px;font-weight:600;color:var(--green);font-family:'IBM Plex Mono',monospace">${esc(item.sessId)}</div>
+        <div style="font-size:10px;color:var(--text3)">${fmtDate(item.tanggal)}</div>
+      </td>
+      <td>
+        <div style="font-size:11px;font-weight:600">${esc(item.equipName)}</div>
+        <div style="font-size:10px;color:var(--text3)">${esc(item.unitName)} · ${esc(item.areaName)}</div>
+      </td>
+      <td>
+        <div style="font-size:12px;font-weight:500">${esc(item.label)}</div>
+        <div style="font-size:10px;color:var(--text3)">${esc(item.section)} · ${esc(item.unit)}</div>
+        ${rangeHint}
+      </td>
+      <td>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--red);word-break:break-all;max-width:140px">
+          ${esc(String(item.rawValue))}
+        </div>
+        <div style="font-size:9px;color:var(--text3);margin-top:2px">${String(item.rawValue).length} digit · Status: ${esc(item.currentStatus||'—')}</div>
+      </td>
+      <td>
+        <div style="font-size:13px;font-weight:700;color:var(--navy)">
+          ${item.prediction.bestValue !== null ? item.prediction.bestValue + ' ' + esc(item.unit) : '—'}
+        </div>
+        <div style="font-size:9px;color:var(--text3);margin-top:2px">${esc(item.prediction.reason)}</div>
+      </td>
+      <td style="text-align:center">${confBadge}</td>
+      <td>
+        <select class="fsel2" style="font-size:11px;padding:4px 6px;min-width:100px"
+          onchange="_bigErrorItems[${gi}].overrideValue=this.value;updateBeSelectedCount()">
+          <option value="" ${!item.overrideValue?'selected':''}>— Kosongkan —</option>
+          ${candidateOptions}
+        </select>
+        <input type="number" step="any"
+          style="margin-top:4px;width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:5px;font-size:11px;outline:none"
+          placeholder="Atau ketik manual..."
+          value="${esc(item.overrideValue)}"
+          oninput="_bigErrorItems[${gi}].overrideValue=this.value"/>
+      </td>
+      <td>
+        <button class="btn btn-primary btn-xs" onclick="applySingleBigErrorFix(${gi})">✓ Fix</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  updateBeSelectedCount();
+}
+
+function beToggleAll(checked) {
+  _bigErrorItems.forEach(item => { item.selected = checked; });
+  renderBigErrorTable();
+}
+
+function beToggleItem(gi, checked) {
+  if (_bigErrorItems[gi]) _bigErrorItems[gi].selected = checked;
+  updateBeSelectedCount();
+}
+
+function updateBeSelectedCount() {
+  const cnt = _bigErrorItems.filter(i => i.selected).length;
+  const el  = document.getElementById('beSelectedCount');
+  if (el) el.textContent = `${cnt} item dipilih`;
+}
+
+function applySingleBigErrorFix(gi) {
+  const item = _bigErrorItems[gi];
+  if (!item) return;
+  const sess = sessions.find(s => s.id === item.sessId);
+  if (!sess) { toast('Sesi tidak ditemukan', 'error'); return; }
+
+  const newVal = item.overrideValue;
+  const targetItem = sess.items[item.itemIdx];
+  if (!targetItem) { toast('Item tidak ditemukan', 'error'); return; }
+
+  const oldVal = targetItem.value;
+
+  if (newVal === '' || newVal === null || newVal === undefined) {
+    targetItem.value  = '';
+    targetItem.status = '';
+  } else {
+    targetItem.value  = newVal;
+    targetItem.status = recalcItemStatus(parseFloat(newVal), item.param);
+  }
+
+  sess.updatedAt = new Date().toISOString();
+  saveAll();
+
+  _bigErrorItems.splice(gi, 1);
+  renderBigErrorStats();
+  renderBigErrorTable();
+  regenerateFindings();
+  renderAll();
+
+  beLog(`✅ Fix: ${item.label} @ ${item.sessId} | ${oldVal} → ${newVal || '(kosong)'} [${targetItem.status}]`);
+  toast(`✅ ${item.label} diperbaiki: ${newVal} ${item.unit}`, 'success');
+
+  // Push sesi yang sudah di-fix langsung ke Sheets — pakai autoSyncSession
+  // (targeted ke 1 sesi) bukan syncAll (full sync semua data, lebih berat & lambat)
+  if (WEBHOOK_URL) {
+    setSyncStatus('syncing');
+    autoSyncSession(sess);
+  }
+}
+
+function applySelectedBigErrorFix() {
+  const selected = _bigErrorItems.filter(i => i.selected);
+  if (!selected.length) { toast('Pilih item terlebih dahulu', 'error'); return; }
+  if (!confirm(`Terapkan koreksi untuk ${selected.length} item?\nPastikan nilai sudah benar sebelum melanjutkan.`)) return;
+
+  let fixed = 0, skipped = 0;
+  const affectedSessions = new Map();
+
+  selected.forEach(item => {
+    const sess = sessions.find(s => s.id === item.sessId);
+    if (!sess) { skipped++; return; }
+    const targetItem = sess.items[item.itemIdx];
+    if (!targetItem) { skipped++; return; }
+
+    const newVal = item.overrideValue;
+    if (newVal === '' || newVal === null) {
+      targetItem.value  = '';
+      targetItem.status = '';
+    } else {
+      targetItem.value  = newVal;
+      targetItem.status = recalcItemStatus(parseFloat(newVal), item.param);
+    }
+    sess.updatedAt = new Date().toISOString();
+    beLog(`✅ ${item.label} @ ${item.sessId}: ${item.rawValue} → ${newVal} [${targetItem.status}]`);
+    affectedSessions.set(sess.id, sess);
+    fixed++;
+  });
+
+  saveAll();
+  regenerateFindings();
+  renderAll();
+
+  _bigErrorItems = _bigErrorItems.filter(i => !i.selected);
+  renderBigErrorStats();
+  renderBigErrorTable();
+
+  toast(`✅ ${fixed} nilai diperbaiki${skipped ? `, ${skipped} dilewati` : ''} ✓`, 'success');
+
+  // Push tiap sesi yang terpengaruh ke Sheets — bukan syncAll yang nge-overwrite
+  // seluruh hierarchy/sessions sekaligus, cukup targeted per sesi yang berubah.
+  if (WEBHOOK_URL && affectedSessions.size > 0) {
+    setSyncStatus('syncing');
+    beLog(`📤 Mengirim ${affectedSessions.size} sesi yang diperbaiki ke Sheets...`);
+    affectedSessions.forEach(sess => autoSyncSession(sess));
+  }
+}
+
+function applyConfidentBigErrorOnly() {
+  _bigErrorItems.forEach(i => { i.selected = i.prediction.confidence === 'confident'; });
+  renderBigErrorTable();
+  applySelectedBigErrorFix();
+}
+
+function clearBigErrorValues() {
+  const selected = _bigErrorItems.filter(i => i.selected);
+  if (!selected.length) { toast('Pilih item terlebih dahulu', 'error'); return; }
+  if (!confirm(`Kosongkan ${selected.length} nilai tidak wajar? (tidak diisi = status pending)`)) return;
+
+  const affectedSessions = new Map();
+  selected.forEach(item => {
+    const sess = sessions.find(s => s.id === item.sessId);
+    if (!sess) return;
+    const targetItem = sess.items[item.itemIdx];
+    if (!targetItem) return;
+    targetItem.value  = '';
+    targetItem.status = '';
+    sess.updatedAt = new Date().toISOString();
+    beLog(`🗑 Dikosongkan: ${item.label} @ ${item.sessId}`);
+    item.overrideValue = '';
+    affectedSessions.set(sess.id, sess);
+  });
+
+  saveAll();
+  regenerateFindings();
+  renderAll();
+  _bigErrorItems = _bigErrorItems.filter(i => !i.selected);
+  renderBigErrorStats();
+  renderBigErrorTable();
+  toast('Nilai dikosongkan ✓', 'info');
+
+  if (WEBHOOK_URL && affectedSessions.size > 0) {
+    setSyncStatus('syncing');
+    affectedSessions.forEach(sess => autoSyncSession(sess));
+  }
+}
+
+function beLog(msg) {
+  const el = document.getElementById('beLogArea');
   if (!el) return;
   el.style.display = 'block';
   el.innerHTML += `<div>[${new Date().toLocaleTimeString('id-ID')}] ${msg}</div>`;
