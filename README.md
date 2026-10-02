@@ -17,7 +17,8 @@ assets/js/tools/        Tool admin (Data Recovery, Scan Big Error)
 api/index.php           Satu-satunya endpoint API (?r=route)
 api/_lib/               Driver SQLite/Turso, skema, auth, repository
 scripts/                CLI: migrate.php, import-sheets.php
-database/               File SQLite lokal (tidak ikut git)
+database/schema.sql     Skema SQL lengkap (SQLite & Turso) — di-generate dari api/_lib/Schema.php
+database/*.db           File SQLite lokal (tidak ikut git)
 legacy/                 Backup index.html monolith lama (boleh dihapus)
 ```
 
