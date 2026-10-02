@@ -9,8 +9,9 @@
 --   Turso  : turso db shell <nama-db> < database/schema.sql
 --   Paling mudah: php scripts/migrate.php (otomatis membuat tabel + admin)
 --
--- Akun user TIDAK dibuat di sini (password harus di-hash). Buat admin dengan:
---   php scripts/migrate.php --admin=admin --password=PasswordKamu
+-- Akun default:  username admin  /  password admin123
+--   Dibuat HANYA jika tabel users masih kosong. Setelah login, buat admin sendiri di
+--   User Management lalu hapus akun default ini (tidak akan dibuat ulang).
 --
 -- Tabel:
 --   users, auth_tokens                      akun & token login
@@ -241,3 +242,8 @@ INSERT OR IGNORE INTO counters (name, value) VALUES
   ('rev', 0), ('hierarchy_rev', 0), ('pics_rev', 0), ('wo_seq', 0);
 
 INSERT OR IGNORE INTO app_meta (key, value) VALUES ('schema_version', '2');
+
+INSERT INTO users (username, name, role, password_hash, active, created_at, updated_at)
+  SELECT 'admin', 'Administrator (default)', 'admin', '$2y$10$NuYmx98uq4RJm.QVxITepe6lh8TTTppcBpEZmnpf2fj6ShHCdDrqG', 1,
+         strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+   WHERE NOT EXISTS (SELECT 1 FROM users);

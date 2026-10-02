@@ -13,6 +13,9 @@ final class Schema
 {
     public const VERSION = 2;
 
+    // password_hash('admin123') — akun default, hapus setelah membuat admin sendiri
+    private const DEFAULT_ADMIN_HASH = '$2y$10$NuYmx98uq4RJm.QVxITepe6lh8TTTppcBpEZmnpf2fj6ShHCdDrqG';
+
     public static function statements(): array
     {
         return [
@@ -217,6 +220,13 @@ final class Schema
             "INSERT OR IGNORE INTO counters (name, value) VALUES
                 ('rev', 0), ('hierarchy_rev', 0), ('pics_rev', 0), ('wo_seq', 0)",
             "INSERT OR IGNORE INTO app_meta (key, value) VALUES ('schema_version', '" . self::VERSION . "')",
+
+            // Akun default admin / admin123 — HANYA dibuat jika belum ada user sama sekali.
+            // Setelah login: buat admin sendiri di User Management, lalu hapus akun ini.
+            "INSERT INTO users (username, name, role, password_hash, active, created_at, updated_at)
+                SELECT 'admin', 'Administrator (default)', 'admin', '" . self::DEFAULT_ADMIN_HASH . "', 1,
+                       strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+                 WHERE NOT EXISTS (SELECT 1 FROM users)",
         ];
     }
 

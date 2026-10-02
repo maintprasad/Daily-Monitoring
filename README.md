@@ -29,10 +29,13 @@ handler `onclick="..."` di HTML tetap berfungsi. Urutan pemuatan diatur di `inde
 
 1. Pastikan `extension=pdo_sqlite` aktif di `php.ini` (default XAMPP sudah aktif).
 2. Salin `.env.example` → `.env` (biarkan `DB_DRIVER=sqlite`).
-3. Buat tabel + admin pertama:
+3. Buat tabel:
    ```
-   D:\Xampp\php\php.exe scripts\migrate.php --admin=admin --password=PasswordKamu
+   D:\Xampp\php\php.exe scripts\migrate.php
    ```
+   Database baru otomatis berisi akun default **`admin` / `admin123`**. Setelah login,
+   buat admin sendiri di User Management, login dengan akun itu, lalu hapus akun `admin`
+   (tidak akan dibuat ulang selama masih ada user lain).
 4. (Opsional) pindahkan data lama dari Google Sheets:
    ```
    D:\Xampp\php\php.exe scripts\import-sheets.php
