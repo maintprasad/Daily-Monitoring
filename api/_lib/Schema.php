@@ -11,7 +11,16 @@ declare(strict_types=1);
  */
 final class Schema
 {
-    public const VERSION = 2;
+    public const VERSION = 3;
+
+    // Kolom users yang ditambahkan di v3 (untuk upgrade database lama lewat ALTER TABLE)
+    private const USER_COLUMNS_V3 = [
+        'unit_id'    => "TEXT NOT NULL DEFAULT ''",   // wilayah: '' = semua unit
+        'phone'      => "TEXT NOT NULL DEFAULT ''",   // nomor WhatsApp (format 62xxx)
+        'reports_to' => "TEXT NOT NULL DEFAULT ''",   // username atasan (bagan organisasi)
+        'notify_app' => 'INTEGER NOT NULL DEFAULT 1', // notifikasi popup di aplikasi
+        'notify_wa'  => 'INTEGER NOT NULL DEFAULT 1', // notifikasi WhatsApp
+    ];
 
     // password_hash('admin123') — akun default, hapus setelah membuat admin sendiri
     private const DEFAULT_ADMIN_HASH = '$2y$10$NuYmx98uq4RJm.QVxITepe6lh8TTTppcBpEZmnpf2fj6ShHCdDrqG';
@@ -33,6 +42,11 @@ final class Schema
                 role          TEXT NOT NULL DEFAULT \'crew\',
                 password_hash TEXT NOT NULL,
                 active        INTEGER NOT NULL DEFAULT 1,
+                unit_id       TEXT NOT NULL DEFAULT \'\',
+                phone         TEXT NOT NULL DEFAULT \'\',
+                reports_to    TEXT NOT NULL DEFAULT \'\',
+                notify_app    INTEGER NOT NULL DEFAULT 1,
+                notify_wa     INTEGER NOT NULL DEFAULT 1,
                 created_at    TEXT NOT NULL,
                 updated_at    TEXT NOT NULL
             )',
@@ -209,6 +223,38 @@ final class Schema
                 PRIMARY KEY (wo_id, seq)
             )',
 
+            // ── Notifikasi & pengaturan ──
+            // Notifikasi in-app per penerima (popup + lonceng di kanan atas)
+            'CREATE TABLE IF NOT EXISTS notifications (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                username   TEXT NOT NULL,
+                severity   TEXT NOT NULL DEFAULT \'WARNING\',
+                title      TEXT NOT NULL DEFAULT \'\',
+                body       TEXT NOT NULL DEFAULT \'\',
+                session_id TEXT NOT NULL DEFAULT \'\',
+                unit_id    TEXT NOT NULL DEFAULT \'\',
+                actor      TEXT NOT NULL DEFAULT \'\',
+                created_at TEXT NOT NULL DEFAULT \'\',
+                read_at    TEXT NOT NULL DEFAULT \'\'
+            )',
+            'CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(username, id)',
+            // Pengaturan aplikasi (JSON per key): wa = Evolution API, notif_rules = role penerima per severity
+            'CREATE TABLE IF NOT EXISTS settings (
+                key        TEXT PRIMARY KEY,
+                value      TEXT NOT NULL DEFAULT \'\',
+                updated_at TEXT NOT NULL DEFAULT \'\'
+            )',
+            // Riwayat pengiriman WhatsApp
+            'CREATE TABLE IF NOT EXISTS wa_logs (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                username   TEXT NOT NULL DEFAULT \'\',
+                phone      TEXT NOT NULL DEFAULT \'\',
+                message    TEXT NOT NULL DEFAULT \'\',
+                status     TEXT NOT NULL DEFAULT \'\',
+                response   TEXT NOT NULL DEFAULT \'\',
+                created_at TEXT NOT NULL DEFAULT \'\'
+            )',
+
             // View bantu untuk dibuka langsung di DB Browser / turso shell
             "CREATE VIEW IF NOT EXISTS v_findings AS
                 SELECT s.id AS session_id, s.tanggal, s.unit_name, s.area_name, s.equip_id, s.equip_name,
@@ -235,6 +281,10 @@ final class Schema
         $oldWorkOrders = self::legacyWorkOrders();
 
         $stmts = [];
+        // v3: kolom baru di tabel users (database lama)
+        foreach (self::missingUserColumns() as $col => $def) {
+            $stmts[] = ["ALTER TABLE users ADD COLUMN $col $def", []];
+        }
         if ($oldWorkOrders !== null) {
             // Skema v1 menyimpan WO sebagai satu kolom JSON `data` → tabel diganti
             $stmts[] = ['DROP TABLE work_orders', []];
@@ -260,6 +310,18 @@ final class Schema
         } catch (Throwable $e) {
             return 0;
         }
+    }
+
+    /** Kolom v3 yang belum ada di tabel users (kosong untuk database baru). */
+    private static function missingUserColumns(): array
+    {
+        $version = self::installedVersion();
+        if ($version === 0 || $version >= 3) {
+            return [];
+        }
+        $rows = Db::driver()->queryMany([["SELECT name FROM pragma_table_info('users')", []]])[0];
+        $existing = array_column($rows, 'name');
+        return array_diff_key(self::USER_COLUMNS_V3, array_flip($existing));
     }
 
     /** WO dari skema v1 (kolom JSON `data`), atau null jika tidak perlu konversi. */

@@ -62,6 +62,7 @@ async function doLogout(opts = {}) {
   }
   if (!opts.skipFlush) apiRequest('auth/logout', { method: 'POST' }).catch(() => {});
   clearAuth();
+  resetNotifications();
   currentUser = null;
 
   // Sembunyikan crew portal jika aktif

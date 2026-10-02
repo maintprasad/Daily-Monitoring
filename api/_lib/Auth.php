@@ -7,7 +7,8 @@ declare(strict_types=1);
  */
 final class Auth
 {
-    public const ROLES = ['admin', 'spv', 'leader', 'crew'];
+    // manager = Plant Manager (per unit) · spv = Supervisor (semua unit) · leader & crew = per unit
+    public const ROLES = ['admin', 'manager', 'spv', 'leader', 'crew'];
     private const TOKEN_DAYS = 7;
 
     private static ?array $user = null;
@@ -15,7 +16,7 @@ final class Auth
     public static function login(string $username, string $password): array
     {
         $username = strtolower(trim($username));
-        $row = Db::query('SELECT username, name, role, password_hash, active FROM users WHERE username = ?', [$username])[0] ?? null;
+        $row = Db::query('SELECT username, name, role, password_hash, active, unit_id FROM users WHERE username = ?', [$username])[0] ?? null;
 
         if (!$row || !password_verify($password, (string) $row['password_hash'])) {
             usleep(300000); // perlambat brute-force
@@ -61,7 +62,7 @@ final class Auth
         }
         $hash = hash('sha256', $token);
         $row = Db::query(
-            'SELECT u.username, u.name, u.role, u.active, t.expires_at
+            'SELECT u.username, u.name, u.role, u.active, u.unit_id, t.expires_at
                FROM auth_tokens t JOIN users u ON u.username = t.username
               WHERE t.token_hash = ? AND t.expires_at > ?',
             [$hash, time()]
@@ -93,6 +94,7 @@ final class Auth
             'name'     => (string) ($row['name'] ?? ''),
             'role'     => (string) ($row['role'] ?? 'crew'),
             'active'   => (int) ($row['active'] ?? 1) === 1,
+            'unitId'   => (string) ($row['unit_id'] ?? ''),
         ];
     }
 

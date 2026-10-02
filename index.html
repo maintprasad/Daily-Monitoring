@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="assets/css/crew-portal.css"/>
 <link rel="stylesheet" href="assets/css/main.css"/>
+<link rel="stylesheet" href="assets/css/notifications.css"/>
 </head>
 <body>
 <body>
@@ -61,6 +62,16 @@
     <button class="nav-btn" data-page="usermgmt" id="navUserMgmtMobile" style="display:none">👥 Users</button>
   </div>
   <div class="top-right">
+    <div class="notif-wrap">
+      <button class="icon-btn notif-bell" id="notifBellBtn" onclick="toggleNotifPanel(event)" title="Notifikasi temuan">🔔<span class="notif-badge" id="notifBadge" hidden>0</span></button>
+      <div class="notif-panel" id="notifPanel" hidden>
+        <div class="notif-panel-hdr">
+          <span>🔔 Notifikasi</span>
+          <button class="btn btn-ghost btn-xs" onclick="markAllNotifRead()">✓ Tandai semua dibaca</button>
+        </div>
+        <div class="notif-list" id="notifList"></div>
+      </div>
+    </div>
     <span class="sync-pill" id="syncBadge" onclick="syncNow()" title="Klik untuk sinkron dengan database">☁ Sync</span>
     <button class="btn-new btn" onclick="openNewSessionModal()">✚ Monitoring Baru</button>
     <button class="icon-btn" id="darkModeBtn" onclick="toggleDarkMode()" title="Dark/Light Mode">🌙</button>
@@ -85,6 +96,7 @@
     <div class="sb-item" data-page="hierarchy"><span class="sb-icon">🗂</span>Hierarki</div>
     <div class="sb-item" data-page="config"><span class="sb-icon">⚙</span>Konfigurasi</div>
     <div class="sb-item" data-page="usermgmt" id="sbUserMgmt" style="display:none"><span class="sb-icon">👥</span>User Management</div>
+    <div class="sb-item" data-page="orgchart" id="sbOrgChart" style="display:none"><span class="sb-icon">🏢</span>Organisasi</div>
     <div class="sb-item" id="sbDataRecovery" style="display:none" onclick="openDataRecoveryTool()"><span class="sb-icon">🔧</span>Data Recovery <span class="sb-badge alert">ADMIN</span></div>
     <div class="sb-item" id="sbBigErrorScan" style="display:none" onclick="openBigErrorScanTool()"><span class="sb-icon">🧨</span>Scan Big Error <span class="sb-badge alert">ADMIN</span></div>
   </div>
@@ -419,6 +431,20 @@
     </div>
   </div>
 
+  <!-- NOTIFIKASI WHATSAPP -->
+  <div class="card" style="margin-bottom:16px" id="configWaCard">
+    <div class="card-hdr">
+      <div>
+        <div class="card-title">📱 Notifikasi WhatsApp</div>
+        <div class="card-sub">Bot WhatsApp via Evolution API — kirim temuan WARNING/ALERT ke Leader, Supervisor & Plant Manager</div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="openWaSettingsModal()">⚙ Atur Notifikasi</button>
+    </div>
+    <div class="card-body">
+      <div style="font-size:12px;color:var(--text2)" id="configWaStatus">Klik "Atur Notifikasi" untuk konfigurasi.</div>
+    </div>
+  </div>
+
   <!-- DATABASE -->
   <div class="card">
     <div class="card-hdr">
@@ -542,12 +568,19 @@
         <span style="color:var(--text2)">Akses penuh ke semua fitur — termasuk User Management, Config, Hierarki, Data Recovery, dan semua data monitoring.</span>
       </div>
       <div style="display:flex;align-items:flex-start;gap:10px">
+        <span class="role-badge role-manager" style="flex-shrink:0;margin-top:1px">manager</span>
+        <span style="color:var(--text2)"><strong>Plant Manager per unit</strong> — semua fitur monitoring, finding, dan laporan. Menerima eskalasi ALERT di unitnya.</span>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:10px">
         <span class="role-badge role-spv" style="flex-shrink:0;margin-top:1px">spv</span>
-        <span style="color:var(--text2)">Semua fitur monitoring, riwayat, finding, dan laporan. Tidak bisa mengelola user atau akses Data Recovery.</span>
+        <span style="color:var(--text2)"><strong>Supervisor semua unit</strong> — semua fitur monitoring, riwayat, finding, dan laporan. Tidak bisa mengelola user atau akses Data Recovery.</span>
       </div>
       <div style="display:flex;align-items:flex-start;gap:10px">
         <span class="role-badge role-leader" style="flex-shrink:0;margin-top:1px">leader</span>
-        <span style="color:var(--text2)">Dashboard, Monitor, Riwayat, Finding, dan Hierarki. Tidak bisa Config dan User Management.</span>
+        <span style="color:var(--text2)"><strong>Per unit</strong> — Dashboard, Monitor, Riwayat, Finding, dan Hierarki. Tidak bisa Config dan User Management.</span>
+      </div>
+      <div style="font-size:11px;color:var(--text3);padding:6px 2px 0">
+        🔗 Alur eskalasi temuan: <strong>Crew → Leader → Supervisor → Plant Manager</strong>. Atur di menu <a href="#" onclick="navigateTo('orgchart');return false">Organisasi</a>.
       </div>
       <div style="display:flex;align-items:flex-start;gap:10px;background:rgba(74,158,63,.1);border:1px solid rgba(74,158,63,.25);border-radius:6px;padding:8px 10px">
         <span class="role-badge role-crew" style="flex-shrink:0;margin-top:1px">crew</span>
@@ -569,11 +602,53 @@
           <th>Nama Lengkap</th>
           <th>Username</th>
           <th>Role</th>
+          <th>Wilayah</th>
+          <th>Melapor ke</th>
+          <th>WhatsApp</th>
           <th>Status</th>
           <th>Aksi</th>
         </tr></thead>
         <tbody id="userMgmtBody"></tbody>
       </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════ ORGANISASI / BAGAN PELAPORAN (admin only) ════ -->
+<div class="page" id="page-orgchart">
+  <div class="sec-hdr">
+    <div>
+      <div class="sec-title">🏢 Bagan Organisasi</div>
+      <div class="sec-sub">Atur siapa melapor ke siapa — dipakai untuk eskalasi notifikasi temuan</div>
+    </div>
+    <div class="sec-actions">
+      <button class="btn btn-ghost btn-sm" onclick="openWaSettingsModal()">📱 Notifikasi WhatsApp</button>
+      <button class="btn btn-orange btn-sm" onclick="autoCascadeOrgChart()">⚡ Atur Otomatis (Cascade)</button>
+      <button class="btn btn-primary btn-sm" id="orgSaveBtn" onclick="saveOrgChart()">💾 Simpan Bagan</button>
+    </div>
+  </div>
+  <div class="org-legend">
+    <span class="role-badge role-crew">Crew · per unit</span><span class="org-arrow">→</span>
+    <span class="role-badge role-leader">Leader · per unit</span><span class="org-arrow">→</span>
+    <span class="role-badge role-spv">Supervisor · semua unit</span><span class="org-arrow">→</span>
+    <span class="role-badge role-manager">Plant Manager · per unit</span>
+    <span class="org-legend-note" id="orgDirtyNote"></span>
+  </div>
+  <div class="org-layout">
+    <div class="card org-tree-card">
+      <div class="card-hdr"><div class="card-title">🌳 Struktur Pelaporan</div></div>
+      <div class="card-body" id="orgTree"></div>
+    </div>
+    <div class="card org-table-card">
+      <div class="card-hdr"><div class="card-title">✏ Atur Atasan</div></div>
+      <div class="card-body" style="padding:0">
+        <div class="tbl-scroll">
+          <table class="data-table">
+            <thead><tr><th>User</th><th>Role</th><th>Wilayah</th><th>Melapor ke</th></tr></thead>
+            <tbody id="orgTableBody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -720,7 +795,7 @@
 
 <!-- ════ MODAL: ADD / EDIT USER ════ -->
 <div class="overlay" id="userFormOverlay">
-  <div class="modal modal-sm">
+  <div class="modal">
     <div class="modal-hdr">
       <div class="modal-title" id="userFormTitle">✚ Tambah User Baru</div>
       <button class="modal-close" onclick="closeOverlay('userFormOverlay')">×</button>
@@ -759,9 +834,10 @@
         <!-- Role -->
         <div class="fg">
           <label class="flabel">Role <span class="req">*</span></label>
-          <select class="fsel2" id="uf-role" onchange="refreshUserPreview()">
+          <select class="fsel2" id="uf-role" onchange="refreshUserPreview();onUserRoleChange()">
             <option value="">— Pilih Role —</option>
             <option value="admin">👑 Admin</option>
+            <option value="manager">🟣 Plant Manager</option>
             <option value="spv">🔵 Supervisor</option>
             <option value="leader">🟠 Leader</option>
             <option value="crew">🟢 Crew</option>
@@ -792,6 +868,43 @@
               style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text3);font-size:14px">👁</button>
           </div>
           <div class="ferr" id="uf-pass2-err"></div>
+        </div>
+
+        <!-- Wilayah (unit) -->
+        <div class="fg">
+          <label class="flabel">Wilayah / Unit</label>
+          <select class="fsel2" id="uf-unit"></select>
+          <div class="fhint" id="uf-unit-hint">Crew, Leader & Plant Manager per unit · Supervisor semua unit</div>
+        </div>
+
+        <!-- Melapor ke -->
+        <div class="fg">
+          <label class="flabel">Melapor ke (Atasan)</label>
+          <select class="fsel2" id="uf-reports"></select>
+          <div class="fhint">Dipakai untuk eskalasi notifikasi temuan</div>
+        </div>
+
+        <!-- Nomor WhatsApp -->
+        <div class="fg">
+          <label class="flabel">Nomor WhatsApp</label>
+          <input type="tel" class="finput" id="uf-phone" placeholder="Contoh: 081234567890" maxlength="20"/>
+          <div class="fhint">Untuk notifikasi WhatsApp (Evolution API)</div>
+          <div class="ferr" id="uf-phone-err"></div>
+        </div>
+
+        <!-- Saluran notifikasi -->
+        <div class="fg">
+          <label class="flabel">Terima Notifikasi Temuan</label>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">
+            <label class="chk-item" id="uf-notify-app-label">
+              <input type="checkbox" id="uf-notify-app" onchange="toggleChk(this,'uf-notify-app-label')"/>
+              <span>🔔 Popup di aplikasi</span>
+            </label>
+            <label class="chk-item" id="uf-notify-wa-label">
+              <input type="checkbox" id="uf-notify-wa" onchange="toggleChk(this,'uf-notify-wa-label')"/>
+              <span>📱 WhatsApp</span>
+            </label>
+          </div>
         </div>
 
         <!-- Nama PIC (opsional) -->
@@ -1012,6 +1125,85 @@
 </div>
 
 <div id="toast"></div>
+<div id="notifPopups"></div>
+
+<!-- ════ MODAL: PENGATURAN NOTIFIKASI WHATSAPP ════ -->
+<div class="overlay" id="waSettingsOverlay">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title">📱 Notifikasi WhatsApp — Evolution API</div>
+      <button class="modal-close" onclick="closeOverlay('waSettingsOverlay')">×</button>
+    </div>
+    <div class="modal-body">
+      <label class="chk-item" id="wa-enabled-label" style="margin-bottom:14px">
+        <input type="checkbox" id="wa-enabled" onchange="toggleChk(this,'wa-enabled-label')"/>
+        <span><strong>Aktifkan notifikasi WhatsApp</strong></span>
+      </label>
+      <div class="form-grid" style="gap:12px">
+        <div class="fg full">
+          <label class="flabel">Base URL Evolution API</label>
+          <input type="url" class="finput" id="wa-baseUrl" placeholder="https://evolution.domainkamu.com"/>
+        </div>
+        <div class="fg">
+          <label class="flabel">Nama Instance</label>
+          <input type="text" class="finput" id="wa-instance" placeholder="prasad-monitoring"/>
+        </div>
+        <div class="fg">
+          <label class="flabel">Versi API</label>
+          <select class="fsel2" id="wa-apiVersion">
+            <option value="v2">Evolution API v2</option>
+            <option value="v1">Evolution API v1</option>
+          </select>
+        </div>
+        <div class="fg full">
+          <label class="flabel">API Key</label>
+          <input type="password" class="finput" id="wa-apiKey" placeholder="Isi untuk mengganti" autocomplete="new-password"/>
+          <div class="fhint" id="wa-apiKey-hint">API key disimpan di server dan tidak ditampilkan kembali</div>
+        </div>
+        <div class="fg full">
+          <label class="flabel">Link Aplikasi (opsional, ditambahkan di akhir pesan)</label>
+          <input type="url" class="finput" id="wa-appUrl" placeholder="https://monitoring.vercel.app"/>
+        </div>
+      </div>
+
+      <div class="wa-rules">
+        <div class="flabel" style="margin-bottom:8px">Siapa yang menerima notifikasi (popup & WhatsApp)?</div>
+        <table class="wa-rules-table">
+          <thead><tr><th>Severity</th><th>Leader</th><th>Supervisor</th><th>Plant Manager</th><th>Admin</th></tr></thead>
+          <tbody>
+            <tr><td><span class="badge b-warn">⚠ WARNING</span></td>
+              <td><input type="checkbox" data-rule="WARNING" value="leader"/></td><td><input type="checkbox" data-rule="WARNING" value="spv"/></td>
+              <td><input type="checkbox" data-rule="WARNING" value="manager"/></td><td><input type="checkbox" data-rule="WARNING" value="admin"/></td></tr>
+            <tr><td><span class="badge b-alert">🚨 ALERT</span></td>
+              <td><input type="checkbox" data-rule="ALERT" value="leader"/></td><td><input type="checkbox" data-rule="ALERT" value="spv"/></td>
+              <td><input type="checkbox" data-rule="ALERT" value="manager"/></td><td><input type="checkbox" data-rule="ALERT" value="admin"/></td></tr>
+          </tbody>
+        </table>
+        <label class="chk-item" id="wa-useOrg-label" style="margin-top:10px">
+          <input type="checkbox" id="wa-useOrgChart" onchange="toggleChk(this,'wa-useOrg-label')"/>
+          <span>Ikuti juga bagan organisasi (atasan pelapor ke atas)</span>
+        </label>
+        <div class="fhint" style="margin-top:6px">Penerima = role terpilih di unit yang sama (Supervisor: semua unit) + atasan pelapor sesuai bagan organisasi. Nomor WA diatur di User Management.</div>
+      </div>
+
+      <div class="wa-test">
+        <input type="tel" class="finput" id="wa-testPhone" placeholder="Nomor tes, mis. 081234567890"/>
+        <button class="btn btn-ghost btn-sm" onclick="sendWaTest()">📤 Kirim Tes</button>
+      </div>
+      <div class="fhint" id="wa-testResult"></div>
+
+      <details style="margin-top:12px">
+        <summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--text2)">📜 Log pengiriman terakhir</summary>
+        <div id="wa-logs" style="margin-top:8px"></div>
+      </details>
+
+      <div class="form-actions">
+        <button class="btn btn-ghost" onclick="closeOverlay('waSettingsOverlay')">Tutup</button>
+        <button class="btn btn-primary" id="wa-saveBtn" onclick="saveWaSettings()">💾 Simpan</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- CREW PORTAL -->
 <div id="crewPortal">
@@ -1390,6 +1582,7 @@
 <script src="assets/js/pages/config.js"></script>
 <script src="assets/js/pages/findings.js"></script>
 <script src="assets/js/pages/usermgmt.js"></script>
+<script src="assets/js/pages/orgchart.js"></script>
 <script src="assets/js/features/param-editor.js"></script>
 <script src="assets/js/features/session-new.js"></script>
 <script src="assets/js/features/checklist.js"></script>
@@ -1399,6 +1592,8 @@
 <script src="assets/js/features/seed.js"></script>
 <script src="assets/js/features/workorder.js"></script>
 <script src="assets/js/features/maintware-sync.js"></script>
+<script src="assets/js/features/notifications.js"></script>
+<script src="assets/js/features/wa-settings.js"></script>
 <script src="assets/js/features/crew-portal.js"></script>
 <script src="assets/js/features/report-monthly.js"></script>
 <script src="assets/js/features/report-pptx.js"></script>

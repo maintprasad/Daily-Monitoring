@@ -80,11 +80,31 @@ Data Turso bisa dilihat lewat `turso db shell dailymonitoring` atau dashboard Tu
 
 Cek koneksi: `https://<project>.vercel.app/api/index.php?r=health`
 
-## Tabel database (skema v2)
+## Wilayah, bagan organisasi & notifikasi
+
+| Role | Wilayah | Menerima notifikasi (default) |
+|---|---|---|
+| Crew | per unit (Crew Portal hanya menampilkan unitnya) | — |
+| Leader | per unit | WARNING & ALERT di unitnya |
+| Supervisor | semua unit | WARNING & ALERT semua unit |
+| Plant Manager | per unit | ALERT di unitnya |
+
+- **User Management** → isi Wilayah, Nomor WhatsApp, dan *Melapor ke* per user.
+- **Organisasi** (admin) → bagan pelaporan; tombol **⚡ Atur Otomatis (Cascade)** mengisi
+  Crew → Leader → Supervisor → Plant Manager sesuai unit, lalu **💾 Simpan Bagan**.
+- Saat sesi disimpan dan ada parameter yang **baru** menjadi WARNING/ALERT, server membuat
+  notifikasi untuk role di atas + atasan pelapor sesuai bagan. Muncul sebagai popup & lonceng 🔔
+  di kanan atas (diperbarui tiap sync 30 detik), dan dikirim ke WhatsApp jika aktif.
+- **Config → 📱 Notifikasi WhatsApp** (admin): Base URL Evolution API, nama instance, API key,
+  versi API (v1/v2), aturan penerima per severity, tombol kirim tes, dan log pengiriman.
+  Pesan dikirim dari server (`POST {baseUrl}/message/sendText/{instance}`, header `apikey`).
+
+## Tabel database (skema v3)
 
 | Tabel | Isi |
 |---|---|
-| `users`, `auth_tokens` | Akun (password di-hash) & token login |
+| `users`, `auth_tokens` | Akun (password di-hash), wilayah, nomor WA, atasan (bagan organisasi) & token login |
+| `notifications`, `settings`, `wa_logs` | Notifikasi in-app per user, pengaturan Evolution API & aturan penerima, log WhatsApp |
 | `units`, `areas`, `equipments`, `equipment_params` | Hierarki Unit → Area → Equipment → Parameter (batas normal/alert) |
 | `sessions`, `session_items` | Sesi monitoring & nilai tiap parameter + status OK/WARNING/ALERT |
 | `deleted_sessions` | Catatan sesi yang dihapus (dipakai sinkronisasi antar perangkat) |
@@ -115,3 +135,7 @@ Database yang dibuat dengan skema lama otomatis di-upgrade saat API pertama kali
 | POST | `push` | Simpan hierarki / PIC / sesi / hapus sesi / work order |
 | POST | `workorders/next-seq` | Nomor urut WO global |
 | GET/POST/PUT/DELETE | `users` | User management (admin) |
+| PUT | `users/org` | Simpan bagan organisasi `{links:[{username, reportsTo}]}` (admin) |
+| POST | `notifications/read` | Tandai notifikasi dibaca `{ids:[...]}` atau `{all:true}` |
+| GET/PUT | `settings/notifications` | Pengaturan WhatsApp & aturan penerima (admin) |
+| POST | `settings/wa-test` | Kirim pesan tes WhatsApp `{phone}` (admin) |

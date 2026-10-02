@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════
--- Prasad Seeds — Monitoring System v5 · Skema database (versi 2)
+-- Prasad Seeds — Monitoring System v5 · Skema database (versi 3)
 -- Kompatibel dengan SQLite (XAMPP) dan Turso / libSQL (Vercel). BUKAN untuk MySQL/phpMyAdmin.
 -- Di-generate dari api/_lib/Schema.php:  php scripts/dump-schema.php
 --
@@ -42,6 +42,11 @@ CREATE TABLE IF NOT EXISTS users (
   role          TEXT NOT NULL DEFAULT 'crew',
   password_hash TEXT NOT NULL,
   active        INTEGER NOT NULL DEFAULT 1,
+  unit_id       TEXT NOT NULL DEFAULT '',
+  phone         TEXT NOT NULL DEFAULT '',
+  reports_to    TEXT NOT NULL DEFAULT '',
+  notify_app    INTEGER NOT NULL DEFAULT 1,
+  notify_wa     INTEGER NOT NULL DEFAULT 1,
   created_at    TEXT NOT NULL,
   updated_at    TEXT NOT NULL
 );
@@ -231,6 +236,37 @@ CREATE TABLE IF NOT EXISTS work_order_logs (
   PRIMARY KEY (wo_id, seq)
 );
 
+CREATE TABLE IF NOT EXISTS notifications (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  username   TEXT NOT NULL,
+  severity   TEXT NOT NULL DEFAULT 'WARNING',
+  title      TEXT NOT NULL DEFAULT '',
+  body       TEXT NOT NULL DEFAULT '',
+  session_id TEXT NOT NULL DEFAULT '',
+  unit_id    TEXT NOT NULL DEFAULT '',
+  actor      TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT '',
+  read_at    TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(username, id);
+
+CREATE TABLE IF NOT EXISTS settings (
+  key        TEXT PRIMARY KEY,
+  value      TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS wa_logs (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  username   TEXT NOT NULL DEFAULT '',
+  phone      TEXT NOT NULL DEFAULT '',
+  message    TEXT NOT NULL DEFAULT '',
+  status     TEXT NOT NULL DEFAULT '',
+  response   TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT ''
+);
+
 CREATE VIEW IF NOT EXISTS v_findings AS
   SELECT s.id AS session_id, s.tanggal, s.unit_name, s.area_name, s.equip_id, s.equip_name,
          i.param_id, i.label AS parameter, i.value, i.unit, i.status, i.note,
@@ -241,7 +277,7 @@ CREATE VIEW IF NOT EXISTS v_findings AS
 INSERT OR IGNORE INTO counters (name, value) VALUES
   ('rev', 0), ('hierarchy_rev', 0), ('pics_rev', 0), ('wo_seq', 0);
 
-INSERT OR IGNORE INTO app_meta (key, value) VALUES ('schema_version', '2');
+INSERT OR IGNORE INTO app_meta (key, value) VALUES ('schema_version', '3');
 
 INSERT INTO users (username, name, role, password_hash, active, created_at, updated_at)
   SELECT 'admin', 'Administrator (default)', 'admin', '$2y$10$NuYmx98uq4RJm.QVxITepe6lh8TTTppcBpEZmnpf2fj6ShHCdDrqG', 1,

@@ -131,7 +131,7 @@ function initNav() {
   });
 }
 function navigateTo(pid) {
-  if (pid === 'usermgmt' && currentUser?.role !== 'admin') pid = 'dashboard';
+  if ((pid === 'usermgmt' || pid === 'orgchart') && currentUser?.role !== 'admin') pid = 'dashboard';
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   const pg = document.getElementById('page-' + pid);
   if (pg) pg.classList.add('active');
@@ -147,6 +147,7 @@ function navigateTo(pid) {
   if (pid === 'config')    renderConfigPage();
   if (pid === 'findings')  renderFindingsPage();
   if (pid === 'usermgmt')  renderUserMgmtPage();
+  if (pid === 'orgchart')  renderOrgChartPage();
   if (window.innerWidth <= 768) closeSidebar();
 }
 function toggleSidebar() {

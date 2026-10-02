@@ -52,11 +52,11 @@ try {
     if ($picList) {
         $first['picList'] = $picList;
     }
-    SyncRepository::push($first, $importer);
+    SyncRepository::push($first, $importer, false);
     out('✓ Hierarki, PIC & work order');
 
     foreach (array_chunk($sessions, 150) as $i => $chunk) {
-        SyncRepository::push(['sessions' => $chunk], $importer);
+        SyncRepository::push(['sessions' => $chunk], $importer, false);
         out(sprintf('✓ Sesi %d–%d', $i * 150 + 1, $i * 150 + count($chunk)));
     }
 

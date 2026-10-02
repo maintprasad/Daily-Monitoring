@@ -8,10 +8,11 @@
 // ═══════════════════════════════════════════════════════
 
 const ROLE_LABELS = {
-  admin:  { label: 'Admin',      cls: 'role-admin',  desc: 'Akses penuh ke semua fitur termasuk User Management, Config, Hierarki, dan semua data monitoring.' },
-  spv:    { label: 'Supervisor', cls: 'role-spv',    desc: 'Akses semua fitur monitoring, riwayat, finding, dan laporan. Tidak bisa mengelola user.' },
-  leader: { label: 'Leader',     cls: 'role-leader', desc: 'Akses Dashboard, Monitor, Riwayat, Finding, dan Hierarki. Tidak bisa Config dan User Management.' },
-  crew:   { label: 'Crew',       cls: 'role-crew',   desc: 'Hanya akses Crew Portal (tampilan mobile-friendly). Cocok untuk teknisi lapangan.' },
+  admin:   { label: 'Admin',         cls: 'role-admin',   desc: 'Akses penuh ke semua fitur termasuk User Management, Organisasi, Config, Hierarki, dan semua data monitoring.' },
+  manager: { label: 'Plant Manager', cls: 'role-manager', desc: 'Plant Manager per unit — semua fitur monitoring, finding & laporan. Menerima eskalasi ALERT di unitnya.' },
+  spv:     { label: 'Supervisor',    cls: 'role-spv',     desc: 'Supervisor semua unit — semua fitur monitoring, riwayat, finding, dan laporan. Tidak bisa mengelola user.' },
+  leader:  { label: 'Leader',        cls: 'role-leader',  desc: 'Leader per unit — Dashboard, Monitor, Riwayat, Finding, dan Hierarki. Tidak bisa Config dan User Management.' },
+  crew:    { label: 'Crew',          cls: 'role-crew',    desc: 'Crew per unit — hanya akses Crew Portal (tampilan mobile-friendly) untuk unitnya.' },
 };
 
 const AVATAR_COLORS = ['#2b6cb8','#4a9e3f','#c0392b','#d35400','#7b3fa0','#2a7a5a'];
@@ -25,9 +26,10 @@ function getAvatarColor(name) {
 }
 
 function getInitials(name) {
-  const parts = (name || '?').split(/[-\s]/).filter(Boolean);
+  // Hanya kata yang diawali huruf/angka — "Administrator (default)" → "A", bukan "A("
+  const parts = (name || '?').split(/[-\s]/).filter(p => /^[\p{L}\p{N}]/u.test(p));
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return (name || '?')[0].toUpperCase();
+  return (parts[0] || name || '?')[0].toUpperCase();
 }
 
 // ── Tampilkan / sembunyikan menu User Management ──────
@@ -41,6 +43,21 @@ function applyUserMgmtVisibility() {
   // Topbar nav
   const navEl = document.getElementById('navUserMgmt');
   if (navEl) navEl.style.display = isAdmin ? '' : 'none';
+
+  // Bagan organisasi
+  const orgEl = document.getElementById('sbOrgChart');
+  if (orgEl) orgEl.style.display = isAdmin ? '' : 'none';
+}
+
+/** Nama unit untuk ditampilkan; kosong = semua unit. */
+function unitLabel(unitId) {
+  if (!unitId) return 'Semua Unit';
+  return hierarchy.units.find(u => u.id === unitId)?.name || unitId;
+}
+
+function userDisplayName(username) {
+  const u = USERS.find(x => x.username === username);
+  return u ? (u.name || u.username) : username;
 }
 
 async function loadUsersFromServer() {
@@ -56,12 +73,12 @@ async function renderUserMgmtPage() {
   if (!tbody) return;
 
   if (!USERS.length) {
-    tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="empty-ico">↻</div><div class="empty-msg">Memuat daftar user...</div></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><div class="empty-ico">↻</div><div class="empty-msg">Memuat daftar user...</div></div></td></tr>`;
   }
   try {
     await loadUsersFromServer();
   } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="empty-ico">⚠</div><div class="empty-msg">Gagal memuat user: ${esc(e.message)}</div></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><div class="empty-ico">⚠</div><div class="empty-msg">Gagal memuat user: ${esc(e.message)}</div></div></td></tr>`;
     return;
   }
   renderUserTable();
@@ -71,7 +88,7 @@ function renderUserTable() {
   const tbody = document.getElementById('userMgmtBody');
   if (!tbody) return;
   if (!USERS.length) {
-    tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="empty-ico">👥</div><div class="empty-msg">Belum ada user.</div></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><div class="empty-ico">👥</div><div class="empty-msg">Belum ada user.</div></div></td></tr>`;
     return;
   }
 
@@ -94,6 +111,9 @@ function renderUserTable() {
       </td>
       <td style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text2)">${esc(u.username)}</td>
       <td><span class="role-badge ${rl.cls}">${esc(rl.label)}</span></td>
+      <td style="font-size:11px">${esc(unitLabel(u.unitId))}</td>
+      <td style="font-size:11px">${u.reportsTo ? esc(userDisplayName(u.reportsTo)) : '<span style="color:var(--text3)">—</span>'}</td>
+      <td style="font-size:11px;font-family:'IBM Plex Mono',monospace">${u.phone ? esc(u.phone) + (u.notifyWa ? '' : ' <span title="Notifikasi WA dimatikan">🔕</span>') : '<span style="color:var(--text3)">—</span>'}</td>
       <td>
         ${u.active === false
           ? '<span class="badge b-alert">Nonaktif</span>'
@@ -152,8 +172,50 @@ function openAddUserModal() {
     const el = document.getElementById(id); if (el) el.textContent = '';
   });
   document.getElementById('uf-role-desc').style.display = 'none';
+  fillUserExtraFields(null);
   refreshUserPreview();
   openOverlay('userFormOverlay');
+}
+
+/** Isi field wilayah, atasan, nomor WA & preferensi notifikasi di form user. */
+function fillUserExtraFields(u) {
+  const unitSel = document.getElementById('uf-unit');
+  if (unitSel) {
+    unitSel.innerHTML = '<option value="">Semua Unit</option>' +
+      hierarchy.units.map(x => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('');
+    unitSel.value = u?.unitId || '';
+  }
+  const repSel = document.getElementById('uf-reports');
+  if (repSel) {
+    repSel.innerHTML = '<option value="">— Tidak ada (puncak) —</option>' +
+      USERS.filter(x => x.username !== u?.username)
+        .map(x => `<option value="${esc(x.username)}">${esc(x.name || x.username)} · ${esc(ROLE_LABELS[x.role]?.label || x.role)}${x.unitId ? ' · ' + esc(unitLabel(x.unitId)) : ''}</option>`).join('');
+    repSel.value = u?.reportsTo || '';
+  }
+  setVal('uf-phone', u?.phone || '');
+  setErr('uf-phone-err', '');
+  [['uf-notify-app', u ? u.notifyApp !== false : true], ['uf-notify-wa', u ? u.notifyWa !== false : true]].forEach(([id, on]) => {
+    const el = document.getElementById(id);
+    if (el) { el.checked = on; document.getElementById(id + '-label')?.classList.toggle('checked', on); }
+  });
+  onUserRoleChange();
+}
+
+/** Supervisor & Admin mencakup semua unit → pilihan wilayah dikunci. */
+function onUserRoleChange() {
+  const role = document.getElementById('uf-role')?.value || '';
+  const unitSel = document.getElementById('uf-unit');
+  const hint = document.getElementById('uf-unit-hint');
+  if (!unitSel) return;
+  const allUnits = role === 'spv' || role === 'admin';
+  unitSel.disabled = allUnits;
+  if (allUnits) unitSel.value = '';
+  if (hint) {
+    hint.textContent = allUnits ? 'Supervisor & Admin otomatis mencakup semua unit'
+      : (role && !unitSel.value ? '⚠ Pilih unit agar notifikasi & Crew Portal sesuai wilayahnya'
+      : 'Crew, Leader & Plant Manager per unit');
+  }
+  unitSel.onchange = onUserRoleChange;
 }
 
 function openEditUserModal(idx) {
@@ -182,6 +244,7 @@ function openEditUserModal(idx) {
     const el = document.getElementById(id); if (el) el.textContent = '';
   });
 
+  fillUserExtraFields(u);
   refreshUserPreview();
   openOverlay('userFormOverlay');
 }
@@ -276,7 +339,22 @@ async function submitUserForm() {
     document.getElementById('uf-pass2-err').textContent = 'Konfirmasi password tidak cocok';
     ok = false;
   }
+  const phone = (document.getElementById('uf-phone')?.value || '').trim();
+  const phoneDigits = phone.replace(/\D/g, '');
+  setErr('uf-phone-err', '');
+  if (phone && (phoneDigits.length < 9 || phoneDigits.length > 15)) {
+    setErr('uf-phone-err', 'Nomor WhatsApp tidak valid (contoh: 081234567890)');
+    ok = false;
+  }
   if (!ok) return;
+
+  const extra = {
+    unitId:    document.getElementById('uf-unit')?.value || '',
+    reportsTo: document.getElementById('uf-reports')?.value || '',
+    phone,
+    notifyApp: document.getElementById('uf-notify-app')?.checked ?? true,
+    notifyWa:  document.getElementById('uf-notify-wa')?.checked ?? true,
+  };
 
   const btn = document.getElementById('uf-submit-btn');
   const btnText = btn?.textContent;
@@ -285,10 +363,10 @@ async function submitUserForm() {
     if (isEdit) {
       await apiRequest('users', { method: 'PUT', body: {
         originalUsername: original.username, username, name, role, password,
-        active: original.active !== false,
+        active: original.active !== false, ...extra,
       }});
     } else {
-      await apiRequest('users', { method: 'POST', body: { username, name, role, password, active: true } });
+      await apiRequest('users', { method: 'POST', body: { username, name, role, password, active: true, ...extra } });
     }
   } catch (e) {
     toast('✗ ' + e.message, 'error', 5000);
@@ -312,7 +390,7 @@ async function submitUserForm() {
 
   // Jika user yang diedit adalah diri sendiri, perbarui data login lokal
   if (isEdit && currentUser && original.username === currentUser.username) {
-    currentUser = { ...currentUser, username, name, role };
+    currentUser = { ...currentUser, username, name, role, unitId: role === 'spv' || role === 'admin' ? '' : extra.unitId };
     saveAuth(getAuthToken(), currentUser);
   }
 

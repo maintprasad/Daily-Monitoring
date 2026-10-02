@@ -12,6 +12,7 @@ require __DIR__ . '/Schema.php';
 require __DIR__ . '/Auth.php';
 require __DIR__ . '/UserRepository.php';
 require __DIR__ . '/SyncRepository.php';
+require __DIR__ . '/NotificationService.php';
 
 // Skrip CLI bisa memilih file env lain (mis. .env.turso) lewat konstanta APP_ENV_FILE.
 // File yang dimuat lebih dulu menang, karena Env::load() tidak menimpa nilai yang sudah ada.

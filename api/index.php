@@ -36,11 +36,36 @@ try {
 
         // ── Sinkronisasi data ─────────────────────────
         case 'GET sync':
-            Auth::user();
-            Http::json(['ok' => true, 'driver' => Db::driverName()] + SyncRepository::pull(
+            $user = Auth::user();
+            $cursorId = (string) Http::query('cursorId', '');
+            $out = ['ok' => true, 'driver' => Db::driverName()] + SyncRepository::pull(
                 max(0, (int) Http::query('since', '0')),
-                (string) Http::query('cursorId', '')
-            ));
+                $cursorId
+            );
+            if ($cursorId === '') {
+                // Notifikasi user ikut dikirim di halaman pertama sync (polling 30 detik)
+                $out += NotificationService::feed($user['username'], max(0, (int) Http::query('notifSince', '0')));
+            }
+            Http::json($out);
+
+        // ── Notifikasi ────────────────────────────────
+        case 'POST notifications/read':
+            $user = Auth::user();
+            $in = Http::body();
+            NotificationService::markRead($user['username'], (array) ($in['ids'] ?? []), !empty($in['all']));
+            Http::json(['ok' => true]);
+
+        case 'GET settings/notifications':
+            Auth::requireRole('admin');
+            Http::json(['ok' => true] + NotificationService::publicSettings());
+
+        case 'PUT settings/notifications':
+            Auth::requireRole('admin');
+            Http::json(['ok' => true] + NotificationService::saveSettings(Http::body()));
+
+        case 'POST settings/wa-test':
+            $actor = Auth::requireRole('admin');
+            Http::json(['ok' => true] + NotificationService::sendTest((string) (Http::body()['phone'] ?? ''), $actor));
 
         case 'POST push':
             $user = Auth::user();
@@ -62,6 +87,11 @@ try {
         case 'PUT users':
             $actor = Auth::requireRole('admin');
             Http::json(['ok' => true, 'user' => UserRepository::update(Http::body(), $actor)]);
+
+        case 'PUT users/org':
+            Auth::requireRole('admin');
+            $changed = UserRepository::saveOrgChart((array) (Http::body()['links'] ?? []));
+            Http::json(['ok' => true, 'changed' => $changed, 'users' => UserRepository::all()]);
 
         case 'DELETE users':
             $actor = Auth::requireRole('admin');

@@ -312,7 +312,8 @@ function crewShowUnitSelect() {
   document.querySelectorAll('.crew-nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('crewNavMonitor')?.classList.add('active');
 
-  const units = hierarchy.units;
+  // Crew hanya melihat unit wilayahnya (jika diatur di User Management)
+  const units = hierarchy.units.filter(u => !currentUser?.unitId || u.id === currentUser.unitId);
 
   if (!units.length) {
     document.getElementById('crewBody').innerHTML = `

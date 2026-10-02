@@ -136,8 +136,11 @@ final class SyncRepository
     // PUSH
     // ═══════════════════════════════════════════════════════
 
-    /** Simpan perubahan dari client dalam satu transaksi atomik. */
-    public static function push(array $in, array $user): array
+    /**
+     * Simpan perubahan dari client dalam satu transaksi atomik.
+     * $notify=false dipakai import data lama agar tidak membanjiri notifikasi.
+     */
+    public static function push(array $in, array $user, bool $notify = true): array
     {
         $isCrew = $user['role'] === 'crew';
         $ignored = [];
@@ -183,9 +186,15 @@ final class SyncRepository
             array_push($stmts, ...self::workOrderStatements($wo));
         }
 
+        // Notifikasi temuan baru (in-app ikut transaksi; WhatsApp dikirim setelah commit)
+        $plan = $notify ? NotificationService::plan($sessions, $user) : ['statements' => [], 'wa' => []];
+        array_push($stmts, ...$plan['statements']);
+
         Db::transaction($stmts);
+        NotificationService::sendWhatsAppBatch($plan['wa']);
         return [
             'ignored' => $ignored,
+            'notified' => count($plan['statements']),
             'saved'   => ['sessions' => count($sessions), 'deletedSessions' => $isCrew ? 0 : count($deleted)],
         ];
     }

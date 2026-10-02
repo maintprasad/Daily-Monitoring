@@ -206,9 +206,12 @@ async function pullFromServer(opts = {}) {
     let since = _sync.rev, cursorId = '', newRev = null, changed = false;
 
     for (;;) {
-      const res = await apiRequest('sync', { query: { since, cursorId } });
+      const query = { since, cursorId };
+      if (!cursorId) query.notifSince = notifSinceParam();
+      const res = await apiRequest('sync', { query });
       if (newRev === null) {
         newRev = res.rev;
+        handleNotificationFeed(res);
         _sync.driver = res.driver || '';
         changed = _applyMasterData(res) || changed;
         changed = _applyDeleted(res.deletedSessions || [], index) || changed;

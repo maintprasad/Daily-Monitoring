@@ -21,6 +21,7 @@ function renderConfigPage() {
     </span>`;
   }
   renderDatabaseStatus();
+  if (document.getElementById('page-config')?.classList.contains('active')) renderWaStatus();
 }
 
 // Status koneksi database (SQLite lokal di XAMPP / Turso di Vercel)
