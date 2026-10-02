@@ -9,7 +9,11 @@ declare(strict_types=1);
  *   php scripts/import-sheets.php --env=.env.turso      → ke Turso
  *   php scripts/import-sheets.php --file=backup.json    → dari file JSON hasil pull yang sudah disimpan
  *   php scripts/import-sheets.php --dry-run             → hanya tampilkan jumlah data
+ *   php scripts/import-sheets.php --chunk=40            → jumlah sesi per kiriman (default 150)
  *   php scripts/import-sheets.php --skip-users          → jangan import akun user
+ *   php scripts/import-sheets.php --sessions-only       → hanya sesi monitoring; hierarki, PIC, WO & user
+ *                                                         di database tidak disentuh (untuk database yang
+ *                                                         sudah disusun ulang)
  *
  * Opsi sumber: --url=<URL Apps Script /exec>  --key=<webhook key>
  */
@@ -44,6 +48,7 @@ try {
 
     Schema::migrate();
     $importer = ['username' => 'import-sheets', 'role' => 'admin'];
+    $sessionsOnly = isset($args['sessions-only']);
 
     $first = ['sessions' => [], 'workOrders' => $workOrders];
     if ($hierarchy['units']) {
@@ -52,15 +57,19 @@ try {
     if ($picList) {
         $first['picList'] = $picList;
     }
-    SyncRepository::push($first, $importer, false);
-    out('✓ Hierarki, PIC & work order');
-
-    foreach (array_chunk($sessions, 150) as $i => $chunk) {
-        SyncRepository::push(['sessions' => $chunk], $importer, false);
-        out(sprintf('✓ Sesi %d–%d', $i * 150 + 1, $i * 150 + count($chunk)));
+    if (!$sessionsOnly) {
+        SyncRepository::push($first, $importer, false);
+        out('✓ Hierarki, PIC & work order');
     }
 
-    if (!isset($args['skip-users']) && $users) {
+    // Batch lebih kecil (--chunk=40) membantu koneksi lambat ke Turso
+    $chunkSize = max(1, (int) ($args['chunk'] ?? 150));
+    foreach (array_chunk($sessions, $chunkSize) as $i => $chunk) {
+        SyncRepository::push(['sessions' => $chunk], $importer, false);
+        out(sprintf('✓ Sesi %d–%d', $i * $chunkSize + 1, $i * $chunkSize + count($chunk)));
+    }
+
+    if (!$sessionsOnly && !isset($args['skip-users']) && $users) {
         $n = UserRepository::importPlain($users);
         out("✓ $n user (password otomatis di-hash)");
     }
