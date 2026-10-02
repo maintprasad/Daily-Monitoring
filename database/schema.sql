@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════
--- Prasad Seeds — Monitoring System v5 · Skema database (versi 5)
+-- Prasad Seeds — Monitoring System v5 · Skema database (versi 6)
 -- Kompatibel dengan SQLite (XAMPP) dan Turso / libSQL (Vercel). BUKAN untuk MySQL/phpMyAdmin.
 -- Di-generate dari api/_lib/Schema.php:  php scripts/dump-schema.php
 --
@@ -295,6 +295,47 @@ CREATE TABLE IF NOT EXISTS rca_findings (
 
 CREATE INDEX IF NOT EXISTS idx_rca_findings_finding ON rca_findings(finding_id);
 
+CREATE TABLE IF NOT EXISTS repairs (
+  id           TEXT PRIMARY KEY,
+  session_id   TEXT NOT NULL DEFAULT '',
+  unit_id      TEXT NOT NULL DEFAULT '',
+  unit_name    TEXT NOT NULL DEFAULT '',
+  area_id      TEXT NOT NULL DEFAULT '',
+  area_name    TEXT NOT NULL DEFAULT '',
+  equip_id     TEXT NOT NULL DEFAULT '',
+  equip_name   TEXT NOT NULL DEFAULT '',
+  action       TEXT NOT NULL DEFAULT '',
+  cause        TEXT NOT NULL DEFAULT '',
+  parts        TEXT NOT NULL DEFAULT '',
+  result       TEXT NOT NULL DEFAULT 'Selesai',
+  note         TEXT NOT NULL DEFAULT '',
+  repaired_by  TEXT NOT NULL DEFAULT '',
+  repaired_by_name TEXT NOT NULL DEFAULT '',
+  repaired_at  TEXT NOT NULL DEFAULT '',
+  updated_at   TEXT NOT NULL DEFAULT '',
+  extra        TEXT,
+  rev          INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_repairs_rev ON repairs(rev);
+
+CREATE INDEX IF NOT EXISTS idx_repairs_session ON repairs(session_id);
+
+CREATE TABLE IF NOT EXISTS repair_findings (
+  repair_id   TEXT NOT NULL,
+  finding_id  TEXT NOT NULL,
+  seq         INTEGER NOT NULL DEFAULT 0,
+  session_id  TEXT NOT NULL DEFAULT '',
+  param_id    TEXT NOT NULL DEFAULT '',
+  parameter   TEXT NOT NULL DEFAULT '',
+  value       TEXT NOT NULL DEFAULT '',
+  unit        TEXT NOT NULL DEFAULT '',
+  find_status TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (repair_id, finding_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_repair_findings_finding ON repair_findings(finding_id);
+
 CREATE TABLE IF NOT EXISTS notifications (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   username   TEXT NOT NULL,
@@ -335,14 +376,18 @@ CREATE VIEW v_findings AS
          (SELECT r.id FROM rca_findings f JOIN rca_reports r ON r.id = f.rca_id
            WHERE f.finding_id = s.id || '_' || i.param_id ORDER BY r.status = 'Closed' DESC LIMIT 1) AS rca_id,
          (SELECT r.status FROM rca_findings f JOIN rca_reports r ON r.id = f.rca_id
-           WHERE f.finding_id = s.id || '_' || i.param_id ORDER BY r.status = 'Closed' DESC LIMIT 1) AS rca_status
+           WHERE f.finding_id = s.id || '_' || i.param_id ORDER BY r.status = 'Closed' DESC LIMIT 1) AS rca_status,
+         (SELECT r.result FROM repair_findings f JOIN repairs r ON r.id = f.repair_id
+           WHERE f.finding_id = s.id || '_' || i.param_id ORDER BY r.repaired_at DESC LIMIT 1) AS repair_result,
+         (SELECT r.repaired_by_name FROM repair_findings f JOIN repairs r ON r.id = f.repair_id
+           WHERE f.finding_id = s.id || '_' || i.param_id ORDER BY r.repaired_at DESC LIMIT 1) AS repaired_by
     FROM session_items i JOIN sessions s ON s.id = i.session_id
    WHERE i.status IN ('WARNING', 'ALERT');
 
 INSERT OR IGNORE INTO counters (name, value) VALUES
   ('rev', 0), ('hierarchy_rev', 0), ('pics_rev', 0), ('wo_seq', 0);
 
-INSERT OR IGNORE INTO app_meta (key, value) VALUES ('schema_version', '5');
+INSERT OR IGNORE INTO app_meta (key, value) VALUES ('schema_version', '6');
 
 INSERT INTO users (username, name, role, password_hash, active, created_at, updated_at)
   SELECT 'admin', 'Administrator (default)', 'admin', '$2y$10$NuYmx98uq4RJm.QVxITepe6lh8TTTppcBpEZmnpf2fj6ShHCdDrqG', 1,

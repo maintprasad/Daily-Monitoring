@@ -58,6 +58,7 @@ const HIST_PAGE_SIZE = 20;
 let findings    = [];
 let workOrders  = [];
 let rcaReports  = [];   // Root Cause Analysis — penutupan finding (lihat features/rca.js)
+let repairs     = [];   // Laporan perbaikan oleh crew sebelum cek ulang (lihat features/repair.js)
 
 // Param editor temp
 let _editingEquipPath = null; // { unitId, areaId, subAreaId, equipId }

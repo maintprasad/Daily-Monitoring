@@ -28,6 +28,7 @@ function regenerateFindings() {
     if (!latest[k] || order > latest[k].order) latest[k] = { order, sessId: s.id, status: i.status };
   }));
   const woById = new Map(workOrders.map(w => [w.id, w]));
+  const repairMap = repairByFinding();
   // RCA per finding (yang sudah Closed diutamakan)
   const rcaByFinding = new Map();
   rcaReports.forEach(r => (r.findings || []).forEach(f => {
@@ -77,6 +78,7 @@ function regenerateFindings() {
         active:    !resolved,
         rcaId:     rca?.id || '',
         rcaStatus: rca?.status || '',
+        repair:    repairMap.get(id) || null,
       });
     });
   });
@@ -208,6 +210,8 @@ const woBtn = g.hasWO
       <tr style="background:${f.status==='ALERT'?'rgba(239,68,68,.04)':'rgba(249,115,22,.03)'};${f.active?'':'opacity:.6'}">
         <td style="padding:5px 12px 5px 28px;font-size:11px;color:var(--text3)" colspan="2">↳ ${esc(f.parameter)}
           ${f.resolved ? `<span class="badge b-ok" style="font-size:9px;margin-left:4px">✓ ${esc(f.resolved)}</span>` : ''}
+          ${f.repair ? `<span class="badge ${f.repair.result === 'Butuh bantuan' ? 'b-alert' : 'b-blue'}" style="font-size:9px;margin-left:4px"
+              title="${esc(f.repair.action)}">🔧 ${esc(REPAIR_RESULT_LABEL[f.repair.result] || f.repair.result)} · ${esc(f.repair.repairedByName || f.repair.repairedBy)}</span>` : ''}
           ${f.rcaId ? `<span class="badge ${f.rcaStatus === 'Closed' ? 'b-ok' : 'b-warn'}" style="font-size:9px;margin-left:4px;cursor:pointer"
               title="Buka RCA" onclick="openRcaModal(${jsArg(f.rcaId)})">${f.rcaStatus === 'Closed' ? '📄' : '📝 RCA berjalan ·'} ${esc(f.rcaId)}</span>` : ''}</td>
         <td style="padding:5px 12px;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:${f.status==='ALERT'?'var(--red)':'var(--orange)'}">

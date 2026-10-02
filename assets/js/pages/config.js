@@ -32,7 +32,7 @@ function renderDatabaseStatus() {
   const driverLabel = { sqlite: 'SQLite lokal (XAMPP)', turso: 'Turso (cloud)' }[_sync.driver] || 'Belum terhubung';
   const pending = currentUser ? collectChanges() : null;
   const pendingCount = pending
-    ? pending.sessions.length + pending.deletedSessions.length + pending.workOrders.length + pending.rcaReports.length
+    ? pending.sessions.length + pending.deletedSessions.length + pending.workOrders.length + pending.rcaReports.length + pending.repairs.length
       + (pending.hierarchy ? 1 : 0) + (pending.picList ? 1 : 0)
     : 0;
   el.innerHTML = `

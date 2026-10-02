@@ -101,6 +101,20 @@ Cek koneksi: `https://<project>.vercel.app/api/index.php?r=health`
   versi API (v1/v2), aturan penerima per severity, tombol kirim tes, dan log pengiriman.
   Pesan dikirim dari server (`POST {baseUrl}/message/sendText/{instance}`, header `apikey`).
 
+## Perbaikan oleh Crew (sebelum cek ulang)
+
+Alur di Crew Portal: **cek → ada temuan → 🔧 Perbaiki → atasan diberi tahu → ↻ Cek Lagi (verifikasi) → Leader menutup via RCA**.
+
+- Jika pengecekan terakhir equipment masih punya temuan aktif yang **belum dilaporkan perbaikannya**,
+  tombol utama menjadi **🔧 Perbaiki** dan **Cek Lagi terkunci**. Beranda crew menampilkan bagian
+  **"Perlu diperbaiki"** paling atas.
+- Laporan perbaikan: temuan yang diperbaiki, tindakan (wajib), hasil (**✅ Sudah diperbaiki /
+  ⏳ Sementara / 🆘 Perlu bantuan**), dugaan penyebab, material, catatan.
+- Laporan dikirim sebagai notifikasi ke atasan sesuai aturan wilayah & bagan organisasi;
+  hasil **🆘 Perlu bantuan** juga dikirim via WhatsApp.
+- Laporan tidak menutup finding. Finding selesai saat cek ulang normal ("Normal kembali")
+  atau ditutup Leader lewat RCA — tindakan korektif RCA otomatis terisi dari laporan crew.
+
 ## Penutupan finding — Root Cause Analysis (RCA)
 
 Untuk saat ini temuan daily monitoring ditutup langsung di aplikasi (ke depan semua temuan
@@ -118,7 +132,7 @@ PM & daily monitoring diarahkan ke WO).
 
 Hanya Leader ke atas yang bisa membuat/menutup RCA (crew ditolak di server).
 
-## Tabel database (skema v5)
+## Tabel database (skema v6)
 
 | Tabel | Isi |
 |---|---|
@@ -130,6 +144,7 @@ Hanya Leader ke atas yang bisa membuat/menutup RCA (crew ditolak di server).
 | `deleted_sessions` | Catatan sesi yang dihapus (dipakai sinkronisasi antar perangkat) |
 | `pics` | Daftar PIC / teknisi |
 | `rca_reports`, `rca_findings` | Root Cause Analysis & daftar finding yang ditutup tiap RCA |
+| `repairs`, `repair_findings` | Laporan perbaikan crew & finding yang diperbaiki |
 | `work_orders`, `work_order_items`, `work_order_logs` | Work order, item checklist temuan, riwayat catatan |
 | `counters`, `app_meta` | Nomor revisi, nomor urut WO, versi skema |
 | `v_findings` (view) | Semua temuan WARNING/ALERT siap dibaca, beserta No. & status RCA-nya |

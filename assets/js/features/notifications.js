@@ -71,13 +71,17 @@ function renderNotifBell() {
   }
   list.innerHTML = NOTIFS.map(n => `
     <div class="notif-item ${n.read ? '' : 'unread'}" onclick="openNotification(${n.id})">
-      <div class="notif-ico">${n.severity === 'ALERT' ? '🚨' : '⚠️'}</div>
+      <div class="notif-ico">${notifIcon(n.severity)}</div>
       <div style="min-width:0">
         <div class="notif-title">${esc(n.title)}</div>
         <div class="notif-body">${esc(n.body)}</div>
         <div class="notif-meta">${esc(fmtNotifTime(n.createdAt))}${n.actor ? ' · oleh ' + esc(n.actor) : ''}</div>
       </div>
     </div>`).join('');
+}
+
+function notifIcon(severity) {
+  return { ALERT: '🚨', WARNING: '⚠️', REPAIR: '🔧' }[severity] || '🔔';
 }
 
 function fmtNotifTime(iso) {
@@ -100,9 +104,9 @@ function showNotifPopups(list) {
   const shown = list.slice(0, NOTIF_MAX_POPUPS);
   shown.forEach(n => {
     const el = document.createElement('div');
-    el.className = 'notif-popup' + (n.severity === 'ALERT' ? ' alert' : '');
+    el.className = 'notif-popup' + (n.severity === 'ALERT' ? ' alert' : n.severity === 'REPAIR' ? ' repair' : '');
     el.innerHTML = `
-      <div class="notif-ico">${n.severity === 'ALERT' ? '🚨' : '⚠️'}</div>
+      <div class="notif-ico">${notifIcon(n.severity)}</div>
       <div style="min-width:0">
         <div class="notif-title">${esc(n.title)}</div>
         <div class="notif-body">${esc(n.body)}</div>

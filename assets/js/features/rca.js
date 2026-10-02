@@ -51,7 +51,10 @@ function openRcaForSession(sessId) {
       active.map(f => `${f.parameter} ${f.value} ${f.unit_param} (${f.status})`.replace(/\s+/g, ' ')).join(', ') +
       ` pada monitoring ${fmtDate(sess.tanggal)}.`,
     category: '', whys: ['', '', '', '', ''],
-    rootCause: '', correctiveAction: '', preventiveAction: '',
+    rootCause: '',
+    // Tindakan korektif otomatis dari laporan perbaikan crew (bisa diedit)
+    correctiveAction: _repairSummary(sessId),
+    preventiveAction: '',
     actionPic: '', targetDate: '', verification: '',
     status: 'Open',
     createdBy: currentUser?.username || '', createdByName: currentUser?.name || currentUser?.username || '',
@@ -60,6 +63,14 @@ function openRcaForSession(sessId) {
     _isNew: true,
   };
   _renderRcaModal();
+}
+
+/** Ringkasan laporan perbaikan crew untuk satu sesi. */
+function _repairSummary(sessId) {
+  return repairs.filter(r => r.sessId === sessId)
+    .sort((a, b) => (a.repairedAt || '').localeCompare(b.repairedAt || ''))
+    .map(r => `${r.action}${r.parts ? ' (material: ' + r.parts + ')' : ''} — ${r.repairedByName || r.repairedBy}, ${REPAIR_RESULT_LABEL[r.result] || r.result}`)
+    .join('\n');
 }
 
 function _rcaFindingOf(f) {
@@ -120,6 +131,21 @@ function _renderRcaModal() {
           </label>`).join('') || '<div class="fhint">Tidak ada finding.</div>'}
       </div>
     </div>
+
+    ${(() => {
+      const reps = repairs.filter(x => x.sessId === r.sessId);
+      return reps.length ? `<div class="rca-repairs">
+        <div class="rca-repairs-title">🔧 Laporan perbaikan crew</div>
+        ${reps.map(x => `<div class="rca-repair">
+          <b>${esc(x.repairedByName || x.repairedBy)}</b> · ${esc(fmtDateTime(x.repairedAt))} ·
+          <span class="badge ${x.result === 'Butuh bantuan' ? 'b-alert' : 'b-blue'}" style="font-size:9px">${esc(REPAIR_RESULT_LABEL[x.result] || x.result)}</span>
+          <div>${esc(x.action)}</div>
+          ${x.cause ? `<div class="rca-sub">Dugaan penyebab: ${esc(x.cause)}</div>` : ''}
+          ${x.parts ? `<div class="rca-sub">Material: ${esc(x.parts)}</div>` : ''}
+          ${x.note ? `<div class="rca-sub">Catatan: ${esc(x.note)}</div>` : ''}
+        </div>`).join('')}
+      </div>` : '';
+    })()}
 
     <div class="rca-sec">
       <div class="rca-sec-title"><span>2</span> Deskripsi Masalah</div>

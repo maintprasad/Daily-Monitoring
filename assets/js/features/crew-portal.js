@@ -196,7 +196,8 @@ function crewEquipmentStatus() {
   const out = [];
   crewUnits().forEach(u => (u.areas || []).forEach(a => (a.equipments || []).forEach(eq => {
     const ls = last.get(u.id + '|' + a.id + '|' + eq.id) || null;
-    out.push({ unit: u, area: a, eq, last: ls, doneToday: !!ls && ls.tanggal === today });
+    const rp = equipRepairState(u.id, a.id, eq.id);
+    out.push({ unit: u, area: a, eq, last: ls, doneToday: !!ls && ls.tanggal === today, repair: rp });
   })));
   return out;
 }
@@ -208,6 +209,7 @@ function crewShowHome() {
 
   document.querySelectorAll('.crew-nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('crewNavHome')?.classList.add('active');
+  regenerateFindings();
 
   const thisMonth = thisMonthISO();
   const myName    = currentUser?.name || currentUser?.username || '';
@@ -221,7 +223,10 @@ function crewShowHome() {
   const doneCount = eqs.filter(x => x.doneToday).length;
   const pct       = eqs.length ? Math.round(doneCount / eqs.length * 100) : 0;
   // Belum dicek hari ini: yang belum pernah dicek dulu, lalu yang paling lama tidak dicek
-  const todo = eqs.filter(x => !x.doneToday)
+  // Equipment dengan temuan yang belum dilaporkan perbaikannya → prioritas paling atas
+  const toRepair = eqs.filter(x => x.repair.needsRepair)
+    .sort((a, b) => (b.repair.pending.some(f => f.status === 'ALERT') ? 1 : 0) - (a.repair.pending.some(f => f.status === 'ALERT') ? 1 : 0));
+  const todo = eqs.filter(x => !x.doneToday && !x.repair.needsRepair)
     .sort((a, b) => (a.last ? 1 : 0) - (b.last ? 1 : 0) || (a.last?.createdAt || '').localeCompare(b.last?.createdAt || ''));
 
   const monthSess  = sessions.filter(s => (s.tanggal || '').startsWith(thisMonth));
@@ -251,6 +256,20 @@ function crewShowHome() {
       </div>
       <button class="cw-cta" onclick="crewNavTo('monitor')"><span>✚</span> Mulai Monitoring</button>
     </div>
+
+    ${toRepair.length ? `
+    <div class="crew-sec-label">🔧 Perlu diperbaiki <span class="cw-count alert">${toRepair.length}</span></div>
+    <div class="cw-todo" style="margin-bottom:18px">${toRepair.map(x => {
+      const alerts = x.repair.pending.filter(f => f.status === 'ALERT').length;
+      return `<button class="cw-todo-item repair" onclick="openRepairModal(${jsArg(x.unit.id)}, ${jsArg(x.area.id)}, ${jsArg(x.eq.id)})">
+        <span class="cw-todo-dot ${alerts ? 'never' : ''}"></span>
+        <span class="cw-todo-info">
+          <span class="cw-todo-name">${esc(x.eq.name)}</span>
+          <span class="cw-todo-meta">${esc(x.area.name)} · ${x.repair.pending.map(f => esc(f.parameter) + ' ' + esc(f.value) + ' ' + esc(f.unit_param || '')).join(', ')}</span>
+        </span>
+        <span class="cw-todo-go">🔧 Perbaiki ›</span>
+      </button>`;
+    }).join('')}</div>` : ''}
 
     <div class="crew-sec-label">⏳ Belum dicek hari ini <span class="cw-count">${todo.length}</span></div>
     ${todo.length ? `<div class="cw-todo">${todoHtml}</div>
@@ -287,6 +306,13 @@ function crewQuickStart(unitId, areaId, eqId) {
   const eq   = findEquipFlex(unitId, areaId, '', eqId);
   if (!eq) { toast('Equipment tidak ditemukan', 'error'); return; }
   if (!(eq.params || []).length) { toast('Equipment ini belum punya parameter. Hubungi Admin.', 'error'); return; }
+  regenerateFindings();
+  const rp = equipRepairState(unitId, areaId, eqId);
+  if (rp.needsRepair) {
+    toast(`🔧 Perbaiki dulu ${rp.pending.length} temuan sebelum cek ulang`, 'info', 5000);
+    openRepairModal(unitId, areaId, eqId);
+    return;
+  }
   crewNav.screen = crewNav.screen === 'home' ? 'home' : 'equip';
 
   // Nama sendiri selalu tersedia & langsung terpilih; PIC lain dari daftar PIC
@@ -472,6 +498,7 @@ function crewSelectArea(areaId, areaName) {
   crewNav.screen   = 'equip';
   crewNav.areaId   = areaId;
   crewNav.areaName = areaName;
+  regenerateFindings();
 
   const area   = findArea(crewNav.unitId, areaId);
   const equips = area?.equipments || [];
@@ -501,12 +528,27 @@ function crewSelectArea(areaId, areaName) {
     );
     const badgeCls = stBadge(st);
     const doneToday = todaySess.length > 0;
-    const statusLine = doneToday
-      ? `<span class="cw-eq-ok">✅ Sudah dicek hari ini${todaySess[0]?.startTime ? ' · ' + esc(todaySess[0].startTime) : ''}</span>`
-      : last ? `<span>Terakhir ${esc(fmtDate(last.tanggal))}</span>`
-             : `<span class="cw-eq-never">⚠ Belum pernah dicek</span>`;
+    const rp = equipRepairState(crewNav.unitId, areaId, eq.id);
+    const awaitingRecheck = !rp.needsRepair && rp.repaired.length > 0;
+    const statusLine = rp.needsRepair
+      ? `<span class="cw-eq-never">🔧 ${rp.pending.length} temuan perlu diperbaiki: ${rp.pending.map(f => esc(f.parameter)).join(', ')}</span>`
+      : awaitingRecheck
+        ? `<span class="cw-eq-wait">🔧 ${esc(REPAIR_RESULT_LABEL[rp.repaired[0].result] || rp.repaired[0].result)} oleh ${esc(rp.repaired[0].repairedByName || rp.repaired[0].repairedBy)} — lakukan Cek Lagi</span>`
+        : doneToday
+          ? `<span class="cw-eq-ok">✅ Sudah dicek hari ini${todaySess[0]?.startTime ? ' · ' + esc(todaySess[0].startTime) : ''}</span>`
+          : last ? `<span>Terakhir ${esc(fmtDate(last.tanggal))}</span>`
+                 : `<span class="cw-eq-never">⚠ Belum pernah dicek</span>`;
 
-    return `<div class="cw-eq ${doneToday ? 'done' : ''}" data-search="${esc((eq.name + ' ' + (eq.tag || '') + ' ' + (eq.type || '')).toLowerCase())}"
+    // Tombol utama mengikuti tahap: Perbaiki → Cek Lagi → (selesai)
+    const actionBtns = rp.needsRepair
+      ? `<button class="cw-btn repair" onclick="openRepairModal(${jsArg(crewNav.unitId)},${jsArg(areaId)},${jsArg(eq.id)})">🔧 Perbaiki</button>
+         <button class="cw-btn locked" disabled title="Perbaiki temuan dulu">🔒 Cek Lagi</button>`
+      : `<button class="cw-btn ${doneToday && !awaitingRecheck ? 'outline' : 'primary'}"
+          onclick="crewStartSession(${jsArg(crewNav.unitId)},${jsArg(areaId)},${jsArg(eq.id)})">
+          ${awaitingRecheck ? '↻ Cek Lagi (verifikasi)' : doneToday ? '↻ Cek Lagi' : last ? '▶ Cek Lagi' : '▶ Mulai Cek'}
+        </button>`;
+
+    return `<div class="cw-eq ${rp.needsRepair ? 'needs-repair' : doneToday ? 'done' : ''}" data-search="${esc((eq.name + ' ' + (eq.tag || '') + ' ' + (eq.type || '')).toLowerCase())}"
         data-done="${doneToday ? '1' : '0'}">
       <div class="cw-eq-main">
         <span class="crew-equip-dot" style="background:${dot}"></span>
@@ -519,10 +561,7 @@ function crewSelectArea(areaId, areaName) {
       </div>
       <div class="cw-eq-actions">
         ${last ? `<button class="cw-btn ghost" onclick="crewOpenSession(${jsArg(last.id)})">👁 Terakhir</button>` : ''}
-        <button class="cw-btn ${doneToday ? 'outline' : 'primary'}"
-          onclick="crewStartSession(${jsArg(crewNav.unitId)},${jsArg(areaId)},${jsArg(eq.id)})">
-          ${doneToday ? '↻ Cek Lagi' : '▶ Mulai Cek'}
-        </button>
+        ${actionBtns}
       </div>
     </div>`;
   }).join('');

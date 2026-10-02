@@ -154,20 +154,7 @@ final class NotificationService
         }
 
         $settings = self::settings();
-        [$users, $links] = Db::queryMany([
-            ['SELECT username, name, role, active, unit_id, phone, notify_app, notify_wa FROM users', []],
-            ['SELECT username, manager FROM user_reports', []],
-        ]);
-        $byName = array_column($users, null, 'username');
-        foreach ($byName as &$u) {
-            $u['managers'] = [];
-        }
-        unset($u);
-        foreach ($links as $l) {
-            if (isset($byName[$l['username']])) {
-                $byName[$l['username']]['managers'][] = (string) $l['manager'];
-            }
-        }
+        $byName = self::userGraph();
 
         $statements = [];
         $wa = [];
@@ -191,6 +178,83 @@ final class NotificationService
                 }
                 if ((int) $u['notify_wa'] === 1 && $u['phone'] !== '') {
                     $wa[] = ['username' => $u['username'], 'phone' => $u['phone'], 'message' => $message];
+                }
+            }
+        }
+        return ['statements' => $statements, 'wa' => $settings['wa']['enabled'] ? $wa : []];
+    }
+
+    /** Semua user beserta daftar atasannya: username → row + ['managers' => [...]] */
+    private static function userGraph(): array
+    {
+        [$users, $links] = Db::queryMany([
+            ['SELECT username, name, role, active, unit_id, phone, notify_app, notify_wa FROM users', []],
+            ['SELECT username, manager FROM user_reports', []],
+        ]);
+        $byName = array_column($users, null, 'username');
+        foreach ($byName as &$u) {
+            $u['managers'] = [];
+        }
+        unset($u);
+        foreach ($links as $l) {
+            if (isset($byName[$l['username']])) {
+                $byName[$l['username']]['managers'][] = (string) $l['manager'];
+            }
+        }
+        return $byName;
+    }
+
+    /**
+     * Notifikasi laporan perbaikan BARU dari crew → atasan sesuai aturan wilayah & bagan.
+     * WhatsApp hanya untuk hasil "Butuh bantuan" (eskalasi), supaya tidak berisik.
+     */
+    public static function planRepairs(array $repairs, array $actor): array
+    {
+        if (!$repairs) {
+            return ['statements' => [], 'wa' => []];
+        }
+        $ids = array_map(fn ($r) => (string) $r['id'], $repairs);
+        $existing = array_column(Db::query('SELECT id FROM repairs WHERE id IN (' . implode(',', array_fill(0, count($ids), '?')) . ')', $ids), 'id');
+        $new = array_values(array_filter($repairs, fn ($r) => !in_array((string) $r['id'], $existing, true)));
+        if (!$new) {
+            return ['statements' => [], 'wa' => []];
+        }
+
+        $settings = self::settings();
+        $byName = self::userGraph();
+        $labels = ['Selesai' => '✅ Selesai', 'Sementara' => '⏳ Sementara', 'Butuh bantuan' => '🆘 Perlu bantuan'];
+        $statements = [];
+        $wa = [];
+        $now = gmdate('c');
+        foreach ($new as $r) {
+            $findings = is_array($r['findings'] ?? null) ? $r['findings'] : [];
+            $severity = array_filter($findings, fn ($f) => ($f['status'] ?? '') === 'ALERT') ? 'ALERT' : 'WARNING';
+            $recipients = self::recipients($severity, (string) ($r['unitId'] ?? ''), $actor['username'], $byName, $settings['rules']);
+            $who = ($r['repairedByName'] ?? '') ?: ($actor['name'] ?? $actor['username']);
+            $result = $labels[$r['result'] ?? ''] ?? (string) ($r['result'] ?? '');
+            $params = implode(', ', array_map(fn ($f) => trim(($f['parameter'] ?? '') . ' ' . ($f['value'] ?? '') . ' ' . ($f['unit'] ?? '')), $findings));
+            $title = 'Perbaikan · ' . ($r['equipName'] ?? 'Equipment') . " ($result)";
+            $body = "$who: " . ($r['action'] ?? '') . " — $params";
+            $msg = implode("
+", array_filter([
+                '🔧 *Laporan Perbaikan — Prasad Seeds Monitoring*', '',
+                '*Equipment:* ' . ($r['equipName'] ?? '-'),
+                '*Lokasi:* ' . trim(($r['unitName'] ?? '') . ' / ' . ($r['areaName'] ?? ''), ' /'),
+                "*Hasil:* $result",
+                '*Finding:* ' . $params,
+                '*Tindakan:* ' . ($r['action'] ?? ''),
+                ($r['note'] ?? '') !== '' ? '*Catatan:* ' . $r['note'] : '',
+                '', "Dilaporkan oleh: $who",
+                $settings['wa']['appUrl'] ?: '',
+            ], fn ($l) => $l !== false));
+            foreach ($recipients as $u) {
+                if ((int) $u['notify_app'] === 1) {
+                    $statements[] = ['INSERT INTO notifications (username, severity, title, body, session_id, unit_id, actor, created_at)
+                                      VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                        [$u['username'], 'REPAIR', $title, $body, (string) ($r['sessId'] ?? ''), (string) ($r['unitId'] ?? ''), $actor['username'], $now]];
+                }
+                if (($r['result'] ?? '') === 'Butuh bantuan' && (int) $u['notify_wa'] === 1 && $u['phone'] !== '') {
+                    $wa[] = ['username' => $u['username'], 'phone' => $u['phone'], 'message' => $msg];
                 }
             }
         }

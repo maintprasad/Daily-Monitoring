@@ -251,6 +251,8 @@ function applyTheme() {
 function toast(msg, type='info', duration=3500) {
   const c = document.getElementById('toast');
   if (!c) return;
+  // Maksimal 3 toast sekaligus supaya tidak menutupi layar HP
+  while (c.children.length >= 3) c.firstElementChild.remove();
   const el = document.createElement('div');
   el.className = 'toast-item ' + type;
   el.textContent = msg;

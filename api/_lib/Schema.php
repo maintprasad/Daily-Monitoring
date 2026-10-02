@@ -11,7 +11,7 @@ declare(strict_types=1);
  */
 final class Schema
 {
-    public const VERSION = 5;
+    public const VERSION = 6;
 
     // Kolom users yang ditambahkan sejak v3 (untuk upgrade database lama lewat ALTER TABLE).
     // Atasan (bagan organisasi) mulai v4 disimpan di tabel user_reports — bisa lebih dari satu.
@@ -279,6 +279,45 @@ final class Schema
             )',
             'CREATE INDEX IF NOT EXISTS idx_rca_findings_finding ON rca_findings(finding_id)',
 
+            // ── Laporan perbaikan oleh crew (sebelum cek ulang) ──
+            // Satu laporan bisa mencakup beberapa finding dari satu sesi.
+            'CREATE TABLE IF NOT EXISTS repairs (
+                id           TEXT PRIMARY KEY,
+                session_id   TEXT NOT NULL DEFAULT \'\',
+                unit_id      TEXT NOT NULL DEFAULT \'\',
+                unit_name    TEXT NOT NULL DEFAULT \'\',
+                area_id      TEXT NOT NULL DEFAULT \'\',
+                area_name    TEXT NOT NULL DEFAULT \'\',
+                equip_id     TEXT NOT NULL DEFAULT \'\',
+                equip_name   TEXT NOT NULL DEFAULT \'\',
+                action       TEXT NOT NULL DEFAULT \'\',
+                cause        TEXT NOT NULL DEFAULT \'\',
+                parts        TEXT NOT NULL DEFAULT \'\',
+                result       TEXT NOT NULL DEFAULT \'Selesai\',
+                note         TEXT NOT NULL DEFAULT \'\',
+                repaired_by  TEXT NOT NULL DEFAULT \'\',
+                repaired_by_name TEXT NOT NULL DEFAULT \'\',
+                repaired_at  TEXT NOT NULL DEFAULT \'\',
+                updated_at   TEXT NOT NULL DEFAULT \'\',
+                extra        TEXT,
+                rev          INTEGER NOT NULL DEFAULT 0
+            )',
+            'CREATE INDEX IF NOT EXISTS idx_repairs_rev ON repairs(rev)',
+            'CREATE INDEX IF NOT EXISTS idx_repairs_session ON repairs(session_id)',
+            'CREATE TABLE IF NOT EXISTS repair_findings (
+                repair_id   TEXT NOT NULL,
+                finding_id  TEXT NOT NULL,
+                seq         INTEGER NOT NULL DEFAULT 0,
+                session_id  TEXT NOT NULL DEFAULT \'\',
+                param_id    TEXT NOT NULL DEFAULT \'\',
+                parameter   TEXT NOT NULL DEFAULT \'\',
+                value       TEXT NOT NULL DEFAULT \'\',
+                unit        TEXT NOT NULL DEFAULT \'\',
+                find_status TEXT NOT NULL DEFAULT \'\',
+                PRIMARY KEY (repair_id, finding_id)
+            )',
+            'CREATE INDEX IF NOT EXISTS idx_repair_findings_finding ON repair_findings(finding_id)',
+
             // ── Notifikasi & pengaturan ──
             // Notifikasi in-app per penerima (popup + lonceng di kanan atas)
             'CREATE TABLE IF NOT EXISTS notifications (
@@ -321,7 +360,11 @@ final class Schema
                        (SELECT r.id FROM rca_findings f JOIN rca_reports r ON r.id = f.rca_id
                          WHERE f.finding_id = s.id || '_' || i.param_id ORDER BY r.status = 'Closed' DESC LIMIT 1) AS rca_id,
                        (SELECT r.status FROM rca_findings f JOIN rca_reports r ON r.id = f.rca_id
-                         WHERE f.finding_id = s.id || '_' || i.param_id ORDER BY r.status = 'Closed' DESC LIMIT 1) AS rca_status
+                         WHERE f.finding_id = s.id || '_' || i.param_id ORDER BY r.status = 'Closed' DESC LIMIT 1) AS rca_status,
+                       (SELECT r.result FROM repair_findings f JOIN repairs r ON r.id = f.repair_id
+                         WHERE f.finding_id = s.id || '_' || i.param_id ORDER BY r.repaired_at DESC LIMIT 1) AS repair_result,
+                       (SELECT r.repaired_by_name FROM repair_findings f JOIN repairs r ON r.id = f.repair_id
+                         WHERE f.finding_id = s.id || '_' || i.param_id ORDER BY r.repaired_at DESC LIMIT 1) AS repaired_by
                   FROM session_items i JOIN sessions s ON s.id = i.session_id
                  WHERE i.status IN ('WARNING', 'ALERT')",
 
