@@ -93,8 +93,13 @@ final class Db
         try {
             return $fn();
         } catch (Throwable $e) {
-            if (!str_contains(strtolower($e->getMessage()), 'no such table')) {
+            $msg = strtolower($e->getMessage());
+            // Tabel/kolom belum ada = database kosong atau masih skema versi lama
+            if (!str_contains($msg, 'no such table') && !str_contains($msg, 'no such column')) {
                 throw $e;
+            }
+            if (Schema::installedVersion() >= Schema::VERSION) {
+                throw $e; // skema sudah terbaru → ini memang error query
             }
             Schema::migrate();
             return $fn();

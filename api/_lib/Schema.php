@@ -11,7 +11,7 @@ declare(strict_types=1);
  */
 final class Schema
 {
-    public const VERSION = 1;
+    public const VERSION = 2;
 
     public static function statements(): array
     {
@@ -146,15 +146,73 @@ final class Schema
                 seq  INTEGER NOT NULL DEFAULT 0
             )',
             'CREATE TABLE IF NOT EXISTS work_orders (
-                id         TEXT PRIMARY KEY,
-                sess_id    TEXT NOT NULL DEFAULT \'\',
-                status     TEXT NOT NULL DEFAULT \'\',
-                data       TEXT NOT NULL,
-                created_at TEXT NOT NULL DEFAULT \'\',
-                updated_at TEXT NOT NULL DEFAULT \'\',
-                rev        INTEGER NOT NULL DEFAULT 0
+                id             TEXT PRIMARY KEY,
+                sess_id        TEXT NOT NULL DEFAULT \'\',
+                title          TEXT NOT NULL DEFAULT \'\',
+                type           TEXT NOT NULL DEFAULT \'\',
+                status         TEXT NOT NULL DEFAULT \'\',
+                priority       TEXT NOT NULL DEFAULT \'\',
+                unit_id        TEXT NOT NULL DEFAULT \'\',
+                area_id        TEXT NOT NULL DEFAULT \'\',
+                equip_id       TEXT NOT NULL DEFAULT \'\',
+                tech_id        TEXT NOT NULL DEFAULT \'\',
+                tech_name      TEXT NOT NULL DEFAULT \'\',
+                requestor_name TEXT NOT NULL DEFAULT \'\',
+                requestor_dept TEXT NOT NULL DEFAULT \'\',
+                created_by     TEXT NOT NULL DEFAULT \'\',
+                due_date       TEXT NOT NULL DEFAULT \'\',
+                est_hours      REAL,
+                actual_hours   TEXT NOT NULL DEFAULT \'\',
+                start_time     TEXT NOT NULL DEFAULT \'\',
+                end_time       TEXT NOT NULL DEFAULT \'\',
+                notes          TEXT NOT NULL DEFAULT \'\',
+                closing_note   TEXT NOT NULL DEFAULT \'\',
+                checklist_done  INTEGER NOT NULL DEFAULT 0,
+                checklist_total INTEGER NOT NULL DEFAULT 0,
+                parts_used     TEXT NOT NULL DEFAULT \'\',
+                parts_count    INTEGER NOT NULL DEFAULT 0,
+                attachments    TEXT NOT NULL DEFAULT \'\',
+                extra          TEXT,
+                created_at     TEXT NOT NULL DEFAULT \'\',
+                updated_at     TEXT NOT NULL DEFAULT \'\',
+                rev            INTEGER NOT NULL DEFAULT 0
             )',
             'CREATE INDEX IF NOT EXISTS idx_work_orders_rev ON work_orders(rev)',
+            'CREATE INDEX IF NOT EXISTS idx_work_orders_sess ON work_orders(sess_id)',
+            // Item checklist WO (satu baris per temuan yang harus ditutup)
+            'CREATE TABLE IF NOT EXISTS work_order_items (
+                wo_id        TEXT NOT NULL,
+                seq          INTEGER NOT NULL,
+                id           TEXT NOT NULL DEFAULT \'\',
+                parameter    TEXT NOT NULL DEFAULT \'\',
+                value        TEXT NOT NULL DEFAULT \'\',
+                unit         TEXT NOT NULL DEFAULT \'\',
+                find_status  TEXT NOT NULL DEFAULT \'\',
+                close_status TEXT NOT NULL DEFAULT \'Open\',
+                closed_by    TEXT NOT NULL DEFAULT \'\',
+                closed_at    TEXT NOT NULL DEFAULT \'\',
+                tindakan     TEXT NOT NULL DEFAULT \'\',
+                catatan      TEXT NOT NULL DEFAULT \'\',
+                extra        TEXT,
+                PRIMARY KEY (wo_id, seq)
+            )',
+            // Riwayat catatan WO (dibuat, progress, auto-close, ...)
+            'CREATE TABLE IF NOT EXISTS work_order_logs (
+                wo_id   TEXT NOT NULL,
+                seq     INTEGER NOT NULL,
+                ts      TEXT NOT NULL DEFAULT \'\',
+                by_user TEXT NOT NULL DEFAULT \'\',
+                msg     TEXT NOT NULL DEFAULT \'\',
+                PRIMARY KEY (wo_id, seq)
+            )',
+
+            // View bantu untuk dibuka langsung di DB Browser / turso shell
+            "CREATE VIEW IF NOT EXISTS v_findings AS
+                SELECT s.id AS session_id, s.tanggal, s.unit_name, s.area_name, s.equip_id, s.equip_name,
+                       i.param_id, i.label AS parameter, i.value, i.unit, i.status, i.note,
+                       s.wo_id, s.wo_status
+                  FROM session_items i JOIN sessions s ON s.id = i.session_id
+                 WHERE i.status IN ('WARNING', 'ALERT')",
 
             "INSERT OR IGNORE INTO counters (name, value) VALUES
                 ('rev', 0), ('hierarchy_rev', 0), ('pics_rev', 0), ('wo_seq', 0)",
@@ -164,9 +222,44 @@ final class Schema
 
     public static function migrate(): void
     {
-        $stmts = array_map(fn ($sql) => [$sql, []], self::statements());
+        $oldWorkOrders = self::legacyWorkOrders();
+
+        $stmts = [];
+        if ($oldWorkOrders !== null) {
+            // Skema v1 menyimpan WO sebagai satu kolom JSON `data` → tabel diganti
+            $stmts[] = ['DROP TABLE work_orders', []];
+        }
+        array_push($stmts, ...array_map(fn ($sql) => [$sql, []], self::statements()));
+        if ($oldWorkOrders) {
+            $stmts[] = ["UPDATE counters SET value = value + 1 WHERE name = 'rev'", []];
+            foreach ($oldWorkOrders as $wo) {
+                array_push($stmts, ...SyncRepository::workOrderStatements($wo));
+            }
+        }
+        $stmts[] = ["UPDATE app_meta SET value = ? WHERE key = 'schema_version'", [(string) self::VERSION]];
         Db::driver()->transaction($stmts);
         self::seedAdminFromEnv();
+    }
+
+    /** Versi skema yang terpasang (0 = database masih kosong). */
+    public static function installedVersion(): int
+    {
+        try {
+            $row = Db::driver()->queryMany([["SELECT value FROM app_meta WHERE key = 'schema_version'", []]])[0][0] ?? null;
+            return (int) ($row['value'] ?? 0);
+        } catch (Throwable $e) {
+            return 0;
+        }
+    }
+
+    /** WO dari skema v1 (kolom JSON `data`), atau null jika tidak perlu konversi. */
+    private static function legacyWorkOrders(): ?array
+    {
+        if (self::installedVersion() !== 1) {
+            return null;
+        }
+        $rows = Db::driver()->queryMany([['SELECT data FROM work_orders', []]])[0];
+        return array_values(array_filter(array_map(fn ($r) => json_decode((string) $r['data'], true), $rows), 'is_array'));
     }
 
     /** Buat admin pertama dari ADMIN_USERNAME / ADMIN_PASSWORD jika tabel users masih kosong. */

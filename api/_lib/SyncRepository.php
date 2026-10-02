@@ -26,7 +26,25 @@ final class SyncRepository
     ];
     private const ITEM_FIELDS = ['paramId' => 'param_id', 'label' => 'label', 'unit' => 'unit',
         'section' => 'section', 'value' => 'value', 'status' => 'status', 'note' => 'note'];
-    private const PARAM_NUMBERS = ['normalMin' => 'normal_min', 'normalMax' => 'normal_max',
+    // Urutan sama dengan objek WO yang dibuat frontend (submitWOFromFinding)
+    private const WO_FIELDS = [
+        'title' => ['title', 'str'], 'type' => ['type', 'str'], 'status' => ['status', 'str'],
+        'priority' => ['priority', 'str'], 'equipId' => ['equip_id', 'str'],
+        'techId' => ['tech_id', 'str'], 'techName' => ['tech_name', 'str'],
+        'unitId' => ['unit_id', 'str'], 'areaId' => ['area_id', 'str'],
+        'requestorName' => ['requestor_name', 'str'], 'requestorDept' => ['requestor_dept', 'str'],
+        'createdBy' => ['created_by', 'str'], 'createdAt' => ['created_at', 'str'],
+        'dueDate' => ['due_date', 'str'], 'estHours' => ['est_hours', 'real'],
+        'actualHours' => ['actual_hours', 'str'], 'startTime' => ['start_time', 'str'],
+        'endTime' => ['end_time', 'str'], 'notes' => ['notes', 'str'], 'closingNote' => ['closing_note', 'str'],
+        'checklistDone' => ['checklist_done', 'int'], 'checklistTotal' => ['checklist_total', 'int'],
+        'partsUsed' => ['parts_used', 'str'], 'partsCount' => ['parts_count', 'int'],
+        'attachments' => ['attachments', 'str'], 'sessId' => ['sess_id', 'str'],
+    ];
+    private const WO_ITEM_FIELDS = ['id' => 'id', 'parameter' => 'parameter', 'value' => 'value', 'unit' => 'unit',
+        'findStatus' => 'find_status', 'closeStatus' => 'close_status', 'closedBy' => 'closed_by',
+        'closedAt' => 'closed_at', 'tindakan' => 'tindakan', 'catatan' => 'catatan'];
+    private const PARAM_NUMBERS =['normalMin' => 'normal_min', 'normalMax' => 'normal_max',
         'warnMin' => 'warn_min', 'warnMax' => 'warn_max'];
 
     // ═══════════════════════════════════════════════════════
@@ -63,7 +81,9 @@ final class SyncRepository
                 'equipments' => ["SELECT * FROM equipments WHERE $hier ORDER BY seq, pk", [$since]],
                 'params'     => ["SELECT * FROM equipment_params WHERE $hier ORDER BY seq, pk", [$since]],
                 'pics'       => ["SELECT name FROM pics WHERE $pics ORDER BY seq, name", [$since]],
-                'workOrders' => ['SELECT data FROM work_orders WHERE rev > ? ORDER BY rev, id', [$since]],
+                'workOrders' => ['SELECT * FROM work_orders WHERE rev > ? ORDER BY rev, id', [$since]],
+                'woItems'    => ['SELECT * FROM work_order_items WHERE wo_id IN (SELECT id FROM work_orders WHERE rev > ?) ORDER BY wo_id, seq', [$since]],
+                'woLogs'     => ['SELECT * FROM work_order_logs WHERE wo_id IN (SELECT id FROM work_orders WHERE rev > ?) ORDER BY wo_id, seq', [$since]],
                 'deleted'    => ['SELECT id FROM deleted_sessions WHERE rev > ? AND ? > 0', [$since, $since]],
             ];
         }
@@ -96,10 +116,17 @@ final class SyncRepository
             if ((int) ($counters['pics_rev'] ?? 0) > $since) {
                 $out['picList'] = array_map(fn ($r) => (string) $r['name'], $res['pics']);
             }
-            $out['workOrders'] = array_values(array_filter(array_map(
-                fn ($r) => json_decode((string) $r['data'], true),
+            $woItems = $woLogs = [];
+            foreach ($res['woItems'] as $r) {
+                $woItems[$r['wo_id']][] = self::workOrderItemOut($r);
+            }
+            foreach ($res['woLogs'] as $r) {
+                $woLogs[$r['wo_id']][] = ['ts' => (string) $r['ts'], 'by' => (string) $r['by_user'], 'msg' => (string) $r['msg']];
+            }
+            $out['workOrders'] = array_map(
+                fn ($r) => self::workOrderOut($r, $woItems[$r['id']] ?? [], $woLogs[$r['id']] ?? []),
                 $res['workOrders']
-            ), 'is_array'));
+            );
             $out['deletedSessions'] = array_map(fn ($r) => (string) $r['id'], $res['deleted']);
         }
         return $out;
@@ -153,7 +180,7 @@ final class SyncRepository
         }
 
         foreach ((is_array($in['workOrders'] ?? null) ? $in['workOrders'] : []) as $wo) {
-            $stmts[] = self::workOrderStatement($wo);
+            array_push($stmts, ...self::workOrderStatements($wo));
         }
 
         Db::transaction($stmts);
@@ -378,21 +405,112 @@ final class SyncRepository
 
     // ── Work order ───────────────────────────────────────
 
-    private static function workOrderStatement(mixed $wo): array
+    /**
+     * Simpan WO ke work_orders + work_order_items (checklist) + work_order_logs (notesLog).
+     * Statement memakai counters.rev saat ini, jadi pemanggil harus sudah menaikkan rev.
+     */
+    public static function workOrderStatements(mixed $wo): array
     {
         if (!is_array($wo)) {
             throw new HttpError('Format work order tidak valid');
         }
         $id = self::id($wo['id'] ?? '', 'ID work order');
-        return [
-            'INSERT INTO work_orders (id, sess_id, status, data, created_at, updated_at, rev)
-             VALUES (?, ?, ?, ?, ?, ?, ' . self::REV . ')
-             ON CONFLICT(id) DO UPDATE SET sess_id = excluded.sess_id, status = excluded.status,
-               data = excluded.data, updated_at = excluded.updated_at, rev = excluded.rev',
-            [$id, self::str($wo['sessId'] ?? ''), self::str($wo['status'] ?? ''),
-             json_encode($wo, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE),
-             self::str($wo['createdAt'] ?? gmdate('c')), gmdate('c')],
+
+        $cols = ['id'];
+        $vals = [$id];
+        $extra = [];
+        foreach (self::WO_FIELDS as $key => [$col, $type]) {
+            $v = $wo[$key] ?? null;
+            if ($v !== null && !is_scalar($v)) {
+                $extra[$key] = $v; // nilai non-teks (mis. array) disimpan utuh di kolom extra
+                $v = null;
+            }
+            $cols[] = $col;
+            $vals[] = match ($type) {
+                'int'  => (int) ($v ?? 0),
+                'real' => self::num($v),
+                default => self::str($v ?? ''),
+            };
+        }
+        foreach ($wo as $k => $v) {
+            if (!array_key_exists($k, self::WO_FIELDS) && !in_array($k, ['id', 'checklist', 'notesLog'], true)
+                && !str_starts_with((string) $k, '_')) {
+                $extra[$k] = $v;
+            }
+        }
+        array_push($cols, 'extra', 'updated_at');
+        array_push($vals, $extra ? json_encode($extra, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) : null, gmdate('c'));
+
+        $updates = implode(', ', array_map(fn ($c) => "$c = excluded.$c", array_diff($cols, ['id'])));
+        $stmts = [
+            ['INSERT INTO work_orders (' . implode(', ', $cols) . ', rev) VALUES (' . str_repeat('?, ', count($cols)) . self::REV . ')
+              ON CONFLICT(id) DO UPDATE SET ' . $updates . ', rev = excluded.rev', $vals],
+            ['DELETE FROM work_order_items WHERE wo_id = ?', [$id]],
+            ['DELETE FROM work_order_logs WHERE wo_id = ?', [$id]],
         ];
+
+        // Checklist: array, atau string JSON (format yang dikirim ke MaintWare)
+        $checklist = $wo['checklist'] ?? [];
+        if (is_string($checklist)) {
+            $checklist = json_decode($checklist, true);
+        }
+        $itemRows = [];
+        foreach (array_values(is_array($checklist) ? $checklist : []) as $i => $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $row = [$id, $i];
+            foreach (self::WO_ITEM_FIELDS as $key => $_) {
+                $row[] = self::str($item[$key] ?? ($key === 'closeStatus' ? 'Open' : ''));
+            }
+            $row[] = self::extra($item, array_merge(array_keys(self::WO_ITEM_FIELDS), ['seq']));
+            $itemRows[] = $row;
+        }
+
+        // notesLog disimpan frontend sebagai string JSON berisi [{ts, by, msg}]
+        $log = $wo['notesLog'] ?? [];
+        if (is_string($log)) {
+            $log = json_decode($log, true);
+        }
+        $logRows = [];
+        foreach (array_values(is_array($log) ? $log : []) as $i => $entry) {
+            if (is_array($entry)) {
+                $logRows[] = [$id, $i, self::str($entry['ts'] ?? ''), self::str($entry['by'] ?? ''), self::str($entry['msg'] ?? '')];
+            }
+        }
+
+        return array_merge(
+            $stmts,
+            Db::insertRows('work_order_items', array_merge(['wo_id', 'seq'], array_values(self::WO_ITEM_FIELDS), ['extra']), $itemRows),
+            Db::insertRows('work_order_logs', ['wo_id', 'seq', 'ts', 'by_user', 'msg'], $logRows)
+        );
+    }
+
+    private static function workOrderOut(array $r, array $items, array $logs): array
+    {
+        $wo = ['id' => (string) $r['id']];
+        foreach (self::WO_FIELDS as $key => [$col, $type]) {
+            $wo[$key] = match ($type) {
+                'int'  => (int) $r[$col],
+                'real' => $r[$col] === null ? '' : $r[$col] + 0,
+                default => (string) $r[$col],
+            };
+            if ($key === 'checklistTotal') {
+                $wo['checklist'] = $items;
+            } elseif ($key === 'partsCount') {
+                $wo['notesLog'] = json_encode($logs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            }
+        }
+        return array_merge($wo, self::extraOut($r['extra']));
+    }
+
+    private static function workOrderItemOut(array $r): array
+    {
+        $item = ['id' => (string) $r['id'], 'seq' => (int) $r['seq'] + 1];
+        foreach (self::WO_ITEM_FIELDS as $key => $col) {
+            $item[$key] = (string) $r[$col];
+        }
+        return $item + self::extraOut($r['extra']);
     }
 
     // ── Helper ───────────────────────────────────────────

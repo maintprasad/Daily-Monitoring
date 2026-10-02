@@ -17,7 +17,7 @@ assets/js/tools/        Tool admin (Data Recovery, Scan Big Error)
 api/index.php           Satu-satunya endpoint API (?r=route)
 api/_lib/               Driver SQLite/Turso, skema, auth, repository
 scripts/                CLI: migrate.php, import-sheets.php
-database/schema.sql     Skema SQL lengkap (SQLite & Turso) — di-generate dari api/_lib/Schema.php
+database/schema.sql     Skema SQL lengkap (SQLite & Turso) — generate ulang: php scripts/dump-schema.php
 database/*.db           File SQLite lokal (tidak ikut git)
 legacy/                 Backup index.html monolith lama (boleh dihapus)
 ```
@@ -76,6 +76,22 @@ Data Turso bisa dilihat lewat `turso db shell dailymonitoring` atau dashboard Tu
 3. Deploy. `vercel.json` sudah mengatur `api/index.php` memakai runtime `vercel-php@0.9.0`.
 
 Cek koneksi: `https://<project>.vercel.app/api/index.php?r=health`
+
+## Tabel database (skema v2)
+
+| Tabel | Isi |
+|---|---|
+| `users`, `auth_tokens` | Akun (password di-hash) & token login |
+| `units`, `areas`, `equipments`, `equipment_params` | Hierarki Unit → Area → Equipment → Parameter (batas normal/alert) |
+| `sessions`, `session_items` | Sesi monitoring & nilai tiap parameter + status OK/WARNING/ALERT |
+| `deleted_sessions` | Catatan sesi yang dihapus (dipakai sinkronisasi antar perangkat) |
+| `pics` | Daftar PIC / teknisi |
+| `work_orders`, `work_order_items`, `work_order_logs` | Work order, item checklist temuan, riwayat catatan |
+| `counters`, `app_meta` | Nomor revisi, nomor urut WO, versi skema |
+| `v_findings` (view) | Semua temuan WARNING/ALERT siap dibaca |
+
+Database yang dibuat dengan skema lama otomatis di-upgrade saat API pertama kali dipakai
+(atau jalankan `php scripts/migrate.php`).
 
 ## Cara kerja sinkronisasi
 

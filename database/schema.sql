@@ -1,15 +1,28 @@
 -- ═══════════════════════════════════════════════════════════════
--- Prasad Seeds — Monitoring System v5 · Skema database (versi 1)
--- Kompatibel dengan SQLite (XAMPP) dan Turso / libSQL (Vercel).
--- Di-generate dari api/_lib/Schema.php — ubah skema di sana, lalu generate ulang file ini.
+-- Prasad Seeds — Monitoring System v5 · Skema database (versi 2)
+-- Kompatibel dengan SQLite (XAMPP) dan Turso / libSQL (Vercel). BUKAN untuk MySQL/phpMyAdmin.
+-- Di-generate dari api/_lib/Schema.php:  php scripts/dump-schema.php
 --
 -- Cara pakai:
 --   SQLite : sqlite3 database/dailymonitoring.db < database/schema.sql
---            (atau buka di DB Browser for SQLite → Execute SQL)
+--            (atau DB Browser for SQLite → Execute SQL)
 --   Turso  : turso db shell <nama-db> < database/schema.sql
+--   Paling mudah: php scripts/migrate.php (otomatis membuat tabel + admin)
 --
 -- Akun user TIDAK dibuat di sini (password harus di-hash). Buat admin dengan:
 --   php scripts/migrate.php --admin=admin --password=PasswordKamu
+--
+-- Tabel:
+--   users, auth_tokens                      akun & token login
+--   units, areas, equipments,
+--   equipment_params                        hierarki Unit → Area → Equipment → Parameter
+--   sessions, session_items                 sesi monitoring & nilai tiap parameter
+--   deleted_sessions                        catatan sesi yang dihapus (untuk sinkronisasi)
+--   pics                                    daftar PIC / teknisi
+--   work_orders, work_order_items,
+--   work_order_logs                         work order, checklist temuan, riwayat catatan
+--   counters, app_meta                      nomor revisi, nomor urut WO, versi skema
+--   v_findings (view)                       temuan WARNING/ALERT siap dibaca
 -- ═══════════════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS counters (
@@ -155,18 +168,76 @@ CREATE TABLE IF NOT EXISTS pics (
 );
 
 CREATE TABLE IF NOT EXISTS work_orders (
-  id         TEXT PRIMARY KEY,
-  sess_id    TEXT NOT NULL DEFAULT '',
-  status     TEXT NOT NULL DEFAULT '',
-  data       TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT '',
-  updated_at TEXT NOT NULL DEFAULT '',
-  rev        INTEGER NOT NULL DEFAULT 0
+  id             TEXT PRIMARY KEY,
+  sess_id        TEXT NOT NULL DEFAULT '',
+  title          TEXT NOT NULL DEFAULT '',
+  type           TEXT NOT NULL DEFAULT '',
+  status         TEXT NOT NULL DEFAULT '',
+  priority       TEXT NOT NULL DEFAULT '',
+  unit_id        TEXT NOT NULL DEFAULT '',
+  area_id        TEXT NOT NULL DEFAULT '',
+  equip_id       TEXT NOT NULL DEFAULT '',
+  tech_id        TEXT NOT NULL DEFAULT '',
+  tech_name      TEXT NOT NULL DEFAULT '',
+  requestor_name TEXT NOT NULL DEFAULT '',
+  requestor_dept TEXT NOT NULL DEFAULT '',
+  created_by     TEXT NOT NULL DEFAULT '',
+  due_date       TEXT NOT NULL DEFAULT '',
+  est_hours      REAL,
+  actual_hours   TEXT NOT NULL DEFAULT '',
+  start_time     TEXT NOT NULL DEFAULT '',
+  end_time       TEXT NOT NULL DEFAULT '',
+  notes          TEXT NOT NULL DEFAULT '',
+  closing_note   TEXT NOT NULL DEFAULT '',
+  checklist_done  INTEGER NOT NULL DEFAULT 0,
+  checklist_total INTEGER NOT NULL DEFAULT 0,
+  parts_used     TEXT NOT NULL DEFAULT '',
+  parts_count    INTEGER NOT NULL DEFAULT 0,
+  attachments    TEXT NOT NULL DEFAULT '',
+  extra          TEXT,
+  created_at     TEXT NOT NULL DEFAULT '',
+  updated_at     TEXT NOT NULL DEFAULT '',
+  rev            INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_work_orders_rev ON work_orders(rev);
 
+CREATE INDEX IF NOT EXISTS idx_work_orders_sess ON work_orders(sess_id);
+
+CREATE TABLE IF NOT EXISTS work_order_items (
+  wo_id        TEXT NOT NULL,
+  seq          INTEGER NOT NULL,
+  id           TEXT NOT NULL DEFAULT '',
+  parameter    TEXT NOT NULL DEFAULT '',
+  value        TEXT NOT NULL DEFAULT '',
+  unit         TEXT NOT NULL DEFAULT '',
+  find_status  TEXT NOT NULL DEFAULT '',
+  close_status TEXT NOT NULL DEFAULT 'Open',
+  closed_by    TEXT NOT NULL DEFAULT '',
+  closed_at    TEXT NOT NULL DEFAULT '',
+  tindakan     TEXT NOT NULL DEFAULT '',
+  catatan      TEXT NOT NULL DEFAULT '',
+  extra        TEXT,
+  PRIMARY KEY (wo_id, seq)
+);
+
+CREATE TABLE IF NOT EXISTS work_order_logs (
+  wo_id   TEXT NOT NULL,
+  seq     INTEGER NOT NULL,
+  ts      TEXT NOT NULL DEFAULT '',
+  by_user TEXT NOT NULL DEFAULT '',
+  msg     TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (wo_id, seq)
+);
+
+CREATE VIEW IF NOT EXISTS v_findings AS
+  SELECT s.id AS session_id, s.tanggal, s.unit_name, s.area_name, s.equip_id, s.equip_name,
+         i.param_id, i.label AS parameter, i.value, i.unit, i.status, i.note,
+         s.wo_id, s.wo_status
+    FROM session_items i JOIN sessions s ON s.id = i.session_id
+   WHERE i.status IN ('WARNING', 'ALERT');
+
 INSERT OR IGNORE INTO counters (name, value) VALUES
   ('rev', 0), ('hierarchy_rev', 0), ('pics_rev', 0), ('wo_seq', 0);
 
-INSERT OR IGNORE INTO app_meta (key, value) VALUES ('schema_version', '1');
+INSERT OR IGNORE INTO app_meta (key, value) VALUES ('schema_version', '2');
