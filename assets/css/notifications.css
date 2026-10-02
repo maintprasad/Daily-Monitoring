@@ -68,8 +68,46 @@
 }
 .org-arrow { color: var(--text3); font-size: 12px; }
 .org-legend-note { margin-left: auto; font-size: 11px; color: var(--orange); font-weight: 600; }
-.org-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 16px; align-items: start; }
-@media (max-width: 1000px) { .org-layout { grid-template-columns: 1fr; } }
+.org-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
+
+/* ── Bagan top-down per level ── */
+.orgc { position: relative; overflow-x: auto; padding: 6px 4px 4px; }
+.orgc-lines { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; }
+.orgc-lines path { fill: none; stroke: var(--text3); stroke-width: 1.6; opacity: .75; transition: opacity .15s, stroke-width .15s; }
+.orgc-lines circle { fill: var(--text3); opacity: .75; }
+.orgc-lines path.warn { stroke: var(--orange); stroke-dasharray: 5 4; }
+.orgc-lines circle.warn { fill: var(--orange); }
+.orgc-lines .hl { stroke: var(--blue); fill: none; stroke-width: 2.6; opacity: 1; }
+.orgc-lines circle.hl { fill: var(--blue); }
+.orgc.dim .orgc-lines path:not(.hl), .orgc.dim .orgc-lines circle:not(.hl) { opacity: .12; }
+.orgc.dim .orgc-node:not(.hl) { opacity: .35; }
+.orgc-row { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 46px; position: relative; z-index: 1; }
+.orgc-row:last-child { margin-bottom: 8px; }
+.orgc-row-label {
+  width: 96px; flex-shrink: 0; padding-top: 16px; font-size: 10px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--text3);
+}
+.orgc-row-items { display: flex; flex: 1; justify-content: center; align-items: flex-start; gap: 22px; min-width: max-content; }
+.orgc-node {
+  display: flex; align-items: center; gap: 10px; width: 210px; padding: 8px 10px;
+  background: var(--bg2); border: 1.5px solid var(--border); border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.06); transition: opacity .15s, border-color .15s, box-shadow .15s; cursor: default;
+}
+.orgc-node.small { width: 190px; padding: 6px 8px; }
+.orgc-node.small .org-avatar { width: 24px; height: 24px; font-size: 10px; }
+.orgc-node.inactive { opacity: .5; }
+.orgc-node.hl { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(43,108,184,.18); }
+.orgc-team { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.orgc-crew { display: flex; flex-direction: column; gap: 8px; padding-left: 30px; }
+.orgc-crew-direct { padding-left: 0; }
+.orgc-team-note { font-size: 10px; color: var(--text3); font-style: italic; padding: 4px 0 0; }
+.orgc-outside { display: flex; flex-wrap: wrap; gap: 10px; }
+.orgc-legend {
+  display: flex; flex-wrap: wrap; gap: 16px; margin-top: 14px; padding-top: 10px;
+  border-top: 1px solid var(--border); font-size: 11px; color: var(--text3);
+}
+.orgc-key { display: inline-block; width: 26px; height: 0; border-top: 2px solid var(--text3); vertical-align: middle; margin-right: 4px; }
+.orgc-key.warn { border-top: 2px dashed var(--orange); }
 .org-tree, .org-tree ul { list-style: none; margin: 0; padding: 0; }
 .org-tree ul { margin-left: 18px; padding-left: 14px; border-left: 2px dashed var(--border2); }
 .org-tree li { position: relative; padding: 5px 0; }

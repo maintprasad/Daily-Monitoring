@@ -39,66 +39,177 @@ function renderOrgChart() {
   renderOrgTable();
 }
 
-function _orgNode(u, extraNote) {
-  const rl = ROLE_LABELS[u.role] || { label: u.role, cls: 'b-gray' };
-  const subCount = USERS.filter(x => (_orgDraft[x.username] || []).includes(u.username)).length;
-  const mgrs = _orgDraft[u.username] || [];
-  return `<div class="org-node ${u.active === false ? 'inactive' : ''}">
-    <div class="org-avatar" style="background:${getAvatarColor(u.name || u.username)}">${esc(getInitials(u.name || u.username))}</div>
-    <div style="min-width:0">
-      <div class="org-name">${esc(u.name || u.username)} ${u.active === false ? '<span class="org-sub">(nonaktif)</span>' : ''}</div>
-      <div class="org-sub"><span class="role-badge ${rl.cls}" style="font-size:9px;padding:1px 6px">${esc(rl.label)}</span>
-        · ${esc(unitLabel(u.unitId))}${subCount ? ` · ${subCount} bawahan` : ''}${u.phone ? ' · 📱' : ''}</div>
-      ${mgrs.length > 1 ? `<div class="org-multi">↗ Melapor ke ${mgrs.length} atasan: ${mgrs.map(m => esc(userDisplayName(m))).join(', ')}</div>` : ''}
-      ${extraNote || ''}
-    </div>
-  </div>`;
-}
+// ═══════════════════════════════════════════════════════
+// GAMBAR BAGAN — top-down per level + garis penghubung (SVG)
+//   Baris 1: Plant Manager · Baris 2: Supervisor · Baris 3: Leader dengan crew di bawahnya.
+//   Setiap garis = "melapor ke". User dengan beberapa atasan punya beberapa garis,
+//   sehingga tidak ada lagi kesan seolah ia hanya di bawah satu atasan.
+// ═══════════════════════════════════════════════════════
+let _orgResizeObs = null;
 
-/**
- * Pohon: user ditampilkan lengkap di bawah atasan PERTAMA-nya; di bawah atasan lainnya
- * hanya muncul sebagai referensi singkat (supaya cabang tidak terduplikasi).
- */
 function renderOrgTree() {
   const el = document.getElementById('orgTree');
   if (!el) return;
   const byName = new Map(USERS.map(u => [u.username, u]));
-  const primary = {}, secondary = {};
-  USERS.forEach(u => {
-    const mgrs = (_orgDraft[u.username] || []).filter(m => byName.has(m));
-    mgrs.forEach((m, i) => {
-      const bucket = i === 0 ? primary : secondary;
-      (bucket[m] = bucket[m] || []).push(u);
-    });
-  });
-  const sortUsers = list => [...list].sort((a, b) =>
-    (ORG_LEVEL[b.role] || 0) - (ORG_LEVEL[a.role] || 0) || unitLabel(a.unitId).localeCompare(unitLabel(b.unitId)) ||
-    (a.name || a.username).localeCompare(b.name || b.username));
+  const mgrsOf = u => (_orgDraft[u.username] || []).filter(m => byName.has(m));
+  const hasSubs = name => USERS.some(u => mgrsOf(u).includes(name));
+  const inStruct = u => mgrsOf(u).length > 0 || hasSubs(u.username);
+  const unitOrder = id => {
+    if (!id) return -1;
+    const i = hierarchy.units.findIndex(x => x.id === id);
+    return i < 0 ? 999 : i;
+  };
+  const byUnitThenName = (a, b) => unitOrder(a.unitId) - unitOrder(b.unitId) ||
+    (a.name || a.username).localeCompare(b.name || b.username);
 
-  const seen = new Set();
-  const branch = u => {
-    if (seen.has(u.username)) return ''; // pengaman rantai melingkar
-    seen.add(u.username);
-    const kids = sortUsers(primary[u.username] || []);
-    const refs = sortUsers(secondary[u.username] || []);
-    const items = [
-      ...kids.map(branch),
-      ...refs.map(r => `<li><div class="org-ref">↪ ${esc(r.name || r.username)}
-        <span class="org-sub">· ${esc(ROLE_LABELS[r.role]?.label || r.role)} — juga melapor ke sini</span></div></li>`),
-    ].join('');
-    return `<li>${_orgNode(u)}${items ? `<ul>${items}</ul>` : ''}</li>`;
+  const struct = USERS.filter(inStruct);
+  const placed = new Set();
+  const take = list => { list.forEach(u => placed.add(u.username)); return list; };
+
+  const admins   = take(struct.filter(u => u.role === 'admin').sort(byUnitThenName));
+  const managers = take(struct.filter(u => u.role === 'manager').sort(byUnitThenName));
+  const spvs     = take(struct.filter(u => u.role === 'spv').sort(byUnitThenName));
+  const leaders  = take(struct.filter(u => u.role === 'leader').sort(byUnitThenName));
+  // Crew diletakkan di bawah leader pertamanya; sisanya (melapor langsung ke spv/PM) di kolom tersendiri
+  const teams = leaders.map(l => ({
+    lead: l,
+    crew: take(struct.filter(u => !placed.has(u.username) && u.role === 'crew' && mgrsOf(u)[0] === l.username).sort(byUnitThenName)),
+  }));
+  const direct = take(struct.filter(u => !placed.has(u.username)).sort(byUnitThenName));
+  const outside = USERS.filter(u => !inStruct(u)).sort(byUnitThenName);
+
+  const row = (label, inner) => inner ? `
+    <div class="orgc-row">
+      <div class="orgc-row-label">${label}</div>
+      <div class="orgc-row-items">${inner}</div>
+    </div>` : '';
+  const cards = list => list.map(u => _orgCard(u, false)).join('');
+
+  const teamCols = teams.map(t => `
+    <div class="orgc-team">
+      ${_orgCard(t.lead, false)}
+      ${t.crew.length ? `<div class="orgc-crew">${t.crew.map(u => _orgCard(u, true)).join('')}</div>` : ''}
+    </div>`).join('') +
+    (direct.length ? `
+    <div class="orgc-team">
+      <div class="orgc-team-note">Melapor langsung</div>
+      <div class="orgc-crew orgc-crew-direct">${direct.map(u => _orgCard(u, true)).join('')}</div>
+    </div>` : '');
+
+  if (!struct.length) {
+    el.innerHTML = `<div class="notif-empty">Belum ada struktur. Klik "⚡ Atur Otomatis (Cascade)" atau atur atasan di tabel di bawah.</div>` +
+      (outside.length ? `<div class="org-section-title">Belum masuk struktur</div><div class="orgc-outside">${outside.map(u => _orgCard(u, true)).join('')}</div>` : '');
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="orgc" id="orgChartCanvas">
+      <svg class="orgc-lines" aria-hidden="true"></svg>
+      ${row('Admin', cards(admins))}
+      ${row('Plant Manager', cards(managers))}
+      ${row('Supervisor', cards(spvs))}
+      ${row(leaders.length ? 'Leader &amp; Crew' : 'Crew', teamCols)}
+    </div>
+    ${outside.length ? `<div class="org-section-title">Belum masuk struktur (tidak punya atasan & bawahan)</div>
+      <div class="orgc-outside">${outside.map(u => _orgCard(u, true)).join('')}</div>` : ''}
+    <div class="orgc-legend">
+      <span><i class="orgc-key"></i> melapor ke</span>
+      <span><i class="orgc-key warn"></i> tidak sesuai cascade (beda unit / level lebih rendah)</span>
+      <span>Arahkan kursor ke kartu untuk menyorot atasan & bawahannya</span>
+    </div>`;
+
+  requestAnimationFrame(drawOrgLines);
+  if (!_orgResizeObs && 'ResizeObserver' in window) {
+    _orgResizeObs = new ResizeObserver(() => requestAnimationFrame(drawOrgLines));
+    _orgResizeObs.observe(el);
+  }
+}
+
+function _orgCard(u, small) {
+  const rl = ROLE_LABELS[u.role] || { label: u.role, cls: 'b-gray' };
+  const mgrs = (_orgDraft[u.username] || []);
+  const subCount = USERS.filter(x => (_orgDraft[x.username] || []).includes(u.username)).length;
+  return `<div class="orgc-node ${small ? 'small' : ''} ${u.active === false ? 'inactive' : ''}" data-user="${esc(u.username)}"
+      onmouseenter="orgHighlight(${jsArg(u.username)})" onmouseleave="orgHighlight(null)">
+    <div class="org-avatar" style="background:${getAvatarColor(u.name || u.username)}">${esc(getInitials(u.name || u.username))}</div>
+    <div style="min-width:0">
+      <div class="org-name">${esc(u.name || u.username)}${u.active === false ? ' <span class="org-sub">(nonaktif)</span>' : ''}</div>
+      <div class="org-sub"><span class="role-badge ${rl.cls}" style="font-size:9px;padding:1px 6px">${esc(rl.label)}</span>
+        ${esc(unitLabel(u.unitId))}${!small && subCount ? ` · ${subCount} bawahan` : ''}${u.phone ? ' · 📱' : ''}</div>
+      ${mgrs.length > 1 ? `<div class="org-multi">↑ ${mgrs.length} atasan: ${mgrs.map(m => esc(userDisplayName(m))).join(', ')}</div>` : ''}
+    </div>
+  </div>`;
+}
+
+/** Gambar garis "melapor ke" sesuai posisi kartu sebenarnya di layar. */
+function drawOrgLines() {
+  const canvas = document.getElementById('orgChartCanvas');
+  if (!canvas || !canvas.offsetParent) return; // halaman tidak tampil
+  const svg = canvas.querySelector('svg.orgc-lines');
+  const base = canvas.getBoundingClientRect();
+  svg.setAttribute('width', canvas.scrollWidth);
+  svg.setAttribute('height', canvas.scrollHeight);
+
+  const nodes = new Map([...canvas.querySelectorAll('.orgc-node')].map(n => [n.dataset.user, n]));
+  const box = name => {
+    const n = nodes.get(name);
+    if (!n) return null;
+    const r = n.getBoundingClientRect();
+    const left = r.left - base.left + canvas.scrollLeft, top = r.top - base.top + canvas.scrollTop;
+    return { left, top, right: left + r.width, bottom: top + r.height, cx: left + r.width / 2, cy: top + r.height / 2 };
   };
 
-  const roots = sortUsers(USERS.filter(u => !(_orgDraft[u.username] || []).some(m => byName.has(m))));
-  const hasKids = u => (primary[u.username] || []).length || (secondary[u.username] || []).length;
-  const connected = roots.filter(u => hasKids(u) || u.role === 'manager');
-  const loose = roots.filter(u => !connected.includes(u));
-
-  el.innerHTML =
-    (connected.length ? `<ul class="org-tree">${connected.map(branch).join('')}</ul>`
-                      : `<div class="notif-empty">Belum ada struktur. Klik "⚡ Atur Otomatis (Cascade)" atau atur atasan di tabel samping.</div>`) +
-    (loose.length ? `<div class="org-section-title">Belum melapor ke siapa pun</div><ul class="org-tree">${loose.map(branch).join('')}</ul>` : '');
+  const paths = [];
+  USERS.forEach(u => {
+    const c = box(u.username);
+    if (!c) return;
+    (_orgDraft[u.username] || []).forEach(m => {
+      const p = box(m);
+      if (!p) return;
+      const mgr = USERS.find(x => x.username === m);
+      const warn = mgr && ((ORG_LEVEL[mgr.role] || 0) < (ORG_LEVEL[u.role] || 0) ||
+        (u.unitId && mgr.unitId && u.unitId !== mgr.unitId));
+      let d, end; // end = titik di kartu bawahan (diberi bulatan kecil)
+      const childTeam = nodes.get(u.username).closest('.orgc-team');
+      const sameTeam = childTeam && childTeam === nodes.get(m).closest('.orgc-team') && c.top > p.bottom;
+      if (sameTeam) {
+        // Crew di bawah leader-nya (satu kolom): rel di sisi kiri
+        d = `M ${p.left + 16} ${p.bottom} V ${c.cy} H ${c.left}`;
+        end = [c.left, c.cy];
+      } else if (c.top > p.bottom + 6) {
+        // Atasan di baris atas: garis siku turun dari bawah atasan ke atas bawahan
+        const midY = c.top - 14;
+        d = `M ${p.cx} ${p.bottom} V ${midY} H ${c.cx} V ${c.top}`;
+        end = [c.cx, c.top];
+      } else {
+        // Posisi tidak lazim (atasan sejajar/di bawah): kurva samping
+        const x1 = c.cx < p.cx ? c.right : c.left, x2 = c.cx < p.cx ? p.left : p.right;
+        d = `M ${x1} ${c.cy} C ${(x1 + x2) / 2} ${c.cy}, ${(x1 + x2) / 2} ${p.cy}, ${x2} ${p.cy}`;
+        end = [x1, c.cy];
+      }
+      const attrs = `class="${warn ? 'warn' : ''}" data-from="${esc(u.username)}" data-to="${esc(m)}"`;
+      paths.push(`<path d="${d}" ${attrs}/><circle cx="${end[0]}" cy="${end[1]}" r="3" ${attrs}/>`);
+    });
+  });
+  svg.innerHTML = paths.join('');
 }
+
+/** Sorot kartu beserta atasan, bawahan, dan garisnya. */
+function orgHighlight(name) {
+  const canvas = document.getElementById('orgChartCanvas');
+  if (!canvas) return;
+  canvas.querySelectorAll('.hl').forEach(x => x.classList.remove('hl'));
+  canvas.classList.toggle('dim', !!name);
+  if (!name) return;
+  const related = new Set([name, ...(_orgDraft[name] || [])]);
+  USERS.forEach(u => { if ((_orgDraft[u.username] || []).includes(name)) related.add(u.username); });
+  canvas.querySelectorAll('.orgc-node').forEach(n => { if (related.has(n.dataset.user)) n.classList.add('hl'); });
+  canvas.querySelectorAll('svg [data-from]').forEach(p => {
+    if (p.dataset.from === name || p.dataset.to === name) p.classList.add('hl');
+  });
+}
+
+window.addEventListener('resize', () => requestAnimationFrame(drawOrgLines));
 
 function renderOrgTable() {
   const tbody = document.getElementById('orgTableBody');
@@ -165,8 +276,10 @@ function toggleOrgManager(username, manager, checked) {
       renderOrgTable();
       return;
     }
-    if (!cur.includes(manager)) _orgDraft[username] = [...cur, manager];
+    if (cur.includes(manager)) return;
+    _orgDraft[username] = [...cur, manager];
   } else {
+    if (!cur.includes(manager)) return;
     _orgDraft[username] = cur.filter(m => m !== manager);
   }
   _setOrgDirty(true);
@@ -223,7 +336,7 @@ async function saveOrgChart() {
   const links = USERS
     .filter(u => JSON.stringify(managersOf(u)) !== JSON.stringify(_orgDraft[u.username] || []))
     .map(u => ({ username: u.username, reportsTo: _orgDraft[u.username] || [] }));
-  if (!links.length) { toast('Tidak ada perubahan', 'info'); return; }
+  if (!links.length) { _setOrgDirty(false); toast('Tidak ada perubahan', 'info'); return; }
 
   const btn = document.getElementById('orgSaveBtn');
   if (btn) { btn.disabled = true; btn.textContent = '↻ Menyimpan...'; }
