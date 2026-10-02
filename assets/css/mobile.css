@@ -1,0 +1,166 @@
+/* ═══════════════════════════════════════
+   CREW PORTAL & CHECKLIST — ramah HP
+═══════════════════════════════════════ */
+
+/* ── Beranda crew ── */
+.cw-hero {
+  background: linear-gradient(135deg, #1a3a6b 0%, #24508f 100%); color: #fff;
+  border-radius: 16px; padding: 16px 16px 14px; margin-bottom: 18px;
+  box-shadow: 0 6px 18px rgba(26,58,107,.25);
+}
+.cw-hello { font-size: 18px; font-weight: 700; }
+.cw-date  { font-size: 12px; color: rgba(255,255,255,.7); margin-top: 2px; }
+.cw-progress { margin: 14px 0 12px; }
+.cw-progress-top { display: flex; justify-content: space-between; font-size: 12px; color: rgba(255,255,255,.8); }
+.cw-progress-top b { color: #fff; }
+.cw-progress-bar { height: 8px; border-radius: 6px; background: rgba(255,255,255,.18); margin-top: 6px; overflow: hidden; }
+.cw-progress-bar > div { height: 100%; background: linear-gradient(90deg, #7ddf6e, #4a9e3f); border-radius: 6px; transition: width .4s; }
+.cw-cta {
+  width: 100%; min-height: 52px; border: none; border-radius: 12px; cursor: pointer;
+  background: linear-gradient(135deg, var(--green) 0%, var(--green-d) 100%); color: #fff;
+  font: 700 16px 'IBM Plex Sans', sans-serif; display: flex; align-items: center; justify-content: center; gap: 10px;
+  box-shadow: 0 4px 14px rgba(74,158,63,.35); transition: transform .1s;
+}
+.cw-cta:active { transform: scale(.98); }
+.cw-cta > span { font-size: 20px; }
+.cw-count {
+  margin-left: 6px; padding: 1px 8px; border-radius: 10px; font-size: 10px; letter-spacing: 0;
+  background: var(--orange-dim); color: var(--orange); border: 1px solid rgba(251,140,58,.3);
+}
+.cw-todo { display: flex; flex-direction: column; gap: 8px; }
+.cw-todo-item {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 10px 12px;
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; cursor: pointer;
+  text-align: left; font-family: 'IBM Plex Sans', sans-serif; transition: border-color .15s, transform .1s;
+}
+.cw-todo-item:active { transform: scale(.99); border-color: var(--green); }
+.cw-todo-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--orange); flex-shrink: 0; }
+.cw-todo-dot.never { background: var(--red); box-shadow: 0 0 0 3px var(--red-dim); }
+.cw-todo-info { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.cw-todo-name { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cw-todo-meta { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.cw-todo-meta b { color: var(--red); font-weight: 600; }
+.cw-todo-go { font-size: 12px; font-weight: 700; color: var(--green); white-space: nowrap; }
+.cw-link, .cw-link-inline {
+  background: none; border: none; color: var(--blue); font: 600 13px 'IBM Plex Sans', sans-serif; cursor: pointer;
+}
+.cw-link { display: block; width: 100%; padding: 12px; text-align: center; }
+.cw-done {
+  padding: 16px; border-radius: 12px; text-align: center; font-size: 13px;
+  background: var(--green-dim); color: var(--green); border: 1px solid rgba(74,158,63,.25);
+}
+.cw-month { margin-bottom: 10px; }
+
+/* ── Daftar equipment ── */
+.cw-search {
+  display: flex; align-items: center; gap: 8px; padding: 0 12px; height: 46px; margin-bottom: 10px;
+  background: var(--bg2); border: 1.5px solid var(--border); border-radius: 12px;
+}
+.cw-search:focus-within { border-color: var(--green); }
+.cw-search input { flex: 1; border: none; outline: none; background: none; font: 15px 'IBM Plex Sans', sans-serif; color: var(--text); }
+.cw-filter { display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto; }
+.cw-chip {
+  flex-shrink: 0; min-height: 38px; padding: 6px 14px; border-radius: 20px; cursor: pointer;
+  border: 1.5px solid var(--border); background: var(--bg2); color: var(--text2);
+  font: 600 13px 'IBM Plex Sans', sans-serif; transition: all .12s;
+}
+.cw-chip.on { background: var(--green); border-color: var(--green); color: #fff; }
+.cw-eq {
+  background: var(--bg2); border: 1.5px solid var(--border); border-radius: 14px; padding: 12px 12px 10px;
+}
+.cw-eq.done { border-color: rgba(74,158,63,.45); background: linear-gradient(0deg, var(--green-dim), var(--green-dim)), var(--bg2); }
+.cw-eq-main { display: flex; gap: 12px; align-items: flex-start; }
+.cw-eq-main .crew-equip-dot { margin-top: 6px; flex-shrink: 0; }
+.cw-eq-name { font-size: 15px; font-weight: 700; color: var(--text); }
+.cw-eq-meta { font-size: 11px; color: var(--text3); margin-top: 3px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.cw-eq-status { font-size: 12px; color: var(--text3); margin-top: 5px; }
+.cw-eq-ok { color: var(--green); font-weight: 600; }
+.cw-eq-never { color: var(--red); font-weight: 600; }
+.cw-eq-actions { display: flex; gap: 8px; margin-top: 10px; }
+.cw-btn {
+  flex: 1; min-height: 44px; border-radius: 10px; cursor: pointer; font: 700 14px 'IBM Plex Sans', sans-serif;
+  border: 1.5px solid transparent; transition: transform .1s;
+}
+.cw-btn:active { transform: scale(.98); }
+.cw-btn.primary { flex: 2; background: var(--green); color: #fff; }
+.cw-btn.outline { flex: 2; background: var(--bg2); color: var(--green); border-color: var(--green); }
+.cw-btn.ghost { background: var(--bg3); color: var(--text2); border-color: var(--border); }
+
+/* ── Lembar "Mulai Cepat" ── */
+.cw-start-eq {
+  display: flex; gap: 12px; align-items: center; padding: 12px; margin-bottom: 16px;
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 12px;
+}
+.cw-start-icon { font-size: 30px; }
+.cw-start-name { font-size: 16px; font-weight: 700; color: var(--text); }
+.cw-start-meta { font-size: 12px; color: var(--text3); margin-top: 2px; }
+.cw-start-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.cw-start-row label { display: flex; flex-direction: column; gap: 5px; font-size: 11px; color: var(--text3); font-weight: 600; }
+.cw-start-row input {
+  height: 46px; padding: 0 12px; border-radius: 10px; border: 1.5px solid var(--border);
+  background: var(--bg2); color: var(--text); font: 15px 'IBM Plex Sans', sans-serif;
+}
+.cw-start-label { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+.cw-start-label span { font-weight: 400; color: var(--text3); font-size: 11px; }
+.cw-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ── Checklist: bar progres + simpan yang selalu terlihat ── */
+#checklistOverlay .modal-hdr { position: sticky; top: 0; z-index: 3; background: var(--bg2); }
+.chk-actions {
+  position: sticky; bottom: 0; z-index: 3; align-items: center; flex-wrap: wrap;
+  margin: 20px -24px -24px; padding: 12px 24px calc(12px + env(safe-area-inset-bottom));
+  background: var(--bg2); box-shadow: 0 -6px 16px rgba(0,0,0,.08);
+}
+.chk-progress { flex: 1; min-width: 160px; margin-right: auto; }
+.chk-progress-txt { font-size: 12px; color: var(--text2); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.chk-progress-bar { height: 6px; border-radius: 4px; background: var(--bg3); margin-top: 5px; overflow: hidden; max-width: 260px; }
+.chk-progress-bar > div { height: 100%; background: var(--green); transition: width .25s; }
+.chk-pill { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 10px; }
+.chk-pill.warn { background: var(--orange-dim); color: var(--orange); }
+.chk-pill.alert { background: var(--red-dim); color: var(--red); }
+
+/* ═══════════════════════════════════════
+   LAYAR HP (≤ 640px)
+═══════════════════════════════════════ */
+@media (max-width: 640px) {
+  /* Checklist layar penuh */
+  #checklistOverlay .modal { max-height: 100dvh; height: 100dvh; border-radius: 0; }
+  #checklistOverlay .modal-body { padding: 12px 14px 24px; }
+  .chk-actions { margin: 16px -14px -24px; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); }
+  .chk-actions .btn { min-height: 46px; font-size: 14px; padding: 0 16px; }
+  .chk-actions .chk-progress { flex-basis: 100%; margin-bottom: 4px; }
+  .chk-actions .btn-primary { flex: 1; }
+
+  /* Tabel parameter → kartu per parameter */
+  .chk-table thead { display: none; }
+  .chk-table, .chk-table tbody { display: block; width: 100%; }
+  .chk-table tbody tr.chk-row {
+    display: grid; grid-template-columns: 1fr auto auto; grid-template-areas: "label unit st" "val val val" "note note note";
+    gap: 6px 8px; align-items: center; padding: 12px; border-bottom: 1px solid var(--border);
+  }
+  .chk-table tbody tr.chk-row td { padding: 0; display: block; }
+  .chk-c-label { grid-area: label; font-size: 14px !important; font-weight: 600 !important; color: var(--text); }
+  .chk-c-unit  { grid-area: unit; font-size: 11px !important; }
+  .chk-c-st    { grid-area: st; }
+  .chk-c-val   { grid-area: val; }
+  .chk-c-note  { grid-area: note; }
+  .chk-c-val .val-input {
+    width: 100%; height: 52px; font-size: 22px; font-weight: 600; border-radius: 10px; border-width: 1.5px;
+  }
+  .chk-c-val .status-sel { width: 100%; height: 50px; font-size: 15px; border-radius: 10px; padding: 0 12px; }
+  .chk-c-val > div > div { font-size: 11px !important; margin-top: 4px !important; }
+  .chk-c-note .param-mini-input {
+    height: 34px; font-size: 12px !important; padding: 0 10px !important; border-radius: 8px;
+    background: transparent; border-style: dashed;
+  }
+  .chk-c-note .param-mini-input:focus, .chk-c-note .param-mini-input:not(:placeholder-shown) { background: var(--bg3); border-style: solid; }
+  .chk-c-st .badge { font-size: 10px; padding: 3px 8px; }
+  .section-group-hdr { position: sticky; top: 0; z-index: 2; }
+
+  /* Riwayat di checklist: sembunyikan kolom PIC */
+  .chk-hist th:nth-child(4), .chk-hist td:nth-child(4) { display: none; }
+
+  /* Crew: target sentuh lebih besar */
+  .crew-back-btn { min-height: 44px; }
+  .crew-card { min-height: 110px; }
+}

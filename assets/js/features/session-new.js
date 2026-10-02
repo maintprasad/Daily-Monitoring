@@ -106,16 +106,25 @@ function submitNewSession() {
   if (!pics.length) { setErr('ne-pic','Pilih minimal satu PIC'); ok=false; }
   if (!ok) return;
 
+  closeOverlay('newSessionOverlay');
+  startDraftSession({ unitId, areaId, eqId, tanggal, start, end: getVal('ns-end'), pics });
+}
+
+/**
+ * Buat sesi SEMENTARA (belum masuk sessions[]) lalu langsung buka checklist.
+ * Data baru tersimpan setelah user klik "Simpan Data Monitoring".
+ * Dipakai form "Sesi Monitoring Baru" dan "Mulai Cepat" di Crew Portal.
+ */
+function startDraftSession({ unitId, areaId, eqId, tanggal, start, end = '', pics }) {
   const unit = findUnit(unitId);
   const area = findArea(unitId, areaId);
   const eq   = (area?.equipments || []).find(e => e.id === eqId);
 
-  // ── Buat objek sesi SEMENTARA — belum masuk sessions[] ──
   _draftSession = {
     id:          genId(),
     tanggal,
     startTime:   start,
-    endTime:     getVal('ns-end'),
+    endTime:     end,
     unitId,      unitName:    unit?.name || '',
     areaId,      areaName:    area?.name || '',
     subAreaId:   '',
@@ -130,9 +139,5 @@ function submitNewSession() {
     items:       [],
     _isDraft:    true,   // flag: belum tersimpan
   };
-
-  closeOverlay('newSessionOverlay');
-
-  // Langsung buka checklist dengan draft — TANPA simpan dulu
   openChecklistModalDraft(_draftSession);
 }

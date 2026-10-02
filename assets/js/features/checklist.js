@@ -137,7 +137,7 @@ function openChecklistModal(sessId, unitId, areaId, saId, eqId) {
         </summary>
         <div style="margin-top:8px;background:var(--bg2);border:1px solid var(--border);
                     border-radius:8px;overflow:hidden">
-          <table style="width:100%;border-collapse:collapse">
+          <table class="chk-hist" style="width:100%;border-collapse:collapse">
             <thead>
               <tr style="background:var(--bg3)">
                 <th style="padding:6px 10px;font-size:9px;color:var(--text3);text-align:left;
@@ -206,12 +206,14 @@ function openChecklistModal(sessId, unitId, areaId, saId, eqId) {
         </div>
       </div>
     </details>
-    <div class="form-actions">
+    <div class="form-actions chk-actions">
+      <div class="chk-progress" id="chkProgress"></div>
       <button class="btn btn-ghost" onclick="closeOverlay('checklistOverlay')">Tutup</button>
-      <button class="btn btn-primary" onclick="saveChecklist('${esc(sess.id)}')">💾 Simpan Data Monitoring</button>
+      <button class="btn btn-primary" onclick="saveChecklist('${esc(sess.id)}')">💾 Simpan</button>
     </div>`;
 
   openOverlay('checklistOverlay');
+  initChecklistProgress();
   startChecklistAutoSave();
 }
 
@@ -316,7 +318,7 @@ function openChecklistModalDraft(draft) {
         </summary>
         <div style="margin-top:8px;background:var(--bg2);border:1px solid var(--border);
                     border-radius:8px;overflow:hidden">
-          <table style="width:100%;border-collapse:collapse">
+          <table class="chk-hist" style="width:100%;border-collapse:collapse">
             <thead><tr style="background:var(--bg3)">
               <th style="padding:6px 10px;font-size:9px;color:var(--text3);text-align:left;
                   font-family:'IBM Plex Mono',monospace;letter-spacing:.07em">TANGGAL</th>
@@ -403,14 +405,14 @@ function openChecklistModalDraft(draft) {
       </div>
     </details>
 
-    <div class="form-actions">
-      <button class="btn btn-danger" onclick="cancelDraftSession()">✕ Batalkan Sesi</button>
-      <button class="btn btn-primary" onclick="saveDraftSession()">
-        💾 Simpan Data Monitoring
-      </button>
+    <div class="form-actions chk-actions">
+      <div class="chk-progress" id="chkProgress"></div>
+      <button class="btn btn-danger" onclick="cancelDraftSession()">✕ Batal</button>
+      <button class="btn btn-primary" onclick="saveDraftSession()">💾 Simpan</button>
     </div>`;
 
   openOverlay('checklistOverlay');
+  initChecklistProgress();
   startChecklistAutoSave();
 }
 
@@ -609,12 +611,12 @@ function buildChkRow(p, existing) {
   }
 
   const badgeCls = status==='OK'?'b-ok':status==='WARNING'?'b-warn':status==='ALERT'?'b-alert':'b-gray';
-  return `<tr class="${rowCls}" id="chk-row-${p.id}">
-    <td style="font-weight:500">${esc(p.label)}</td>
-    <td style="text-align:center;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3)">${esc(p.unit||'—')}</td>
-    <td>${inputHtml}</td>
-    <td style="text-align:center"><span class="badge ${badgeCls}" id="chk-${p.id}-badge">${status||'—'}</span></td>
-    <td><input class="param-mini-input" id="chk-${p.id}-note" name="chk_${p.id}_note" value="${esc(note)}" placeholder="Catatan opsional..." autocomplete="off" style="width:100%;font-size:11px;padding:4px 6px"/></td>
+  return `<tr class="chk-row ${rowCls}" id="chk-row-${p.id}">
+    <td class="chk-c-label" style="font-weight:500">${esc(p.label)}</td>
+    <td class="chk-c-unit" style="text-align:center;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3)">${esc(p.unit||'—')}</td>
+    <td class="chk-c-val">${inputHtml}</td>
+    <td class="chk-c-st" style="text-align:center"><span class="badge ${badgeCls}" id="chk-${p.id}-badge">${status||'—'}</span></td>
+    <td class="chk-c-note"><input class="param-mini-input" id="chk-${p.id}-note" name="chk_${p.id}_note" value="${esc(note)}" placeholder="+ Catatan (opsional)" autocomplete="off" style="width:100%;font-size:11px;padding:4px 6px"/></td>
   </tr>`;
 }
 
@@ -812,6 +814,35 @@ function saveChecklist(sessId) {
       }, 400);
     }
   }
+}
+
+/**
+ * Progres pengisian checklist di bar bawah: "7/10 terisi · 1 ⚠ · 1 🚨".
+ * Diperbarui setiap kali isian berubah.
+ */
+function initChecklistProgress() {
+  const body = document.getElementById('chkBody');
+  if (!body) return;
+  body.oninput = updateChecklistProgress;
+  body.onchange = updateChecklistProgress;
+  updateChecklistProgress();
+}
+
+function updateChecklistProgress() {
+  const el = document.getElementById('chkProgress');
+  if (!el) return;
+  const rows = [...document.querySelectorAll('#chkBody tr.chk-row')];
+  const filled = rows.filter(r => (r.querySelector('[id$="-val"]')?.value || '').trim() !== '').length;
+  const badges = rows.map(r => r.querySelector('.chk-c-st .badge')?.textContent.trim());
+  const warn = badges.filter(b => b === 'WARNING').length;
+  const alert = badges.filter(b => b === 'ALERT').length;
+  const bad = badges.filter(b => b === '✗ FORMAT').length;
+  const pct = rows.length ? Math.round(filled / rows.length * 100) : 0;
+  el.innerHTML = `<div class="chk-progress-txt"><b>${filled}/${rows.length}</b> terisi
+      ${warn ? `<span class="chk-pill warn">⚠ ${warn}</span>` : ''}
+      ${alert ? `<span class="chk-pill alert">🚨 ${alert}</span>` : ''}
+      ${bad ? `<span class="chk-pill alert">✗ ${bad} format</span>` : ''}</div>
+    <div class="chk-progress-bar"><div style="width:${pct}%"></div></div>`;
 }
 
 /** Baca nilai checklist dari form (dipakai simpan sesi baru, edit sesi & auto-save). */

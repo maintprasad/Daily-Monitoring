@@ -177,6 +177,30 @@ function crewNavTo(tab) {
 }
 
 // ── HOME SCREEN ───────────────────────────────────────────────
+// Ringkas & langsung ke pekerjaan: progres hari ini + daftar equipment yang belum dicek.
+
+/** Unit dalam wilayah crew (kosong = semua unit). */
+function crewUnits() {
+  return hierarchy.units.filter(u => !currentUser?.unitId || u.id === currentUser.unitId);
+}
+
+/** Semua equipment di wilayah crew beserta sesi terakhir & status hari ini. */
+function crewEquipmentStatus() {
+  const today = todayISO();
+  const last = new Map();
+  sessions.forEach(s => {
+    const k = s.unitId + '|' + s.areaId + '|' + s.equipId;
+    const cur = last.get(k);
+    if (!cur || (s.createdAt || '') > (cur.createdAt || '')) last.set(k, s);
+  });
+  const out = [];
+  crewUnits().forEach(u => (u.areas || []).forEach(a => (a.equipments || []).forEach(eq => {
+    const ls = last.get(u.id + '|' + a.id + '|' + eq.id) || null;
+    out.push({ unit: u, area: a, eq, last: ls, doneToday: !!ls && ls.tanggal === today });
+  })));
+  return out;
+}
+
 function crewShowHome() {
   crewNav.screen = 'home';
   crewNav.unitId = null; crewNav.unitName = '';
@@ -185,122 +209,136 @@ function crewShowHome() {
   document.querySelectorAll('.crew-nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('crewNavHome')?.classList.add('active');
 
-  const today      = todayISO();
-  const thisMonth  = today.slice(0, 7);
-  const myName     = currentUser?.name || currentUser?.username || '';
+  const thisMonth = thisMonthISO();
+  const myName    = currentUser?.name || currentUser?.username || '';
+  const firstName = myName.split(/\s+/)[0] || myName;
+  const hour      = new Date().getHours();
+  const greet     = hour < 11 ? 'Selamat pagi' : hour < 15 ? 'Selamat siang' : hour < 19 ? 'Selamat sore' : 'Selamat malam';
+  const nowDate   = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const scope     = currentUser?.unitId ? unitLabel(currentUser.unitId) : 'Semua unit';
 
-  // Stat bulan ini
-  const monthSess  = sessions.filter(s => (s.tanggal||'').startsWith(thisMonth));
+  const eqs       = crewEquipmentStatus();
+  const doneCount = eqs.filter(x => x.doneToday).length;
+  const pct       = eqs.length ? Math.round(doneCount / eqs.length * 100) : 0;
+  // Belum dicek hari ini: yang belum pernah dicek dulu, lalu yang paling lama tidak dicek
+  const todo = eqs.filter(x => !x.doneToday)
+    .sort((a, b) => (a.last ? 1 : 0) - (b.last ? 1 : 0) || (a.last?.createdAt || '').localeCompare(b.last?.createdAt || ''));
+
+  const monthSess  = sessions.filter(s => (s.tanggal || '').startsWith(thisMonth));
   const monthItems = monthSess.flatMap(s => s.items || []);
-  const monthOK    = monthItems.filter(i => i.status==='OK').length;
-  const monthWarn  = monthItems.filter(i => i.status==='WARNING').length;
-  const monthAlert = monthItems.filter(i => i.status==='ALERT').length;
 
-  // Sesi bulan ini dari SEMUA teknisi
-  const recentAll = [...sessions]
-    .filter(s => (s.tanggal||'').startsWith(thisMonth))
-    .sort((a,b) => new Date(b.createdAt||0) - new Date(a.createdAt||0))
-    .slice(0, 6);
-
-  const recentHtml = recentAll.length
-    ? recentAll.map(s => {
-        const st  = sessStatus(s);
-        const dot = {OK:'var(--green)',WARNING:'var(--orange)',ALERT:'var(--red)',PENDING:'var(--text3)'}[st]||'var(--text3)';
-        const bd  = stBadge(st);
-        return `<div class="crew-recent-item" onclick="crewOpenSession('${esc(s.id)}')">
-          <div class="crew-recent-dot" style="background:${dot}"></div>
-          <div class="crew-recent-info">
-            <div class="crew-recent-equip">${esc(s.equipName||'—')}</div>
-            <div class="crew-recent-meta">
-              ${esc(s.areaName||'')} · 👤 ${esc(s.pic||'—')}
-            </div>
-            <div class="crew-recent-meta">${fmtDate(s.tanggal)} ${esc(s.startTime||'')}</div>
-          </div>
-          <span class="badge ${bd} crew-recent-badge">${st}</span>
-        </div>`;
-      }).join('')
-    : `<div style="padding:16px;font-size:12px;color:var(--text3);text-align:center">
-        Belum ada sesi monitoring.
-       </div>`;
-
-  // Quick stats
-  const totalEquip = countEquipments();
-  const unitCount  = hierarchy.units.length;
-
-  const nowDate = new Date().toLocaleDateString('id-ID', {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-  });
+  const todoHtml = todo.slice(0, 8).map(x => `
+    <button class="cw-todo-item" onclick="crewQuickStart(${jsArg(x.unit.id)}, ${jsArg(x.area.id)}, ${jsArg(x.eq.id)})">
+      <span class="cw-todo-dot ${x.last ? '' : 'never'}"></span>
+      <span class="cw-todo-info">
+        <span class="cw-todo-name">${esc(x.eq.name)}</span>
+        <span class="cw-todo-meta">${esc(x.area.name)}${crewUnits().length > 1 ? ' · ' + esc(x.unit.name) : ''} ·
+          ${x.last ? 'terakhir ' + esc(fmtDate(x.last.tanggal)) : '<b>belum pernah dicek</b>'}</span>
+      </span>
+      <span class="cw-todo-go">Mulai ›</span>
+    </button>`).join('');
 
   document.getElementById('crewBody').innerHTML = `
-    <!-- Welcome Banner -->
-    <div class="crew-welcome">
-      <div class="crew-welcome-icon">👷</div>
-      <div class="crew-welcome-title">Selamat Datang di Menu Monitoring Maintenance</div>
-      <div class="crew-welcome-name">${esc(myName)}</div>
-      <div class="crew-welcome-sub">Prasad Seeds Indonesia · Departemen Electrical</div>
-      <div class="crew-welcome-date">📅 ${nowDate}</div>
+    <div class="cw-hero">
+      <div class="cw-hello">${greet}, ${esc(firstName)} 👋</div>
+      <div class="cw-date">${esc(nowDate)} · ${esc(scope)}</div>
+      <div class="cw-progress">
+        <div class="cw-progress-top">
+          <span>Pengecekan hari ini</span>
+          <b>${doneCount} / ${eqs.length} equipment</b>
+        </div>
+        <div class="cw-progress-bar"><div style="width:${pct}%"></div></div>
+      </div>
+      <button class="cw-cta" onclick="crewNavTo('monitor')"><span>✚</span> Mulai Monitoring</button>
     </div>
 
-    <!-- Dropdown bulan -->
-    <div style="margin-bottom:12px">
-      ${buildMonthDropdownHTML('crewHomeMonthSel', thisMonth, 'onCrewHomeMonthChange(this.value)')}
+    <div class="crew-sec-label">⏳ Belum dicek hari ini <span class="cw-count">${todo.length}</span></div>
+    ${todo.length ? `<div class="cw-todo">${todoHtml}</div>
+      ${todo.length > 8 ? `<button class="cw-link" onclick="crewNavTo('monitor')">Lihat semua ${todo.length} equipment ›</button>` : ''}`
+      : `<div class="cw-done">✅ Semua equipment di wilayahmu sudah dicek hari ini. Mantap!</div>`}
+
+    <div class="crew-sec-label" id="crewHomeStatLabel" style="margin-top:20px">📊 Statistik ${formatMonthLabel(thisMonth)}</div>
+    <div class="cw-month">${buildMonthDropdownHTML('crewHomeMonthSel', thisMonth, 'onCrewHomeMonthChange(this.value)')}</div>
+    <div class="crew-stats-row" id="crewHomeStatRow">
+      <div class="crew-stat"><div class="crew-stat-val" style="color:var(--blue)" id="crewStatSesi">${monthSess.length}</div><div class="crew-stat-lbl">Sesi</div></div>
+      <div class="crew-stat"><div class="crew-stat-val" style="color:var(--orange)" id="crewStatWarn">${monthItems.filter(i => i.status === 'WARNING').length}</div><div class="crew-stat-lbl">Warning</div></div>
+      <div class="crew-stat"><div class="crew-stat-val" style="color:var(--red)" id="crewStatAlert">${monthItems.filter(i => i.status === 'ALERT').length}</div><div class="crew-stat-lbl">Alert</div></div>
     </div>
 
-    <!-- Quick Stats Bulan Ini -->
-    <div class="crew-sec-label" id="crewHomeStatLabel">📊 Statistik ${formatMonthLabel(thisMonth)}</div>
-    <div class="crew-stats-row" style="margin-bottom:20px" id="crewHomeStatRow">
-      <div class="crew-stat">
-        <div class="crew-stat-val" style="color:var(--blue)" id="crewStatSesi">${monthSess.length}</div>
-        <div class="crew-stat-lbl">Total Sesi</div>
-      </div>
-      <div class="crew-stat">
-        <div class="crew-stat-val" style="color:var(--orange)" id="crewStatWarn">${monthWarn}</div>
-        <div class="crew-stat-lbl">Warning</div>
-      </div>
-      <div class="crew-stat">
-        <div class="crew-stat-val" style="color:var(--red)" id="crewStatAlert">${monthAlert}</div>
-        <div class="crew-stat-lbl">Alert</div>
-      </div>
-    </div>
-
-    <!-- CTA Mulai Monitoring -->
-    <button onclick="crewNavTo('monitor')" style="
-      width:100%;padding:18px;border:none;border-radius:14px;
-      background:linear-gradient(135deg,var(--green) 0%,var(--green-d) 100%);
-      color:#fff;font-size:16px;font-weight:700;
-      font-family:'IBM Plex Sans',sans-serif;
-      cursor:pointer;margin-bottom:20px;
-      display:flex;align-items:center;justify-content:center;gap:10px;
-      box-shadow:0 4px 16px rgba(74,158,63,.35);
-      transition:all .15s;
-    " onmousedown="this.style.transform='scale(.97)'" onmouseup="this.style.transform=''">
-      <span style="font-size:22px">✚</span>
-      Mulai Monitoring Baru
-    </button>
-
-    <!-- Sesi Terbaru -->
-    <div class="crew-sec-label">⏱ Sesi Terbaru</div>
-    <div class="crew-recent" style="margin-bottom:20px">
+    <div class="crew-recent" style="margin:16px 0 8px">
       <div class="crew-recent-hdr">
-          <div class="crew-recent-title">Sesi Terbaru Bulan Ini</div>
-          <button onclick="crewShowHistory(false)" style="background:none;border:none;color:var(--blue);font-size:12px;cursor:pointer;font-family:'IBM Plex Sans',sans-serif">Lihat Semua →</button>
-        </div>
-        <div id="crewHomeRecentList">${recentHtml}</div>
+        <div class="crew-recent-title">⏱ Sesi terbaru</div>
+        <button class="cw-link-inline" onclick="crewShowHistory(false)">Lihat semua ›</button>
       </div>
+      <div id="crewHomeRecentList"></div>
+    </div>`;
 
-    <!-- Info sistem -->
-    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;font-size:12px;color:var(--text3)">
-      <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:8px;font-family:'IBM Plex Mono',monospace">ℹ INFORMASI SISTEM</div>
-      <div style="display:flex;flex-direction:column;gap:6px">
-        <div>🏭 ${unitCount} unit produksi terdaftar</div>
-        <div>⚙ ${totalEquip} equipment dimonitor</div>
-        <div>👷 ${PIC_LIST.length} teknisi aktif</div>
-        <div style="margin-top:4px;padding-top:8px;border-top:1px solid var(--border);font-size:10px">
-          Jika ada temuan penting, segera buat Work Order melalui halaman Finding.
-        </div>
+  // Daftar sesi terbaru memakai renderer yang sama dengan dropdown bulan
+  onCrewHomeMonthChange(thisMonth);
+}
+
+// ── MULAI CEPAT (tanpa form panjang) ──────────────────────────
+// Crew sudah memilih equipment, jadi cukup konfirmasi waktu & PIC lalu langsung isi checklist.
+let _crewQuick = null;
+
+function crewQuickStart(unitId, areaId, eqId) {
+  const unit = findUnit(unitId);
+  const area = findArea(unitId, areaId);
+  const eq   = findEquipFlex(unitId, areaId, '', eqId);
+  if (!eq) { toast('Equipment tidak ditemukan', 'error'); return; }
+  if (!(eq.params || []).length) { toast('Equipment ini belum punya parameter. Hubungi Admin.', 'error'); return; }
+  crewNav.screen = crewNav.screen === 'home' ? 'home' : 'equip';
+
+  // Nama sendiri selalu tersedia & langsung terpilih; PIC lain dari daftar PIC
+  const me = (currentUser?.name || currentUser?.username || '').toUpperCase();
+  const pics = [...new Set([me, ...PIC_LIST.map(p => p.toUpperCase())].filter(Boolean))];
+  _crewQuick = { unitId, areaId, eqId, selected: new Set(me ? [me] : []) };
+
+  const last = getLastSession(unitId, areaId, '', eqId);
+  const now = new Date();
+  document.getElementById('crewStartBody').innerHTML = `
+    <div class="cw-start-eq">
+      <div class="cw-start-icon">${getAreaIcon(area?.name)}</div>
+      <div style="min-width:0">
+        <div class="cw-start-name">${esc(eq.name)}</div>
+        <div class="cw-start-meta">${esc(unit?.name || '')} · ${esc(area?.name || '')}${eq.tag ? ' · ' + esc(eq.tag) : ''}</div>
+        <div class="cw-start-meta">${(eq.params || []).length} parameter · ${last ? 'terakhir ' + esc(fmtDate(last.tanggal)) + ' (' + sessStatus(last) + ')' : 'belum pernah dicek'}</div>
       </div>
     </div>
-  `;
+
+    <div class="cw-start-row">
+      <label>Tanggal<input type="date" id="cqDate" value="${todayISO()}"/></label>
+      <label>Jam mulai<input type="time" id="cqTime" value="${now.toTimeString().slice(0, 5)}"/></label>
+    </div>
+
+    <div class="cw-start-label">Siapa yang mengecek? <span>(boleh lebih dari satu)</span></div>
+    <div class="cw-chips" id="cqPics">
+      ${pics.map(p => `<button type="button" class="cw-chip ${_crewQuick.selected.has(p) ? 'on' : ''}" data-pic="${esc(p)}"
+        onclick="crewQuickTogglePic(this)">${p === me ? '👷 ' : ''}${esc(p)}</button>`).join('')}
+    </div>
+
+    <button class="cw-cta" style="margin-top:18px" onclick="crewQuickSubmit()"><span>▶</span> Mulai Isi Checklist</button>
+    <button class="cw-link" onclick="closeOverlay('crewStartOverlay')">Batal</button>`;
+  openOverlay('crewStartOverlay');
+}
+
+function crewQuickTogglePic(btn) {
+  const p = btn.dataset.pic;
+  if (_crewQuick.selected.has(p)) _crewQuick.selected.delete(p); else _crewQuick.selected.add(p);
+  btn.classList.toggle('on', _crewQuick.selected.has(p));
+}
+
+function crewQuickSubmit() {
+  if (!_crewQuick) return;
+  const tanggal = getVal('cqDate');
+  const start   = getVal('cqTime');
+  if (!tanggal || !start) { toast('Isi tanggal dan jam mulai', 'error'); return; }
+  if (!_crewQuick.selected.size) { toast('Pilih minimal satu PIC', 'error'); return; }
+  const { unitId, areaId, eqId } = _crewQuick;
+  const pics = [..._crewQuick.selected];
+  _crewQuick = null;
+  closeOverlay('crewStartOverlay');
+  startDraftSession({ unitId, areaId, eqId, tanggal, start, pics });
 }
 
 // ── UNIT SELECT SCREEN ────────────────────────────────────────
@@ -461,53 +499,36 @@ function crewSelectArea(areaId, areaName) {
     const todaySess    = equipAllSess.filter(s =>
       (s.tanggal||'') === todayISO()
     );
-    const lastStr = last
-      ? `Terakhir: ${fmtDate(last.tanggal)} ${last.startTime||''}`
-      : '⚠ Belum pernah dimonitoring';
     const badgeCls = stBadge(st);
-    const sessInfo = sessCount > 0
-      ? `${sessCount}× dicek${todaySess.length > 0 ? ` · ✅ ${todaySess.length}× hari ini` : ''}`
-      : '';
+    const doneToday = todaySess.length > 0;
+    const statusLine = doneToday
+      ? `<span class="cw-eq-ok">✅ Sudah dicek hari ini${todaySess[0]?.startTime ? ' · ' + esc(todaySess[0].startTime) : ''}</span>`
+      : last ? `<span>Terakhir ${esc(fmtDate(last.tanggal))}</span>`
+             : `<span class="cw-eq-never">⚠ Belum pernah dicek</span>`;
 
-    return `<div class="crew-equip-item"
-      style="flex-direction:column;align-items:stretch;gap:8px;cursor:default;
-             ${todaySess.length>0?'border-color:var(--green);background:var(--green-dim);':''}">
-      <div style="display:flex;align-items:center;gap:14px">
-        <div class="crew-equip-dot" style="background:${dot};flex-shrink:0"></div>
-        <div class="crew-equip-info" style="flex:1;min-width:0">
-          <div class="crew-equip-name">${esc(eq.name)}</div>
-          <div class="crew-equip-meta" style="margin-top:3px">
-            ${typePill}
-            ${eq.tag ? `<span style="color:var(--text3)">${esc(eq.tag)}</span> · ` : ''}
-            ${eq.params?.length||0} param
-          </div>
-          <div style="margin-top:5px;display:flex;align-items:center;gap:5px;flex-wrap:wrap">
-            <span class="badge ${badgeCls}" style="font-size:9px">${st}</span>
-            ${sessInfo ? `<span style="font-size:9px;color:var(--green);background:var(--green-dim);
-              padding:1px 6px;border-radius:4px;border:1px solid rgba(74,158,63,.25)">${sessInfo}</span>` : ''}
-          </div>
-          <div style="margin-top:4px;font-size:10px;
-            color:${!last?'var(--red)':'var(--text3)'};
-            font-weight:${!last?'600':'400'}">
-            ${lastStr}
-          </div>
+    return `<div class="cw-eq ${doneToday ? 'done' : ''}" data-search="${esc((eq.name + ' ' + (eq.tag || '') + ' ' + (eq.type || '')).toLowerCase())}"
+        data-done="${doneToday ? '1' : '0'}">
+      <div class="cw-eq-main">
+        <span class="crew-equip-dot" style="background:${dot}"></span>
+        <div style="min-width:0;flex:1">
+          <div class="cw-eq-name">${esc(eq.name)}</div>
+          <div class="cw-eq-meta">${typePill}${eq.tag ? esc(eq.tag) + ' · ' : ''}${eq.params?.length || 0} param
+            ${last ? ` · <span class="badge ${badgeCls}" style="font-size:9px;padding:1px 6px">${st}</span>` : ''}</div>
+          <div class="cw-eq-status">${statusLine}${sessCount ? ` · ${sessCount}× dicek` : ''}</div>
         </div>
       </div>
-      <div style="display:flex;gap:6px">
-        ${last ? `
-          <button class="btn btn-ghost btn-sm" style="flex:1;font-size:11px"
-            onclick="crewOpenSession('${esc(last.id)}')">
-            👁 Lihat (${sessCount}×)
-          </button>` : ''}
-        <button class="btn btn-primary btn-sm"
-          style="flex:${last?'1':'2'};font-size:11px;
-            ${todaySess.length>0?'background:var(--green-d);':''}"
-          onclick="crewStartSession('${esc(crewNav.unitId)}','${esc(areaId)}','${esc(eq.id)}')">
-          ✚ ${!last ? 'Mulai Monitor' : todaySess.length>0 ? 'Monitor Lagi (Hari Ini)' : 'Monitor Lagi'}
+      <div class="cw-eq-actions">
+        ${last ? `<button class="cw-btn ghost" onclick="crewOpenSession(${jsArg(last.id)})">👁 Terakhir</button>` : ''}
+        <button class="cw-btn ${doneToday ? 'outline' : 'primary'}"
+          onclick="crewStartSession(${jsArg(crewNav.unitId)},${jsArg(areaId)},${jsArg(eq.id)})">
+          ${doneToday ? '↻ Cek Lagi' : '▶ Mulai Cek'}
         </button>
       </div>
     </div>`;
   }).join('');
+
+  const pending = equips.length - equips.filter(eq =>
+    getEquipHistory(crewNav.unitId, areaId, eq.id).some(s => s.tanggal === todayISO())).length;
 
   document.getElementById('crewBody').innerHTML = `
     ${crewBreadcrumb()}
@@ -516,34 +537,42 @@ function crewSelectArea(areaId, areaName) {
       ← Kembali ke Area
     </button>
     <div class="crew-sec-label">
-      ⚙ Pilih Equipment — <span style="color:var(--navy)">${esc(areaName)}</span>
+      ⚙ ${esc(areaName)} <span class="cw-count">${pending} belum dicek</span>
     </div>
-    <div class="crew-equip-list">
+    <div class="cw-search">
+      <span>🔍</span>
+      <input type="search" id="cwEqSearch" placeholder="Cari equipment / tag..." oninput="crewFilterEquip()" autocomplete="off"/>
+    </div>
+    <div class="cw-filter">
+      <button class="cw-chip on" data-f="all" onclick="crewFilterEquip(this)">Semua (${equips.length})</button>
+      <button class="cw-chip" data-f="todo" onclick="crewFilterEquip(this)">Belum dicek hari ini (${pending})</button>
+    </div>
+    <div class="crew-equip-list" id="cwEqList">
       ${equipItems}
+      <div class="cw-done" id="cwEqEmpty" hidden>Tidak ada equipment yang cocok.</div>
     </div>`;
+}
+
+/** Filter daftar equipment tanpa render ulang (fokus input tidak hilang). */
+function crewFilterEquip(chip) {
+  if (chip) {
+    document.querySelectorAll('.cw-filter .cw-chip').forEach(c => c.classList.toggle('on', c === chip));
+  }
+  const mode = document.querySelector('.cw-filter .cw-chip.on')?.dataset.f || 'all';
+  const q = (getVal('cwEqSearch') || '').toLowerCase().trim();
+  let shown = 0;
+  document.querySelectorAll('#cwEqList .cw-eq').forEach(el => {
+    const ok = (!q || el.dataset.search.includes(q)) && (mode === 'all' || el.dataset.done === '0');
+    el.hidden = !ok;
+    if (ok) shown++;
+  });
+  const empty = document.getElementById('cwEqEmpty');
+  if (empty) empty.hidden = shown > 0;
 }
 
 // ── START SESSION FROM CREW PORTAL ───────────────────────────
 function crewStartSession(unitId, areaId, eqId) {
-  crewNav.screen = 'equip';
-  openNewSessionModal(unitId, areaId, '', eqId);
-
-  // Fallback: pastikan dropdown equip terisi benar
-  setTimeout(() => {
-    const nsEquip = document.getElementById('ns-equip');
-    if (nsEquip && eqId && nsEquip.value !== eqId) {
-      setVal('ns-unit', unitId);
-      onNSUnitChange();
-      setTimeout(() => {
-        setVal('ns-area', areaId);
-        onNSAreaChange();
-        setTimeout(() => {
-          setVal('ns-equip', eqId);
-          onNSEquipChange();
-        }, 80);
-      }, 80);
-    }
-  }, 350);
+  crewQuickStart(unitId, areaId, eqId);
 }
 
 // ── OPEN / VIEW SESSION ───────────────────────────────────────
