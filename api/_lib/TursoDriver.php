@@ -135,7 +135,6 @@ final class TursoDriver implements DbDriver
             $raw = curl_exec($ch);
             $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
             $error = curl_error($ch);
-            curl_close($ch);
             if ($raw === false) {
                 throw new RuntimeException('Turso: koneksi gagal — ' . $error);
             }
@@ -151,7 +150,11 @@ final class TursoDriver implements DbDriver
                 throw new RuntimeException('Turso: koneksi gagal (curl tidak tersedia)');
             }
             $status = 200;
-            foreach ($http_response_header ?? [] as $h) {
+            // $http_response_header deprecated di PHP 8.5 → pakai fungsi penggantinya bila ada
+            $respHeaders = function_exists('http_get_last_response_headers')
+                ? (http_get_last_response_headers() ?? [])
+                : ($http_response_header ?? []);
+            foreach ($respHeaders as $h) {
                 if (preg_match('~^HTTP/\S+\s+(\d{3})~', $h, $m)) {
                     $status = (int) $m[1];
                 }

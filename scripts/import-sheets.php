@@ -93,7 +93,6 @@ function load_source(array $args): array
         if ($raw === false) {
             throw new RuntimeException('Gagal mengambil data: ' . curl_error($ch));
         }
-        curl_close($ch);
     }
     $data = json_decode((string) $raw, true);
     if (!is_array($data)) {

@@ -16,7 +16,7 @@ assets/js/features/     Checklist, sesi, Work Order, laporan PDF/PPTX, crew port
 assets/js/tools/        Tool admin (Data Recovery, Scan Big Error)
 api/index.php           Satu-satunya endpoint API (?r=route)
 api/_lib/               Driver SQLite/Turso, skema, auth, repository
-scripts/                CLI: migrate.php, import-sheets.php
+scripts/                CLI: migrate.php, import-sheets.php, copy-to-turso.php
 database/schema.sql     Skema SQL lengkap (SQLite & Turso) — generate ulang: php scripts/dump-schema.php
 database/*.db           File SQLite lokal (tidak ikut git)
 legacy/                 Backup index.html monolith lama (boleh dihapus)
@@ -61,7 +61,15 @@ DB_DRIVER=turso
 TURSO_DATABASE_URL=libsql://dailymonitoring-xxx.turso.io
 TURSO_AUTH_TOKEN=eyJ...
 ```
-Lalu buat tabel, admin, dan (opsional) import data — dari komputer lokal:
+**Pindahkan data lokal (XAMPP) ke Turso** — semua tabel (user, bagan organisasi, hierarki,
+sesi, RCA, perbaikan, WO, pengaturan) disalin; password user tetap sama:
+```
+php scriptscopy-to-turso.php --env=.env.turso
+```
+Jika Turso sudah berisi data, script menolak kecuali ditambah `--force` (isi Turso ditimpa).
+File `.db` sendiri **tidak** di-push ke GitHub (repo publik & berisi hash password / nomor HP).
+
+Atau mulai dari kosong: buat tabel, admin, dan (opsional) import data — dari komputer lokal:
 ```
 php scripts\migrate.php --env=.env.turso --admin=admin --password=PasswordKamu
 php scripts\import-sheets.php --env=.env.turso
@@ -74,8 +82,9 @@ Data Turso bisa dilihat lewat `turso db shell dailymonitoring` atau dashboard Tu
 ## 3. Deploy ke Vercel
 
 1. Push repo ke GitHub, import project di Vercel (Framework Preset: **Other**).
-2. Project → Settings → Environment Variables:
-   `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` (opsional `DB_DRIVER=turso`).
+2. **Storage** → pilih database Turso → **Connect Project** (env var otomatis terisi), atau
+   Project → Settings → Environment Variables: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`.
+   Nama dengan prefix kustom dari integrasi (mis. `STORAGE_TURSO_DATABASE_URL`) juga dikenali.
 3. Deploy. `vercel.json` sudah mengatur `api/index.php` memakai runtime `vercel-php@0.9.0`.
 
 Cek koneksi: `https://<project>.vercel.app/api/index.php?r=health`

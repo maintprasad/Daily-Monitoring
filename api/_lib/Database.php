@@ -42,18 +42,18 @@ final class Db
         if ($explicit !== '') {
             return $explicit;
         }
-        return Env::get('TURSO_DATABASE_URL') ? 'turso' : 'sqlite';
+        return Env::turso()[0] !== null ? 'turso' : 'sqlite';
     }
 
     private static function create(): DbDriver
     {
         $name = self::driverName();
         if ($name === 'turso') {
-            $url = Env::get('TURSO_DATABASE_URL');
+            [$url, $token] = Env::turso();
             if (!$url) {
                 throw new RuntimeException('TURSO_DATABASE_URL belum diset');
             }
-            return new TursoDriver($url, (string) Env::get('TURSO_AUTH_TOKEN', ''));
+            return new TursoDriver($url, $token);
         }
         if ($name !== 'sqlite') {
             throw new RuntimeException("DB_DRIVER tidak dikenal: $name (pakai sqlite atau turso)");

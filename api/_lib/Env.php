@@ -29,7 +29,8 @@ final class Env
             if ($len >= 2 && ($value[0] === '"' || $value[0] === "'") && $value[$len - 1] === $value[0]) {
                 $value = substr($value, 1, -1);
             }
-            if (self::fromProcess($key) === null) {
+            // File yang dimuat lebih dulu menang (mis. --env=.env.turso sebelum .env)
+            if (self::fromProcess($key) === null && !array_key_exists($key, self::$values)) {
                 self::$values[$key] = $value;
             }
         }
@@ -48,6 +49,27 @@ final class Env
             return $default;
         }
         return in_array(strtolower($value), ['1', 'true', 'yes', 'on'], true);
+    }
+
+    /**
+     * Kredensial Turso. Integrasi Turso di Vercel Marketplace bisa memberi prefix kustom
+     * (mis. STORAGE_TURSO_DATABASE_URL) — nama tanpa prefix tetap diutamakan.
+     * @return array{0:?string,1:string} [url, token]
+     */
+    public static function turso(): array
+    {
+        $url = self::get('TURSO_DATABASE_URL');
+        if ($url !== null) {
+            return [$url, (string) self::get('TURSO_AUTH_TOKEN', '')];
+        }
+        $all = array_merge(self::$values, $_SERVER, $_ENV, getenv() ?: []);
+        foreach ($all as $key => $value) {
+            if (is_string($key) && is_string($value) && $value !== ''
+                && preg_match('~^(.+_)TURSO_DATABASE_URL$~', $key, $m)) {
+                return [$value, (string) self::get($m[1] . 'TURSO_AUTH_TOKEN', '')];
+            }
+        }
+        return [null, ''];
     }
 
     private static function fromProcess(string $key): ?string

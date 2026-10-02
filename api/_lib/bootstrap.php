@@ -3,6 +3,13 @@ declare(strict_types=1);
 
 define('APP_ROOT', dirname(__DIR__, 2));
 
+// Peringatan/deprecation PHP tidak boleh tercetak ke respons — bisa merusak JSON API.
+// Tetap tercatat di log server (Vercel: Runtime Logs, XAMPP: php_error_log).
+if (PHP_SAPI !== 'cli') {
+    ini_set('display_errors', '0');
+    ini_set('log_errors', '1');
+}
+
 require __DIR__ . '/Env.php';
 require __DIR__ . '/Http.php';
 require __DIR__ . '/Database.php';
