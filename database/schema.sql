@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════
--- Prasad Seeds — Monitoring System v5 · Skema database (versi 3)
+-- Prasad Seeds — Monitoring System v5 · Skema database (versi 4)
 -- Kompatibel dengan SQLite (XAMPP) dan Turso / libSQL (Vercel). BUKAN untuk MySQL/phpMyAdmin.
 -- Di-generate dari api/_lib/Schema.php:  php scripts/dump-schema.php
 --
@@ -44,7 +44,6 @@ CREATE TABLE IF NOT EXISTS users (
   active        INTEGER NOT NULL DEFAULT 1,
   unit_id       TEXT NOT NULL DEFAULT '',
   phone         TEXT NOT NULL DEFAULT '',
-  reports_to    TEXT NOT NULL DEFAULT '',
   notify_app    INTEGER NOT NULL DEFAULT 1,
   notify_wa     INTEGER NOT NULL DEFAULT 1,
   created_at    TEXT NOT NULL,
@@ -59,6 +58,15 @@ CREATE TABLE IF NOT EXISTS auth_tokens (
 );
 
 CREATE INDEX IF NOT EXISTS idx_auth_tokens_user ON auth_tokens(username);
+
+CREATE TABLE IF NOT EXISTS user_reports (
+  username TEXT NOT NULL,
+  manager  TEXT NOT NULL,
+  seq      INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (username, manager)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_reports_manager ON user_reports(manager);
 
 CREATE TABLE IF NOT EXISTS units (
   pk          INTEGER PRIMARY KEY,
@@ -277,7 +285,7 @@ CREATE VIEW IF NOT EXISTS v_findings AS
 INSERT OR IGNORE INTO counters (name, value) VALUES
   ('rev', 0), ('hierarchy_rev', 0), ('pics_rev', 0), ('wo_seq', 0);
 
-INSERT OR IGNORE INTO app_meta (key, value) VALUES ('schema_version', '3');
+INSERT OR IGNORE INTO app_meta (key, value) VALUES ('schema_version', '4');
 
 INSERT INTO users (username, name, role, password_hash, active, created_at, updated_at)
   SELECT 'admin', 'Administrator (default)', 'admin', '$2y$10$NuYmx98uq4RJm.QVxITepe6lh8TTTppcBpEZmnpf2fj6ShHCdDrqG', 1,

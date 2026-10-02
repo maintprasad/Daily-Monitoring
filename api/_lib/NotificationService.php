@@ -154,8 +154,20 @@ final class NotificationService
         }
 
         $settings = self::settings();
-        $users = Db::query('SELECT username, name, role, active, unit_id, phone, reports_to, notify_app, notify_wa FROM users');
+        [$users, $links] = Db::queryMany([
+            ['SELECT username, name, role, active, unit_id, phone, notify_app, notify_wa FROM users', []],
+            ['SELECT username, manager FROM user_reports', []],
+        ]);
         $byName = array_column($users, null, 'username');
+        foreach ($byName as &$u) {
+            $u['managers'] = [];
+        }
+        unset($u);
+        foreach ($links as $l) {
+            if (isset($byName[$l['username']])) {
+                $byName[$l['username']]['managers'][] = (string) $l['manager'];
+            }
+        }
 
         $statements = [];
         $wa = [];
@@ -186,8 +198,9 @@ final class NotificationService
     }
 
     /**
-     * Penerima = (rantai atasan pelapor ∪ user ber-role sesuai di unit tsb) yang role-nya
+     * Penerima = (semua atasan pelapor ke atas ∪ user ber-role sesuai di unit tsb) yang role-nya
      * diizinkan untuk severity ini, aktif, dan bukan pelapor sendiri.
+     * $byName[username]['managers'] = daftar atasan (satu user bisa punya beberapa atasan).
      */
     public static function recipients(string $severity, string $unitId, string $actor, array $byName, array $rules): array
     {
@@ -199,13 +212,22 @@ final class NotificationService
             }
         }
         if (!empty($rules['useOrgChart'])) {
-            $cur = $byName[$actor]['reports_to'] ?? '';
-            $guard = 0;
-            while ($cur !== '' && isset($byName[$cur]) && $guard++ < 20) {
-                if (in_array($byName[$cur]['role'], $roles, true)) {
-                    $out[$cur] = $byName[$cur];
+            // Telusuri semua jalur atasan ke atas (BFS, aman dari siklus)
+            $queue = $byName[$actor]['managers'] ?? [];
+            $seen = [$actor => true];
+            while ($queue) {
+                $m = array_shift($queue);
+                if (isset($seen[$m]) || !isset($byName[$m])) {
+                    continue;
                 }
-                $cur = $byName[$cur]['reports_to'];
+                $seen[$m] = true;
+                // Tetap disaring wilayah: supervisor yang melapor ke PM Unit 1 & PM Unit 2
+                // hanya meneruskan temuan Unit 1 ke PM Unit 1 (bukan ke PM Unit 2)
+                $mUnit = $byName[$m]['unit_id'];
+                if (in_array($byName[$m]['role'], $roles, true) && ($mUnit === '' || $mUnit === $unitId)) {
+                    $out[$m] = $byName[$m];
+                }
+                array_push($queue, ...$byName[$m]['managers']);
             }
         }
         unset($out[$actor]);

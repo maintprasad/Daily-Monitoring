@@ -60,6 +60,35 @@ function userDisplayName(username) {
   return u ? (u.name || u.username) : username;
 }
 
+/** Daftar atasan user (array). Menerima format lama berupa string. */
+function managersOf(u) {
+  const r = u?.reportsTo;
+  return Array.isArray(r) ? r : (r ? [r] : []);
+}
+
+// Urutan level jabatan untuk pengurutan & peringatan bagan organisasi
+const ORG_LEVEL = { crew: 1, leader: 2, spv: 3, manager: 4, admin: 5 };
+
+/**
+ * HTML daftar centang calon atasan (lebih dari satu boleh dipilih).
+ * onToggle: nama fungsi global yang dipanggil (username, manager, checked); kosong = form biasa.
+ */
+function managerPickerHTML(forUser, selected, onToggle) {
+  const cands = USERS.filter(x => x.username !== forUser)
+    .sort((a, b) => (ORG_LEVEL[b.role] || 0) - (ORG_LEVEL[a.role] || 0) || (a.name || a.username).localeCompare(b.name || b.username));
+  if (!cands.length) return '<div class="fhint">Belum ada user lain.</div>';
+  return cands.map(x => {
+    const on = selected.includes(x.username);
+    const handler = onToggle ? ` onchange="${onToggle}(${jsArg(forUser)}, ${jsArg(x.username)}, this.checked)"` : '';
+    return `<label class="mgr-opt ${on ? 'on' : ''}">
+      <input type="checkbox" value="${esc(x.username)}" ${on ? 'checked' : ''}${handler}
+        onclick="this.parentElement.classList.toggle('on', this.checked)"/>
+      <span>${esc(x.name || x.username)}</span>
+      <span class="mgr-meta">${esc(ROLE_LABELS[x.role]?.label || x.role)}${x.unitId ? ' · ' + esc(unitLabel(x.unitId)) : ''}</span>
+    </label>`;
+  }).join('');
+}
+
 async function loadUsersFromServer() {
   const res = await apiRequest('users');
   USERS = res.users || [];
@@ -112,7 +141,7 @@ function renderUserTable() {
       <td style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text2)">${esc(u.username)}</td>
       <td><span class="role-badge ${rl.cls}">${esc(rl.label)}</span></td>
       <td style="font-size:11px">${esc(unitLabel(u.unitId))}</td>
-      <td style="font-size:11px">${u.reportsTo ? esc(userDisplayName(u.reportsTo)) : '<span style="color:var(--text3)">—</span>'}</td>
+      <td style="font-size:11px">${managersOf(u).length ? managersOf(u).map(m => esc(userDisplayName(m))).join(', ') : '<span style="color:var(--text3)">—</span>'}</td>
       <td style="font-size:11px;font-family:'IBM Plex Mono',monospace">${u.phone ? esc(u.phone) + (u.notifyWa ? '' : ' <span title="Notifikasi WA dimatikan">🔕</span>') : '<span style="color:var(--text3)">—</span>'}</td>
       <td>
         ${u.active === false
@@ -185,13 +214,8 @@ function fillUserExtraFields(u) {
       hierarchy.units.map(x => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('');
     unitSel.value = u?.unitId || '';
   }
-  const repSel = document.getElementById('uf-reports');
-  if (repSel) {
-    repSel.innerHTML = '<option value="">— Tidak ada (puncak) —</option>' +
-      USERS.filter(x => x.username !== u?.username)
-        .map(x => `<option value="${esc(x.username)}">${esc(x.name || x.username)} · ${esc(ROLE_LABELS[x.role]?.label || x.role)}${x.unitId ? ' · ' + esc(unitLabel(x.unitId)) : ''}</option>`).join('');
-    repSel.value = u?.reportsTo || '';
-  }
+  const picker = document.getElementById('uf-reports');
+  if (picker) picker.innerHTML = managerPickerHTML(u?.username || '', managersOf(u), '');
   setVal('uf-phone', u?.phone || '');
   setErr('uf-phone-err', '');
   [['uf-notify-app', u ? u.notifyApp !== false : true], ['uf-notify-wa', u ? u.notifyWa !== false : true]].forEach(([id, on]) => {
@@ -350,7 +374,7 @@ async function submitUserForm() {
 
   const extra = {
     unitId:    document.getElementById('uf-unit')?.value || '',
-    reportsTo: document.getElementById('uf-reports')?.value || '',
+    reportsTo: [...document.querySelectorAll('#uf-reports input[type=checkbox]:checked')].map(cb => cb.value),
     phone,
     notifyApp: document.getElementById('uf-notify-app')?.checked ?? true,
     notifyWa:  document.getElementById('uf-notify-wa')?.checked ?? true,

@@ -11,13 +11,13 @@ declare(strict_types=1);
  */
 final class Schema
 {
-    public const VERSION = 3;
+    public const VERSION = 4;
 
-    // Kolom users yang ditambahkan di v3 (untuk upgrade database lama lewat ALTER TABLE)
+    // Kolom users yang ditambahkan sejak v3 (untuk upgrade database lama lewat ALTER TABLE).
+    // Atasan (bagan organisasi) mulai v4 disimpan di tabel user_reports — bisa lebih dari satu.
     private const USER_COLUMNS_V3 = [
         'unit_id'    => "TEXT NOT NULL DEFAULT ''",   // wilayah: '' = semua unit
         'phone'      => "TEXT NOT NULL DEFAULT ''",   // nomor WhatsApp (format 62xxx)
-        'reports_to' => "TEXT NOT NULL DEFAULT ''",   // username atasan (bagan organisasi)
         'notify_app' => 'INTEGER NOT NULL DEFAULT 1', // notifikasi popup di aplikasi
         'notify_wa'  => 'INTEGER NOT NULL DEFAULT 1', // notifikasi WhatsApp
     ];
@@ -44,7 +44,6 @@ final class Schema
                 active        INTEGER NOT NULL DEFAULT 1,
                 unit_id       TEXT NOT NULL DEFAULT \'\',
                 phone         TEXT NOT NULL DEFAULT \'\',
-                reports_to    TEXT NOT NULL DEFAULT \'\',
                 notify_app    INTEGER NOT NULL DEFAULT 1,
                 notify_wa     INTEGER NOT NULL DEFAULT 1,
                 created_at    TEXT NOT NULL,
@@ -57,6 +56,14 @@ final class Schema
                 created_at TEXT NOT NULL
             )',
             'CREATE INDEX IF NOT EXISTS idx_auth_tokens_user ON auth_tokens(username)',
+            // Bagan organisasi: satu baris per pasangan bawahan → atasan (boleh lebih dari satu atasan)
+            'CREATE TABLE IF NOT EXISTS user_reports (
+                username TEXT NOT NULL,
+                manager  TEXT NOT NULL,
+                seq      INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (username, manager)
+            )',
+            'CREATE INDEX IF NOT EXISTS idx_user_reports_manager ON user_reports(manager)',
 
             // ── Hierarki: Unit → Area → Equipment → Parameter ──
             'CREATE TABLE IF NOT EXISTS units (
@@ -282,8 +289,11 @@ final class Schema
 
         $stmts = [];
         // v3: kolom baru di tabel users (database lama)
-        foreach (self::missingUserColumns() as $col => $def) {
-            $stmts[] = ["ALTER TABLE users ADD COLUMN $col $def", []];
+        $userCols = self::legacyUserColumns();
+        if ($userCols !== null) {
+            foreach (array_diff_key(self::USER_COLUMNS_V3, array_flip($userCols)) as $col => $def) {
+                $stmts[] = ["ALTER TABLE users ADD COLUMN $col $def", []];
+            }
         }
         if ($oldWorkOrders !== null) {
             // Skema v1 menyimpan WO sebagai satu kolom JSON `data` → tabel diganti
@@ -295,6 +305,12 @@ final class Schema
             foreach ($oldWorkOrders as $wo) {
                 array_push($stmts, ...SyncRepository::workOrderStatements($wo));
             }
+        }
+        if ($userCols !== null && in_array('reports_to', $userCols, true)) {
+            // v4: satu atasan per user (kolom users.reports_to) → tabel user_reports
+            $stmts[] = ["INSERT OR IGNORE INTO user_reports (username, manager, seq)
+                         SELECT username, reports_to, 0 FROM users WHERE reports_to <> ''", []];
+            $stmts[] = ['ALTER TABLE users DROP COLUMN reports_to', []];
         }
         $stmts[] = ["UPDATE app_meta SET value = ? WHERE key = 'schema_version'", [(string) self::VERSION]];
         Db::driver()->transaction($stmts);
@@ -312,16 +328,15 @@ final class Schema
         }
     }
 
-    /** Kolom v3 yang belum ada di tabel users (kosong untuk database baru). */
-    private static function missingUserColumns(): array
+    /** Kolom tabel users pada database lama yang perlu di-upgrade (null = database baru / sudah terbaru). */
+    private static function legacyUserColumns(): ?array
     {
         $version = self::installedVersion();
-        if ($version === 0 || $version >= 3) {
-            return [];
+        if ($version === 0 || $version >= self::VERSION) {
+            return null;
         }
         $rows = Db::driver()->queryMany([["SELECT name FROM pragma_table_info('users')", []]])[0];
-        $existing = array_column($rows, 'name');
-        return array_diff_key(self::USER_COLUMNS_V3, array_flip($existing));
+        return array_column($rows, 'name');
     }
 
     /** WO dari skema v1 (kolom JSON `data`), atau null jika tidak perlu konversi. */
