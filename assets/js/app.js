@@ -146,6 +146,7 @@ function navigateTo(pid) {
   }
   if (pid === 'config')    renderConfigPage();
   if (pid === 'findings')  renderFindingsPage();
+  if (pid === 'rca')       renderRcaPage();
   if (pid === 'usermgmt')  renderUserMgmtPage();
   if (pid === 'orgchart')  renderOrgChartPage();
   if (window.innerWidth <= 768) closeSidebar();

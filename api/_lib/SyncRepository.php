@@ -85,6 +85,8 @@ final class SyncRepository
                 'woItems'    => ['SELECT * FROM work_order_items WHERE wo_id IN (SELECT id FROM work_orders WHERE rev > ?) ORDER BY wo_id, seq', [$since]],
                 'woLogs'     => ['SELECT * FROM work_order_logs WHERE wo_id IN (SELECT id FROM work_orders WHERE rev > ?) ORDER BY wo_id, seq', [$since]],
                 'deleted'    => ['SELECT id FROM deleted_sessions WHERE rev > ? AND ? > 0', [$since, $since]],
+                'rca'        => ['SELECT * FROM rca_reports WHERE rev > ? ORDER BY rev, id', [$since]],
+                'rcaItems'   => ['SELECT * FROM rca_findings WHERE rca_id IN (SELECT id FROM rca_reports WHERE rev > ?) ORDER BY rca_id, seq', [$since]],
             ];
         }
 
@@ -128,6 +130,11 @@ final class SyncRepository
                 $res['workOrders']
             );
             $out['deletedSessions'] = array_map(fn ($r) => (string) $r['id'], $res['deleted']);
+            $rcaItems = [];
+            foreach ($res['rcaItems'] as $r) {
+                $rcaItems[$r['rca_id']][] = self::rcaFindingOut($r);
+            }
+            $out['rcaReports'] = array_map(fn ($r) => self::rcaOut($r, $rcaItems[$r['id']] ?? []), $res['rca']);
         }
         return $out;
     }
@@ -184,6 +191,16 @@ final class SyncRepository
 
         foreach ((is_array($in['workOrders'] ?? null) ? $in['workOrders'] : []) as $wo) {
             array_push($stmts, ...self::workOrderStatements($wo));
+        }
+
+        // RCA / penutupan finding — hanya leader ke atas
+        $rcaList = is_array($in['rcaReports'] ?? null) ? $in['rcaReports'] : [];
+        if ($rcaList && $isCrew) {
+            $ignored[] = 'rcaReports';
+        } else {
+            foreach ($rcaList as $rca) {
+                array_push($stmts, ...self::rcaStatements($rca, $user));
+            }
         }
 
         // Notifikasi temuan baru (in-app ikut transaksi; WhatsApp dikirim setelah commit)
@@ -520,6 +537,94 @@ final class SyncRepository
             $item[$key] = (string) $r[$col];
         }
         return $item + self::extraOut($r['extra']);
+    }
+
+    // ── RCA (penutupan finding) ──────────────────────────
+
+    private const RCA_FIELDS = [
+        'sessId' => 'session_id', 'unitId' => 'unit_id', 'unitName' => 'unit_name',
+        'areaId' => 'area_id', 'areaName' => 'area_name', 'equipId' => 'equip_id', 'equipName' => 'equip_name',
+        'problem' => 'problem', 'category' => 'category', 'rootCause' => 'root_cause',
+        'correctiveAction' => 'corrective_action', 'preventiveAction' => 'preventive_action',
+        'actionPic' => 'action_pic', 'targetDate' => 'target_date', 'verification' => 'verification',
+        'status' => 'status', 'createdBy' => 'created_by', 'createdAt' => 'created_at',
+        'closedBy' => 'closed_by', 'closedAt' => 'closed_at',
+    ];
+    private const RCA_FINDING_FIELDS = ['findingId' => 'finding_id', 'sessId' => 'session_id', 'paramId' => 'param_id',
+        'parameter' => 'parameter', 'value' => 'value', 'unit' => 'unit', 'status' => 'find_status'];
+    public const RCA_CATEGORIES = ['Man', 'Machine', 'Method', 'Material', 'Measurement', 'Environment'];
+
+    private static function rcaStatements(mixed $rca, array $user): array
+    {
+        if (!is_array($rca)) {
+            throw new HttpError('Format RCA tidak valid');
+        }
+        $id = self::id($rca['id'] ?? '', 'ID RCA');
+        $status = ($rca['status'] ?? 'Open') === 'Closed' ? 'Closed' : 'Open';
+        $whys = array_values(is_array($rca['whys'] ?? null) ? $rca['whys'] : []);
+        $findings = array_values(array_filter(is_array($rca['findings'] ?? null) ? $rca['findings'] : [], 'is_array'));
+
+        if (!$findings) {
+            throw new HttpError("RCA $id belum memilih finding yang ditutup");
+        }
+        if ($status === 'Closed' && (trim((string) ($rca['rootCause'] ?? '')) === '' || trim((string) ($rca['correctiveAction'] ?? '')) === '')) {
+            throw new HttpError("RCA $id: akar masalah dan tindakan korektif wajib diisi untuk menutup finding");
+        }
+        if (($rca['category'] ?? '') !== '' && !in_array($rca['category'], self::RCA_CATEGORIES, true)) {
+            throw new HttpError("RCA $id: kategori akar masalah tidak valid");
+        }
+
+        $cols = ['id'];
+        $vals = [$id];
+        foreach (self::RCA_FIELDS as $key => $col) {
+            $cols[] = $col;
+            $vals[] = $key === 'status' ? $status : self::str($rca[$key] ?? '');
+        }
+        for ($i = 0; $i < 5; $i++) {
+            $cols[] = 'why' . ($i + 1);
+            $vals[] = self::str($whys[$i] ?? '');
+        }
+        array_push($cols, 'extra', 'updated_at');
+        array_push($vals, self::extra($rca, array_merge(array_keys(self::RCA_FIELDS), ['id', 'whys', 'findings', 'updatedAt'])), gmdate('c'));
+
+        $updates = implode(', ', array_map(fn ($c) => "$c = excluded.$c", array_diff($cols, ['id', 'created_by', 'created_at'])));
+        $stmts = [
+            ['INSERT INTO rca_reports (' . implode(', ', $cols) . ', rev) VALUES (' . str_repeat('?, ', count($cols)) . self::REV . ')
+              ON CONFLICT(id) DO UPDATE SET ' . $updates . ', rev = excluded.rev', $vals],
+            ['DELETE FROM rca_findings WHERE rca_id = ?', [$id]],
+        ];
+        $rows = [];
+        foreach ($findings as $i => $f) {
+            $fid = self::id($f['findingId'] ?? '', 'ID finding');
+            $row = [$id, $i];
+            foreach (self::RCA_FINDING_FIELDS as $key => $_) {
+                $row[] = $key === 'findingId' ? $fid : self::str($f[$key] ?? '');
+            }
+            $rows[] = $row;
+        }
+        return array_merge($stmts, Db::insertRows('rca_findings',
+            array_merge(['rca_id', 'seq'], array_values(self::RCA_FINDING_FIELDS)), $rows));
+    }
+
+    private static function rcaOut(array $r, array $findings): array
+    {
+        $rca = ['id' => (string) $r['id']];
+        foreach (self::RCA_FIELDS as $key => $col) {
+            $rca[$key] = (string) $r[$col];
+        }
+        $rca['whys'] = [(string) $r['why1'], (string) $r['why2'], (string) $r['why3'], (string) $r['why4'], (string) $r['why5']];
+        $rca['findings'] = $findings;
+        $rca['updatedAt'] = (string) $r['updated_at'];
+        return $rca + self::extraOut($r['extra']);
+    }
+
+    private static function rcaFindingOut(array $r): array
+    {
+        $f = [];
+        foreach (self::RCA_FINDING_FIELDS as $key => $col) {
+            $f[$key] = (string) $r[$col];
+        }
+        return $f;
     }
 
     // ── Helper ───────────────────────────────────────────

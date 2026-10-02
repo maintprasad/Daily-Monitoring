@@ -28,6 +28,12 @@ function regenerateFindings() {
     if (!latest[k] || order > latest[k].order) latest[k] = { order, sessId: s.id, status: i.status };
   }));
   const woById = new Map(workOrders.map(w => [w.id, w]));
+  // RCA per finding (yang sudah Closed diutamakan)
+  const rcaByFinding = new Map();
+  rcaReports.forEach(r => (r.findings || []).forEach(f => {
+    const cur = rcaByFinding.get(f.findingId);
+    if (!cur || (cur.status !== 'Closed' && r.status === 'Closed')) rcaByFinding.set(f.findingId, r);
+  }));
 
   findings = [];
   sessions.forEach(sess => {
@@ -41,8 +47,11 @@ function regenerateFindings() {
       const last = latest[[sess.unitId, sess.areaId, sess.equipId, item.paramId].join('|')];
       const woItem = woChecklist.find(c => c.id === id);
 
+      const rca = rcaByFinding.get(id) || null;
+
       let resolved = '';
-      if (woItem?.closeStatus === 'Closed' || woStatus === 'Closed') resolved = 'WO selesai';
+      if (rca?.status === 'Closed') resolved = 'Ditutup (RCA)';
+      else if (woItem?.closeStatus === 'Closed' || woStatus === 'Closed') resolved = 'WO selesai';
       else if (last && last.sessId !== sess.id) resolved = last.status === 'OK' ? 'Normal kembali' : 'Ada pengecekan lebih baru';
 
       findings.push({
@@ -66,6 +75,8 @@ function regenerateFindings() {
         hasWO:     !!sess.woId,
         resolved,
         active:    !resolved,
+        rcaId:     rca?.id || '',
+        rcaStatus: rca?.status || '',
       });
     });
   });
@@ -83,6 +94,14 @@ function regenerateFindings() {
   }
   // Update dashboard sc-alert with finding count
   setText('sc-alert', activeCount);
+
+  // Badge RCA yang masih open
+  const rcaBadge = document.getElementById('sbRcaBadge');
+  if (rcaBadge) {
+    const openRca = rcaReports.filter(r => r.status !== 'Closed').length;
+    rcaBadge.hidden = openRca === 0;
+    rcaBadge.textContent = openRca;
+  }
 }
 function renderFindingsPage() {
   regenerateFindings();
@@ -188,7 +207,9 @@ const woBtn = g.hasWO
     const detailRows = g.findings.map(f => `
       <tr style="background:${f.status==='ALERT'?'rgba(239,68,68,.04)':'rgba(249,115,22,.03)'};${f.active?'':'opacity:.6'}">
         <td style="padding:5px 12px 5px 28px;font-size:11px;color:var(--text3)" colspan="2">↳ ${esc(f.parameter)}
-          ${f.resolved ? `<span class="badge b-ok" style="font-size:9px;margin-left:4px">✓ ${esc(f.resolved)}</span>` : ''}</td>
+          ${f.resolved ? `<span class="badge b-ok" style="font-size:9px;margin-left:4px">✓ ${esc(f.resolved)}</span>` : ''}
+          ${f.rcaId ? `<span class="badge ${f.rcaStatus === 'Closed' ? 'b-ok' : 'b-warn'}" style="font-size:9px;margin-left:4px;cursor:pointer"
+              title="Buka RCA" onclick="openRcaModal(${jsArg(f.rcaId)})">${f.rcaStatus === 'Closed' ? '📄' : '📝 RCA berjalan ·'} ${esc(f.rcaId)}</span>` : ''}</td>
         <td style="padding:5px 12px;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:${f.status==='ALERT'?'var(--red)':'var(--orange)'}">
           ${esc(f.value)} <span style="font-size:10px;font-weight:400;color:var(--text3)">${esc(f.unit_param)}</span>
         </td>
@@ -208,9 +229,25 @@ const woBtn = g.hasWO
         </td>
         <td style="font-size:11px;color:var(--text3)">${g.findings.length} temuan</td>
         <td>${woBtn}</td>
-        <td colspan="2"><button class="tbl-btn" onclick="viewSession('${esc(g.sessId)}')">👁 Lihat Sesi</button></td>
+        <td colspan="2"><div style="display:flex;gap:4px;flex-wrap:wrap">
+          ${rcaGroupButton(g)}
+          <button class="tbl-btn" onclick="viewSession('${esc(g.sessId)}')">👁 Lihat Sesi</button>
+        </div></td>
       </tr>
       ${detailRows}`;
   }).join('');
+}
+/** Tombol RCA per kelompok sesi: buat baru / lanjutkan draft / lihat RCA yang sudah selesai. */
+function rcaGroupButton(g) {
+  if (currentUser?.role === 'crew') return '';
+  const openRca = g.findings.find(f => f.rcaStatus === 'Open');
+  if (openRca) {
+    return `<button class="tbl-btn rca-btn draft" onclick="openRcaModal(${jsArg(openRca.rcaId)})">📝 Lanjutkan RCA</button>`;
+  }
+  if (g.findings.some(f => f.active)) {
+    return `<button class="tbl-btn rca-btn" onclick="openRcaForSession(${jsArg(g.sessId)})">🔍 RCA &amp; Tutup</button>`;
+  }
+  const closed = g.findings.find(f => f.rcaStatus === 'Closed');
+  return closed ? `<button class="tbl-btn rca-btn done" onclick="printRca(${jsArg(closed.rcaId)})">🖨 Cetak RCA</button>` : '';
 }
 // ADD END: FINDING SYSTEM

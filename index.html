@@ -104,6 +104,7 @@
   <div class="sb-section">
     <div class="sb-label">Analitik</div>
     <div class="sb-item" data-page="findings"><span class="sb-icon">🚨</span>Finding / Alarm <span class="sb-badge alert" id="sbFindingBadge">0</span></div>
+    <div class="sb-item" data-page="rca"><span class="sb-icon">🔍</span>Root Cause Analysis <span class="sb-badge" id="sbRcaBadge" hidden>0</span></div>
   </div>
   <!-- ADD END -->
   <div class="sb-section" id="sbSyncSection">
@@ -609,6 +610,42 @@
           <th>Aksi</th>
         </tr></thead>
         <tbody id="userMgmtBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════ ROOT CAUSE ANALYSIS (penutupan finding) ════ -->
+<div class="page" id="page-rca">
+  <div class="sec-hdr">
+    <div>
+      <div class="sec-title">🔍 Root Cause Analysis</div>
+      <div class="sec-sub">Penutupan finding daily monitoring — analisis 5-Why, tindakan korektif &amp; preventif</div>
+    </div>
+    <div class="sec-actions">
+      <input class="fsel" id="rcaSearch" placeholder="Cari equipment, akar masalah, PIC..." oninput="renderRcaPage()" style="min-width:220px"/>
+      <select class="fsel" id="rcaStatusFilter" onchange="renderRcaPage()">
+        <option value="">Semua Status</option>
+        <option value="Open">📝 Open</option>
+        <option value="Overdue">⏰ Lewat Target</option>
+        <option value="Closed">✅ Closed</option>
+      </select>
+      <button class="btn btn-primary btn-sm" onclick="navigateTo('findings')">🚨 Ke Finding Aktif</button>
+    </div>
+  </div>
+  <div class="rca-stats">
+    <div class="rca-stat"><div class="rca-stat-val" id="rcaStatTotal">0</div><div class="rca-stat-lbl">Total RCA</div></div>
+    <div class="rca-stat open"><div class="rca-stat-val" id="rcaStatOpen">0</div><div class="rca-stat-lbl">Open</div></div>
+    <div class="rca-stat overdue"><div class="rca-stat-val" id="rcaStatOverdue">0</div><div class="rca-stat-lbl">Lewat Target</div></div>
+    <div class="rca-stat closed"><div class="rca-stat-val" id="rcaStatClosed">0</div><div class="rca-stat-lbl">Closed</div></div>
+  </div>
+  <div class="tbl-wrap">
+    <div class="tbl-scroll">
+      <table class="data-table" style="min-width:900px">
+        <thead><tr>
+          <th>No. RCA</th><th>Equipment</th><th>Finding</th><th>Kategori</th><th>Akar Masalah</th><th>PIC / Target</th><th>Status</th><th>Aksi</th>
+        </tr></thead>
+        <tbody id="rcaTableBody"></tbody>
       </table>
     </div>
   </div>
@@ -1127,6 +1164,17 @@
 <div id="toast"></div>
 <div id="notifPopups"></div>
 
+<!-- ════ MODAL: ROOT CAUSE ANALYSIS ════ -->
+<div class="overlay" id="rcaOverlay">
+  <div class="modal modal-lg">
+    <div class="modal-hdr">
+      <div class="modal-title" id="rcaTitle">🔍 Root Cause Analysis</div>
+      <button class="modal-close" onclick="closeOverlay('rcaOverlay')">×</button>
+    </div>
+    <div class="modal-body" id="rcaBody"></div>
+  </div>
+</div>
+
 <!-- ════ MODAL: PENGATURAN NOTIFIKASI WHATSAPP ════ -->
 <div class="overlay" id="waSettingsOverlay">
   <div class="modal">
@@ -1594,6 +1642,7 @@
 <script src="assets/js/features/maintware-sync.js"></script>
 <script src="assets/js/features/notifications.js"></script>
 <script src="assets/js/features/wa-settings.js"></script>
+<script src="assets/js/features/rca.js"></script>
 <script src="assets/js/features/crew-portal.js"></script>
 <script src="assets/js/features/report-monthly.js"></script>
 <script src="assets/js/features/report-pptx.js"></script>

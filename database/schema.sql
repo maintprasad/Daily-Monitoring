@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════
--- Prasad Seeds — Monitoring System v5 · Skema database (versi 4)
+-- Prasad Seeds — Monitoring System v5 · Skema database (versi 5)
 -- Kompatibel dengan SQLite (XAMPP) dan Turso / libSQL (Vercel). BUKAN untuk MySQL/phpMyAdmin.
 -- Di-generate dari api/_lib/Schema.php:  php scripts/dump-schema.php
 --
@@ -244,6 +244,57 @@ CREATE TABLE IF NOT EXISTS work_order_logs (
   PRIMARY KEY (wo_id, seq)
 );
 
+CREATE TABLE IF NOT EXISTS rca_reports (
+  id                TEXT PRIMARY KEY,
+  session_id        TEXT NOT NULL DEFAULT '',
+  unit_id           TEXT NOT NULL DEFAULT '',
+  unit_name         TEXT NOT NULL DEFAULT '',
+  area_id           TEXT NOT NULL DEFAULT '',
+  area_name         TEXT NOT NULL DEFAULT '',
+  equip_id          TEXT NOT NULL DEFAULT '',
+  equip_name        TEXT NOT NULL DEFAULT '',
+  problem           TEXT NOT NULL DEFAULT '',
+  category          TEXT NOT NULL DEFAULT '',
+  why1              TEXT NOT NULL DEFAULT '',
+  why2              TEXT NOT NULL DEFAULT '',
+  why3              TEXT NOT NULL DEFAULT '',
+  why4              TEXT NOT NULL DEFAULT '',
+  why5              TEXT NOT NULL DEFAULT '',
+  root_cause        TEXT NOT NULL DEFAULT '',
+  corrective_action TEXT NOT NULL DEFAULT '',
+  preventive_action TEXT NOT NULL DEFAULT '',
+  action_pic        TEXT NOT NULL DEFAULT '',
+  target_date       TEXT NOT NULL DEFAULT '',
+  verification      TEXT NOT NULL DEFAULT '',
+  status            TEXT NOT NULL DEFAULT 'Open',
+  created_by        TEXT NOT NULL DEFAULT '',
+  created_at        TEXT NOT NULL DEFAULT '',
+  closed_by         TEXT NOT NULL DEFAULT '',
+  closed_at         TEXT NOT NULL DEFAULT '',
+  updated_at        TEXT NOT NULL DEFAULT '',
+  extra             TEXT,
+  rev               INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_rca_reports_rev ON rca_reports(rev);
+
+CREATE INDEX IF NOT EXISTS idx_rca_reports_session ON rca_reports(session_id);
+
+CREATE TABLE IF NOT EXISTS rca_findings (
+  rca_id      TEXT NOT NULL,
+  finding_id  TEXT NOT NULL,
+  seq         INTEGER NOT NULL DEFAULT 0,
+  session_id  TEXT NOT NULL DEFAULT '',
+  param_id    TEXT NOT NULL DEFAULT '',
+  parameter   TEXT NOT NULL DEFAULT '',
+  value       TEXT NOT NULL DEFAULT '',
+  unit        TEXT NOT NULL DEFAULT '',
+  find_status TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (rca_id, finding_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_rca_findings_finding ON rca_findings(finding_id);
+
 CREATE TABLE IF NOT EXISTS notifications (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   username   TEXT NOT NULL,
@@ -275,17 +326,23 @@ CREATE TABLE IF NOT EXISTS wa_logs (
   created_at TEXT NOT NULL DEFAULT ''
 );
 
-CREATE VIEW IF NOT EXISTS v_findings AS
+DROP VIEW IF EXISTS v_findings;
+
+CREATE VIEW v_findings AS
   SELECT s.id AS session_id, s.tanggal, s.unit_name, s.area_name, s.equip_id, s.equip_name,
          i.param_id, i.label AS parameter, i.value, i.unit, i.status, i.note,
-         s.wo_id, s.wo_status
+         s.wo_id, s.wo_status,
+         (SELECT r.id FROM rca_findings f JOIN rca_reports r ON r.id = f.rca_id
+           WHERE f.finding_id = s.id || '_' || i.param_id ORDER BY r.status = 'Closed' DESC LIMIT 1) AS rca_id,
+         (SELECT r.status FROM rca_findings f JOIN rca_reports r ON r.id = f.rca_id
+           WHERE f.finding_id = s.id || '_' || i.param_id ORDER BY r.status = 'Closed' DESC LIMIT 1) AS rca_status
     FROM session_items i JOIN sessions s ON s.id = i.session_id
    WHERE i.status IN ('WARNING', 'ALERT');
 
 INSERT OR IGNORE INTO counters (name, value) VALUES
   ('rev', 0), ('hierarchy_rev', 0), ('pics_rev', 0), ('wo_seq', 0);
 
-INSERT OR IGNORE INTO app_meta (key, value) VALUES ('schema_version', '4');
+INSERT OR IGNORE INTO app_meta (key, value) VALUES ('schema_version', '5');
 
 INSERT INTO users (username, name, role, password_hash, active, created_at, updated_at)
   SELECT 'admin', 'Administrator (default)', 'admin', '$2y$10$NuYmx98uq4RJm.QVxITepe6lh8TTTppcBpEZmnpf2fj6ShHCdDrqG', 1,

@@ -11,7 +11,7 @@ declare(strict_types=1);
  */
 final class Schema
 {
-    public const VERSION = 4;
+    public const VERSION = 5;
 
     // Kolom users yang ditambahkan sejak v3 (untuk upgrade database lama lewat ALTER TABLE).
     // Atasan (bagan organisasi) mulai v4 disimpan di tabel user_reports — bisa lebih dari satu.
@@ -230,6 +230,55 @@ final class Schema
                 PRIMARY KEY (wo_id, seq)
             )',
 
+            // ── Penutupan finding: Root Cause Analysis (RCA) ──
+            // Satu RCA bisa menutup beberapa finding (parameter WARNING/ALERT) dari satu sesi.
+            'CREATE TABLE IF NOT EXISTS rca_reports (
+                id                TEXT PRIMARY KEY,
+                session_id        TEXT NOT NULL DEFAULT \'\',
+                unit_id           TEXT NOT NULL DEFAULT \'\',
+                unit_name         TEXT NOT NULL DEFAULT \'\',
+                area_id           TEXT NOT NULL DEFAULT \'\',
+                area_name         TEXT NOT NULL DEFAULT \'\',
+                equip_id          TEXT NOT NULL DEFAULT \'\',
+                equip_name        TEXT NOT NULL DEFAULT \'\',
+                problem           TEXT NOT NULL DEFAULT \'\',
+                category          TEXT NOT NULL DEFAULT \'\',
+                why1              TEXT NOT NULL DEFAULT \'\',
+                why2              TEXT NOT NULL DEFAULT \'\',
+                why3              TEXT NOT NULL DEFAULT \'\',
+                why4              TEXT NOT NULL DEFAULT \'\',
+                why5              TEXT NOT NULL DEFAULT \'\',
+                root_cause        TEXT NOT NULL DEFAULT \'\',
+                corrective_action TEXT NOT NULL DEFAULT \'\',
+                preventive_action TEXT NOT NULL DEFAULT \'\',
+                action_pic        TEXT NOT NULL DEFAULT \'\',
+                target_date       TEXT NOT NULL DEFAULT \'\',
+                verification      TEXT NOT NULL DEFAULT \'\',
+                status            TEXT NOT NULL DEFAULT \'Open\',
+                created_by        TEXT NOT NULL DEFAULT \'\',
+                created_at        TEXT NOT NULL DEFAULT \'\',
+                closed_by         TEXT NOT NULL DEFAULT \'\',
+                closed_at         TEXT NOT NULL DEFAULT \'\',
+                updated_at        TEXT NOT NULL DEFAULT \'\',
+                extra             TEXT,
+                rev               INTEGER NOT NULL DEFAULT 0
+            )',
+            'CREATE INDEX IF NOT EXISTS idx_rca_reports_rev ON rca_reports(rev)',
+            'CREATE INDEX IF NOT EXISTS idx_rca_reports_session ON rca_reports(session_id)',
+            'CREATE TABLE IF NOT EXISTS rca_findings (
+                rca_id      TEXT NOT NULL,
+                finding_id  TEXT NOT NULL,
+                seq         INTEGER NOT NULL DEFAULT 0,
+                session_id  TEXT NOT NULL DEFAULT \'\',
+                param_id    TEXT NOT NULL DEFAULT \'\',
+                parameter   TEXT NOT NULL DEFAULT \'\',
+                value       TEXT NOT NULL DEFAULT \'\',
+                unit        TEXT NOT NULL DEFAULT \'\',
+                find_status TEXT NOT NULL DEFAULT \'\',
+                PRIMARY KEY (rca_id, finding_id)
+            )',
+            'CREATE INDEX IF NOT EXISTS idx_rca_findings_finding ON rca_findings(finding_id)',
+
             // ── Notifikasi & pengaturan ──
             // Notifikasi in-app per penerima (popup + lonceng di kanan atas)
             'CREATE TABLE IF NOT EXISTS notifications (
@@ -263,10 +312,16 @@ final class Schema
             )',
 
             // View bantu untuk dibuka langsung di DB Browser / turso shell
-            "CREATE VIEW IF NOT EXISTS v_findings AS
+            // (di-drop & dibuat ulang supaya definisi view selalu yang terbaru)
+            'DROP VIEW IF EXISTS v_findings',
+            "CREATE VIEW v_findings AS
                 SELECT s.id AS session_id, s.tanggal, s.unit_name, s.area_name, s.equip_id, s.equip_name,
                        i.param_id, i.label AS parameter, i.value, i.unit, i.status, i.note,
-                       s.wo_id, s.wo_status
+                       s.wo_id, s.wo_status,
+                       (SELECT r.id FROM rca_findings f JOIN rca_reports r ON r.id = f.rca_id
+                         WHERE f.finding_id = s.id || '_' || i.param_id ORDER BY r.status = 'Closed' DESC LIMIT 1) AS rca_id,
+                       (SELECT r.status FROM rca_findings f JOIN rca_reports r ON r.id = f.rca_id
+                         WHERE f.finding_id = s.id || '_' || i.param_id ORDER BY r.status = 'Closed' DESC LIMIT 1) AS rca_status
                   FROM session_items i JOIN sessions s ON s.id = i.session_id
                  WHERE i.status IN ('WARNING', 'ALERT')",
 

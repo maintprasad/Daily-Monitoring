@@ -101,10 +101,10 @@ function applyRoleRestrictions() {
   if (sbBE) sbBE.style.display = isAdmin ? '' : 'none';
 
   // ── Sembunyikan menu sesuai role (lihat ROLE_LABELS) ──
-  const hiddenPages = isCrew ? ['hierarchy','config','findings'] : isLeader ? ['config'] : [];
+  const hiddenPages = isCrew ? ['hierarchy','config','findings','rca'] : isLeader ? ['config'] : [];
   document.querySelectorAll('[data-page]').forEach(el => {
     const pg = el.dataset.page;
-    if (['hierarchy','config','findings'].includes(pg)) {
+    if (['hierarchy','config','findings','rca'].includes(pg)) {
       el.style.display = hiddenPages.includes(pg) ? 'none' : '';
     }
   });

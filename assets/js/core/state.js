@@ -57,6 +57,7 @@ const HIST_PAGE_SIZE = 20;
 // ADD START: Findings state & Equipment Type Templates
 let findings    = [];
 let workOrders  = [];
+let rcaReports  = [];   // Root Cause Analysis — penutupan finding (lihat features/rca.js)
 
 // Param editor temp
 let _editingEquipPath = null; // { unitId, areaId, subAreaId, equipId }

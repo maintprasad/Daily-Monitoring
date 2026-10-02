@@ -101,7 +101,24 @@ Cek koneksi: `https://<project>.vercel.app/api/index.php?r=health`
   versi API (v1/v2), aturan penerima per severity, tombol kirim tes, dan log pengiriman.
   Pesan dikirim dari server (`POST {baseUrl}/message/sendText/{instance}`, header `apikey`).
 
-## Tabel database (skema v4)
+## Penutupan finding — Root Cause Analysis (RCA)
+
+Untuk saat ini temuan daily monitoring ditutup langsung di aplikasi (ke depan semua temuan
+PM & daily monitoring diarahkan ke WO).
+
+1. **Finding / Alarm** → pada sesi bertemuan klik **🔍 RCA & Tutup**.
+2. Pilih finding yang ditutup (satu RCA bisa menutup beberapa parameter sekaligus), isi
+   deskripsi masalah, **5-Why**, kategori **6M**, **akar masalah**, tindakan **korektif** & **preventif**,
+   PIC, target, dan verifikasi hasil.
+3. **💾 Simpan Draft** → finding tetap aktif dengan tanda "RCA berjalan".
+   **🔒 Tutup Finding** (wajib akar masalah + tindakan korektif) → finding tidak lagi dihitung aktif.
+4. Menu **Root Cause Analysis** → daftar semua RCA (Open / Lewat Target / Closed), edit,
+   **🔓 Buka Kembali**, dan **🖨 Cetak RCA** (laporan siap PDF dengan kolom tanda tangan
+   Dibuat / Diperiksa Supervisor / Disetujui Plant Manager).
+
+Hanya Leader ke atas yang bisa membuat/menutup RCA (crew ditolak di server).
+
+## Tabel database (skema v5)
 
 | Tabel | Isi |
 |---|---|
@@ -112,9 +129,10 @@ Cek koneksi: `https://<project>.vercel.app/api/index.php?r=health`
 | `sessions`, `session_items` | Sesi monitoring & nilai tiap parameter + status OK/WARNING/ALERT |
 | `deleted_sessions` | Catatan sesi yang dihapus (dipakai sinkronisasi antar perangkat) |
 | `pics` | Daftar PIC / teknisi |
+| `rca_reports`, `rca_findings` | Root Cause Analysis & daftar finding yang ditutup tiap RCA |
 | `work_orders`, `work_order_items`, `work_order_logs` | Work order, item checklist temuan, riwayat catatan |
 | `counters`, `app_meta` | Nomor revisi, nomor urut WO, versi skema |
-| `v_findings` (view) | Semua temuan WARNING/ALERT siap dibaca |
+| `v_findings` (view) | Semua temuan WARNING/ALERT siap dibaca, beserta No. & status RCA-nya |
 
 Database yang dibuat dengan skema lama otomatis di-upgrade saat API pertama kali dipakai
 (atau jalankan `php scripts/migrate.php`).
