@@ -165,7 +165,9 @@ function openWOFromFinding(findingId) {
 }
 
    function openWOFromSession(sessId) {
-  const sessFindings = findings.filter(f => f.sessId === sessId);
+  // Hanya temuan yang masih aktif (yang sudah normal kembali tidak perlu masuk WO)
+  const allSessFindings = findings.filter(f => f.sessId === sessId);
+  const sessFindings = allSessFindings.some(f => f.active) ? allSessFindings.filter(f => f.active) : allSessFindings;
   if (!sessFindings.length) { toast('Tidak ada finding untuk sesi ini','error'); return; }
 
   const first    = sessFindings[0];

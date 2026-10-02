@@ -34,7 +34,7 @@ function renderDashboard() {
   setText('sc-equip', countEquipments());
   const monitoredAreas = new Set(monthSess.map(s => s.areaId).filter(Boolean));
   setText('sc-areas', monitoredAreas.size);
-  setText('sc-alert', findings.length);
+  setText('sc-alert', findings.filter(f => f.active).length);
   setText('sc-today', todaySess.length);
   setText('sc-total', sessions.length);
   setText('sc-ok',   allItems.filter(i => i.status === 'OK').length);
@@ -66,8 +66,10 @@ function renderDashFindingTable() {
   const lbl   = document.getElementById('dashFindingLbl');
   if (!tbody) return;
 
-  const active = findings.slice(0, 12); // max 12 baris di dashboard
-  if (lbl) lbl.textContent = `${findings.length} temuan aktif — ${findings.filter(f=>f.status==='ALERT').length} Alert, ${findings.filter(f=>f.status==='WARNING').length} Warning`;
+  // Hanya finding yang masih aktif; findings sudah terurut ALERT dulu lalu terbaru
+  const activeAll = findings.filter(f => f.active);
+  const active = activeAll.slice(0, 12); // max 12 baris di dashboard
+  if (lbl) lbl.textContent = `${activeAll.length} temuan aktif — ${activeAll.filter(f=>f.status==='ALERT').length} Alert, ${activeAll.filter(f=>f.status==='WARNING').length} Warning`;
 
   if (!active.length) {
     tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="empty-ico">✅</div><div class="empty-msg">Tidak ada finding aktif saat ini</div></div></td></tr>`;

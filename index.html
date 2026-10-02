@@ -445,6 +445,11 @@
       <div class="sec-sub" id="findingCountLbl">Auto-generated dari parameter yang melewati batas</div>
     </div>
     <div class="sec-actions">
+      <select class="fsel" id="findingStateFilter" onchange="renderFindingsPage()" title="Aktif = belum ada WO yang di-close dan belum dicek ulang">
+        <option value="active">🔴 Aktif</option>
+        <option value="resolved">✓ Selesai</option>
+        <option value="all">Semua Riwayat</option>
+      </select>
       <select class="fsel" id="findingAreaFilter" onchange="renderFindingsPage()">
         <option value="">Semua Area</option>
       </select>
@@ -453,7 +458,7 @@
         <option value="WARNING">⚠ WARNING</option>
         <option value="ALERT">🚨 ALERT</option>
       </select>
-      <button class="btn btn-ghost btn-sm" onclick="regenerateFindings();toast('Findings di-refresh ✓','success')">↻ Refresh</button>
+      <button class="btn btn-ghost btn-sm" onclick="renderFindingsPage();toast('Findings di-refresh ✓','success')">↻ Refresh</button>
     </div>
   </div>
 

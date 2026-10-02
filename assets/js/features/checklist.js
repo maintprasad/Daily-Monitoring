@@ -423,6 +423,7 @@ function saveDraftSession() {
 
   const eq     = findEquipFlex(_draftSession.unitId, _draftSession.areaId, '', _draftSession.equipId);
   const params = eq?.params || [];
+  if (rejectInvalidChecklist(params)) return;
 
   // Baca semua nilai dari DOM
   const items = collectChecklistItems(params);
@@ -627,10 +628,16 @@ function onChkNumChange(paramId, value, nMin, nMax, wMin, wMax) {
     return;
   }
 
-  // Normalisasi pakai fungsi yang sama dengan saat simpan, agar preview
+  // Validasi pakai fungsi yang sama dengan saat simpan, agar preview
   // status saat mengetik konsisten dengan nilai yang benar-benar tersimpan.
-  const normalized = normalizeNumericValue(value, 'numeric');
-  const v      = parseFloat(normalized);
+  const parsed = parseNumericInput(value);
+  if (!parsed.ok) {
+    if (inputEl) { inputEl.className = 'val-input val-alert'; inputEl.title = 'Format tidak valid — isi angka saja, contoh 28,7'; }
+    if (badge)   { badge.textContent = '✗ FORMAT'; badge.className = 'badge b-alert'; }
+    return;
+  }
+  if (inputEl) inputEl.title = '';
+  const v      = parseFloat(parsed.value);
 
   // (normalisasi tampilan dilakukan saat onblur)
 
@@ -670,12 +677,10 @@ function onChkNumBlur(paramId) {
   if (!inputEl) return;
   const raw = inputEl.value.trim();
   if (raw === '') return;
-  // Pakai fungsi normalisasi yang sama persis dengan saat simpan
-  const normalized = normalizeNumericValue(raw, 'numeric');
-  const v = parseFloat(normalized);
-  if (!isNaN(v)) {
-    inputEl.value = String(v); // tampilkan nilai bersih: "28.7" bukan "28,7"
-  }
+  // Pakai validasi yang sama persis dengan saat simpan; input tidak valid dibiarkan
+  // apa adanya (merah) supaya user memperbaikinya sendiri
+  const parsed = parseNumericInput(raw);
+  if (parsed.ok) inputEl.value = parsed.value; // tampilkan nilai bersih: "28.7" bukan "28,7"
 }
 
 function onChkStatusChange(paramId, sel) {
@@ -709,54 +714,45 @@ function onChkStatusChange(paramId, sel) {
  */
 function normalizeNumericValue(val, paramType) {
   if (paramType === 'status') return val; // dropdown — jangan diubah
-  if (val === null || val === undefined) return '';
-  const s = String(val).trim();
-  if (s === '') return '';
+  return parseNumericInput(val).value;
+}
 
-  // Jika sudah berupa number (dari JSON parse), langsung stringify
-  if (typeof val === 'number') return String(val);
+/**
+ * parseNumericInput — validasi ketat input angka parameter monitoring.
+ * Diterima: bilangan bulat / desimal dengan SATU pemisah desimal, titik atau koma
+ *   ("28", "28,7", "28.7", "-5,5", ",5"). Spasi diabaikan.
+ * Ditolak (ok=false): format yang ambigu seperti "11.20.26", "1/5", "2026-05-04",
+ *   "1.234,5", "12A". Versi lama menebak format seperti ini (mis. "11.20.26" → 1120.26,
+ *   "1/5" → 15) sehingga nilai salah tersimpan tanpa disadari — sumber "Big Error".
+ * @returns {{ok:boolean, value:string}} value = angka bersih (titik desimal) atau input asli jika tidak valid
+ */
+function parseNumericInput(raw) {
+  if (raw === null || raw === undefined) return { ok: true, value: '' };
+  if (typeof raw === 'number') return isFinite(raw) ? { ok: true, value: String(raw) } : { ok: false, value: '' };
+  const s = String(raw).replace(/\s+/g, '');
+  if (s === '') return { ok: true, value: '' };
+  if (!/^-?(\d+([.,]\d+)?|[.,]\d+)$/.test(s)) return { ok: false, value: s };
+  let v = s.replace(',', '.');
+  v = v.replace(/^(-?)\./, '$10.'); // ".5" → "0.5"
+  return { ok: true, value: v };
+}
 
-  // Hapus semua karakter selain digit, koma, titik, dan minus
-  let clean = s.replace(/[^\d,.\-]/g, '');
+/** Daftar label parameter angka yang isinya tidak valid di form checklist. */
+function findInvalidNumericInputs(params) {
+  return params
+    .filter(p => p.type !== 'status')
+    .filter(p => !parseNumericInput(document.getElementById('chk-' + p.id + '-val')?.value ?? '').ok)
+    .map(p => p.label);
+}
 
-  // CATATAN: Untuk parameter monitoring (arus, suhu, tekanan, dll), titik dan
-  // koma SELALU dianggap sebagai pemisah DESIMAL — bukan pemisah ribuan.
-  // Nilai seperti arus/suhu/tekanan di lapangan tidak pernah butuh pemisah ribuan,
-  // jadi logika "format Indonesia 1.234,56" DIHAPUS karena menyebabkan input
-  // seperti "11.20" atau input dengan banyak titik salah dibaca jadi angka raksasa
-  // (misal "1120260000000700"). Jika ada lebih dari satu titik/koma dalam input,
-  // hanya ambil yang TERAKHIR sebagai pemisah desimal, sisanya dianggap typo dan dibuang.
-
-  // Hitung jumlah pemisah (titik + koma) yang ada
-  const sepMatches = clean.match(/[,.]/g) || [];
-
-  if (sepMatches.length > 1) {
-    // Lebih dari 1 pemisah — kemungkinan salah ketik / multi-titik.
-    // Ambil pemisah TERAKHIR sebagai desimal, hapus semua pemisah sebelumnya.
-    const lastSepIdx = Math.max(clean.lastIndexOf('.'), clean.lastIndexOf(','));
-    const intPart = clean.slice(0, lastSepIdx).replace(/[,.]/g, '');
-    const decPart = clean.slice(lastSepIdx + 1).replace(/[,.]/g, '');
-    clean = decPart ? `${intPart}.${decPart}` : intPart;
-    return clean.replace(/^-?\./, m => m); // jaga minus di depan jika ada
-  }
-
-  // Koma sebagai desimal saja: 28,7 → 28.7
-  if (/^-?\d+,\d+$/.test(clean)) {
-    return clean.replace(',', '.');
-  }
-
-  // Titik sebagai desimal (sudah benar): 28.7 → 28.7
-  if (/^-?\d+\.\d+$/.test(clean)) {
-    return clean;
-  }
-
-  // Bilangan bulat
-  if (/^-?\d+$/.test(clean)) {
-    return clean;
-  }
-
-  // Fallback — kembalikan string bersih
-  return clean;
+function rejectInvalidChecklist(params) {
+  const invalid = findInvalidNumericInputs(params);
+  if (!invalid.length) return false;
+  toast(`✗ Format angka tidak valid: ${invalid.slice(0, 4).join(', ')}${invalid.length > 4 ? ` (+${invalid.length - 4})` : ''}. ` +
+        'Isi angka saja, contoh 28,7 atau 28.7', 'error', 7000);
+  const first = params.find(p => p.label === invalid[0]);
+  document.getElementById('chk-' + first?.id + '-val')?.focus();
+  return true;
 }
 
 function saveChecklist(sessId) {
@@ -772,6 +768,7 @@ function saveChecklist(sessId) {
 
   // Nilai parameter yang sudah tidak ada di equipment (parameternya dihapus/diganti)
   // tetap dipertahankan — sebelumnya ikut terhapus saat sesi lama diedit.
+  if (rejectInvalidChecklist(params)) return;
   const currentIds = new Set(params.map(p => p.id));
   const orphanItems = (sess.items || []).filter(i => !currentIds.has(i.paramId));
   sess.items = [...collectChecklistItems(params), ...orphanItems];

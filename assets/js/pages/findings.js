@@ -4,79 +4,126 @@
 // ADD START: FINDING / ALARM SYSTEM
 // ═══════════════════════════════════════════════════════
 
+// Urutan kronologis sesi: tanggal monitoring → jam mulai → waktu input
+function sessOrderKey(s) {
+  return `${s.tanggal || ''} ${s.startTime || ''} ${s.createdAt || ''}`;
+}
+
 /**
- * regenerateFindings — derives findings from all sessions.
- * Called after saveAll() and on DOMContentLoaded.
+ * regenerateFindings — bangun daftar finding dari semua sesi.
+ *
+ * Finding dianggap SELESAI (tidak aktif) jika:
+ *   • item checklist WO-nya sudah Closed / WO-nya sudah Closed, atau
+ *   • parameter yang sama pada equipment yang sama sudah dicek lagi di sesi yang lebih baru
+ *     (normal kembali → selesai; masih bermasalah → digantikan finding yang lebih baru).
+ * Versi lama menghitung SEMUA warning/alert sepanjang riwayat sebagai "aktif" selamanya.
  */
 function regenerateFindings() {
+  // Pembacaan terbaru per equipment + parameter
+  const latest = {};
+  sessions.forEach(s => (s.items || []).forEach(i => {
+    if (!i.status) return;
+    const k = [s.unitId, s.areaId, s.equipId, i.paramId].join('|');
+    const order = sessOrderKey(s);
+    if (!latest[k] || order > latest[k].order) latest[k] = { order, sessId: s.id, status: i.status };
+  }));
+  const woById = new Map(workOrders.map(w => [w.id, w]));
+
   findings = [];
   sessions.forEach(sess => {
+    const wo = sess.woId ? woById.get(sess.woId) : null;
+    const woStatus = wo?.status || sess.woStatus || '';
+    const woChecklist = Array.isArray(wo?.checklist) ? wo.checklist : (Array.isArray(sess.checklist) ? sess.checklist : []);
+
     (sess.items || []).forEach(item => {
-      if (item.status === 'WARNING' || item.status === 'ALERT') {
-        findings.push({
-          id:        sess.id + '_' + item.paramId,
-          tanggal:   sess.tanggal,
-          unit:      sess.unitName  || '',
-          unitId:    sess.unitId    || '',
-          area:      sess.areaName  || '',
-          areaId:    sess.areaId    || '',
-          equipment: sess.equipName || '',
-          equipId:   sess.equipId   || '',
-          parameter: item.label     || item.paramId,
-          value:     item.value     || '',
-          unit_param:item.unit      || '',
-          note:      item.note      || '',
-          sessId:    sess.id,
-          status:    item.status,
-          woId:      sess.woId || '',
-          hasWO:     !!sess.woId,
-        });
-      }
+      if (item.status !== 'WARNING' && item.status !== 'ALERT') return;
+      const id = sess.id + '_' + item.paramId;
+      const last = latest[[sess.unitId, sess.areaId, sess.equipId, item.paramId].join('|')];
+      const woItem = woChecklist.find(c => c.id === id);
+
+      let resolved = '';
+      if (woItem?.closeStatus === 'Closed' || woStatus === 'Closed') resolved = 'WO selesai';
+      else if (last && last.sessId !== sess.id) resolved = last.status === 'OK' ? 'Normal kembali' : 'Ada pengecekan lebih baru';
+
+      findings.push({
+        id,
+        tanggal:   sess.tanggal,
+        order:     sessOrderKey(sess),
+        unit:      sess.unitName  || '',
+        unitId:    sess.unitId    || '',
+        area:      sess.areaName  || '',
+        areaId:    sess.areaId    || '',
+        areaKey:   (sess.unitId || '') + '|' + (sess.areaId || ''),
+        equipment: sess.equipName || '',
+        equipId:   sess.equipId   || '',
+        parameter: item.label     || item.paramId,
+        value:     item.value     || '',
+        unit_param:item.unit      || '',
+        note:      item.note      || '',
+        sessId:    sess.id,
+        status:    item.status,
+        woId:      sess.woId || '',
+        hasWO:     !!sess.woId,
+        resolved,
+        active:    !resolved,
+      });
     });
   });
 
+  // ALERT dulu, lalu yang terbaru
+  findings.sort((a, b) =>
+    (a.status === 'ALERT' ? 0 : 1) - (b.status === 'ALERT' ? 0 : 1) || b.order.localeCompare(a.order));
+
+  const activeCount = findings.filter(f => f.active).length;
   // Update sidebar badge
   const badge = document.getElementById('sbFindingBadge');
   if (badge) {
-    badge.textContent = findings.length;
-    badge.classList.toggle('alert', findings.length > 0);
+    badge.textContent = activeCount;
+    badge.classList.toggle('alert', activeCount > 0);
   }
   // Update dashboard sc-alert with finding count
-  setText('sc-alert', findings.length);
+  setText('sc-alert', activeCount);
 }
 function renderFindingsPage() {
   regenerateFindings();
 
-  // Populate area filter
+  const filterState = document.getElementById('findingStateFilter')?.value ?? 'active';
+  const byState = filterState === 'active' ? findings.filter(f => f.active)
+                : filterState === 'resolved' ? findings.filter(f => !f.active)
+                : findings;
+
+  // Populate area filter — dikunci per unit+area (nama area seperti "CTP 1" ada di Unit 1 & Unit 2)
   const areaFilter = document.getElementById('findingAreaFilter');
   if (areaFilter) {
     const cur = areaFilter.value;
-    const areas = [...new Set(findings.map(f => f.area).filter(Boolean))];
+    const areas = new Map();
+    byState.forEach(f => { if (!areas.has(f.areaKey)) areas.set(f.areaKey, `${f.unit} / ${f.area}`); });
     areaFilter.innerHTML = '<option value="">Semua Area</option>' +
-      areas.map(a => `<option value="${esc(a)}" ${cur===a?'selected':''}>${esc(a)}</option>`).join('');
+      [...areas].map(([k, label]) => `<option value="${esc(k)}" ${cur===k?'selected':''}>${esc(label)}</option>`).join('');
   }
 
   const filterArea   = document.getElementById('findingAreaFilter')?.value   || '';
   const filterStatus = document.getElementById('findingStatusFilter')?.value || '';
 
-  let filtered = findings;
-  if (filterArea)   filtered = filtered.filter(f => f.area   === filterArea);
+  let filtered = byState;
+  if (filterArea)   filtered = filtered.filter(f => f.areaKey === filterArea);
   if (filterStatus) filtered = filtered.filter(f => f.status === filterStatus);
 
-  setText('findingCountLbl', `${filtered.length} finding dari ${findings.length} total — auto-generated dari parameter melebihi batas`);
+  const activeTotal = findings.filter(f => f.active).length;
+  setText('findingCountLbl', `${filtered.length} finding ditampilkan · ${activeTotal} aktif dari ${findings.length} total riwayat`);
 
   // Summary cards per area
   const summaryEl = document.getElementById('findingSummaryCards');
   if (summaryEl) {
     const byArea = {};
-    findings.forEach(f => {
-      if (!byArea[f.area]) byArea[f.area] = { area: f.area, WARNING: 0, ALERT: 0 };
-      byArea[f.area][f.status] = (byArea[f.area][f.status] || 0) + 1;
+    byState.forEach(f => {
+      if (!byArea[f.areaKey]) byArea[f.areaKey] = { key: f.areaKey, unit: f.unit, area: f.area, WARNING: 0, ALERT: 0 };
+      byArea[f.areaKey][f.status] = (byArea[f.areaKey][f.status] || 0) + 1;
     });
     summaryEl.innerHTML = Object.values(byArea).map(a => `
       <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;cursor:pointer"
-           onclick="document.getElementById('findingAreaFilter').value=${jsArg(a.area)};renderFindingsPage()">
-        <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(a.area||'—')}</div>
+           onclick="document.getElementById('findingAreaFilter').value=${jsArg(a.key)};renderFindingsPage()">
+        <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(a.area||'—')} <span style="font-weight:400;color:var(--text3)">· ${esc(a.unit)}</span></div>
         <div style="display:flex;gap:6px">
           <span class="badge b-alert">🚨 ${a.ALERT}</span>
           <span class="badge b-warn">⚠ ${a.WARNING}</span>
@@ -87,7 +134,7 @@ function renderFindingsPage() {
   // Table
   const tbody = document.getElementById('findingsBody');
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="empty-ico">✅</div><div class="empty-msg">Tidak ada finding${filterArea||filterStatus?' dengan filter ini':''}.</div></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="empty-ico">✅</div><div class="empty-msg">Tidak ada finding${filterState==='active'?' aktif':''}${filterArea||filterStatus?' dengan filter ini':''}.</div></div></td></tr>`;
     return;
   }
   // Group findings by session
@@ -110,7 +157,7 @@ function renderFindingsPage() {
     .sort((a,b) => {
       const aHasAlert = a.findings.some(f=>f.status==='ALERT') ? 0 : 1;
       const bHasAlert = b.findings.some(f=>f.status==='ALERT') ? 0 : 1;
-      return aHasAlert - bHasAlert || (b.tanggal||'').localeCompare(a.tanggal||'');
+      return aHasAlert - bHasAlert || b.findings[0].order.localeCompare(a.findings[0].order);
     });
 
   tbody.innerHTML = groups.map(g => {
@@ -139,8 +186,9 @@ const woBtn = g.hasWO
        onclick="openWOFromSession('${esc(g.sessId)}')">🔧 Buat WO</button>`;
 
     const detailRows = g.findings.map(f => `
-      <tr style="background:${f.status==='ALERT'?'rgba(239,68,68,.04)':'rgba(249,115,22,.03)'}">
-        <td style="padding:5px 12px 5px 28px;font-size:11px;color:var(--text3)" colspan="2">↳ ${esc(f.parameter)}</td>
+      <tr style="background:${f.status==='ALERT'?'rgba(239,68,68,.04)':'rgba(249,115,22,.03)'};${f.active?'':'opacity:.6'}">
+        <td style="padding:5px 12px 5px 28px;font-size:11px;color:var(--text3)" colspan="2">↳ ${esc(f.parameter)}
+          ${f.resolved ? `<span class="badge b-ok" style="font-size:9px;margin-left:4px">✓ ${esc(f.resolved)}</span>` : ''}</td>
         <td style="padding:5px 12px;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:${f.status==='ALERT'?'var(--red)':'var(--orange)'}">
           ${esc(f.value)} <span style="font-size:10px;font-weight:400;color:var(--text3)">${esc(f.unit_param)}</span>
         </td>
