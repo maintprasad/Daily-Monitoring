@@ -1,0 +1,13 @@
+# Pengaman untuk XAMPP (Apache). Tidak dipakai di Vercel.
+Options -Indexes
+
+# Blokir file tersembunyi (.env, .git, dll), file database, dan dokumentasi internal
+<FilesMatch "^\.|\.(db|db-wal|db-shm|db-journal|sqlite|md|log)$">
+    Require all denied
+</FilesMatch>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    # Folder yang hanya boleh diakses dari CLI / server, bukan dari browser
+    RewriteRule ^(database|scripts|legacy|api/_lib)(/|$) - [F,L]
+</IfModule>

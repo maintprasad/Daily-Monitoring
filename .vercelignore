@@ -1,0 +1,9 @@
+# File yang tidak perlu ikut di-deploy ke Vercel
+database/
+scripts/
+legacy/
+.env
+.env.*
+*.md
+.htaccess
+**/.htaccess

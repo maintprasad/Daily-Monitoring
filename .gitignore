@@ -1,0 +1,19 @@
+# Rahasia & konfigurasi lokal
+.env
+.env.*
+!.env.example
+
+# Database SQLite lokal
+database/*.db
+database/*.db-wal
+database/*.db-shm
+database/*.db-journal
+
+# Vercel
+.vercel
+
+# Editor / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
