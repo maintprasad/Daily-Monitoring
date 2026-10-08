@@ -170,6 +170,8 @@ function crewNavTo(tab) {
   } else if (tab === 'history') {
     document.getElementById('crewNavHistory')?.classList.add('active');
     crewShowHistory();
+  } else if (tab === 'monwo') {
+    crewShowMonWo();
   } else {
     document.getElementById('crewNavHome')?.classList.add('active');
     crewShowHome();
@@ -231,6 +233,7 @@ function crewShowHome() {
 
   const monthSess  = sessions.filter(s => (s.tanggal || '').startsWith(thisMonth));
   const monthItems = monthSess.flatMap(s => s.items || []);
+  const openMonWo  = monWoOpenList(currentUser?.unitId || '');
 
   const todoHtml = todo.slice(0, 8).map(x => `
     <button class="cw-todo-item" onclick="crewQuickStart(${jsArg(x.unit.id)}, ${jsArg(x.area.id)}, ${jsArg(x.eq.id)})">
@@ -268,8 +271,19 @@ function crewShowHome() {
           <span class="cw-todo-meta">${esc(x.area.name)} · ${x.repair.pending.map(f => esc(f.parameter) + ' ' + esc(f.value) + ' ' + esc(f.unit_param || '')).join(', ')}</span>
         </span>
         <span class="cw-todo-go">🔧 Perbaiki ›</span>
-      </button>`;
+      </button>
+      <button class="cw-link" style="margin:-4px 0 10px" onclick="crewMonitorAgain(${jsArg(x.unit.id)}, ${jsArg(x.area.id)}, ${jsArg(x.eq.id)})">↻ Monitoring Lagi (skip ke WO Monitoring)</button>`;
     }).join('')}</div>` : ''}
+
+    ${openMonWo.length ? `
+    <button class="cw-todo-item repair" style="margin-bottom:18px;width:100%" onclick="crewShowMonWo()">
+      <span class="cw-todo-dot"></span>
+      <span class="cw-todo-info">
+        <span class="cw-todo-name">📋 WO Monitoring terbuka</span>
+        <span class="cw-todo-meta">${openMonWo.length} equipment masih punya temuan yang belum selesai</span>
+      </span>
+      <span class="cw-todo-go">Lihat ›</span>
+    </button>` : ''}
 
     <div class="crew-sec-label">⏳ Belum dicek hari ini <span class="cw-count">${todo.length}</span></div>
     ${todo.length ? `<div class="cw-todo">${todoHtml}</div>
@@ -300,17 +314,54 @@ function crewShowHome() {
 // Crew sudah memilih equipment, jadi cukup konfirmasi waktu & PIC lalu langsung isi checklist.
 let _crewQuick = null;
 
-function crewQuickStart(unitId, areaId, eqId) {
+/**
+ * Equipment masih punya temuan yang belum dilaporkan perbaikannya: tawarkan Perbaiki,
+ * atau Monitoring Lagi — temuan di-skip dan disimpan ke WO Monitoring.
+ */
+function crewMonitorAgain(unitId, areaId, eqId) {
+  regenerateFindings();
+  const eq = findEquipFlex(unitId, areaId, '', eqId);
+  const st = equipRepairState(unitId, areaId, eqId);
+  if (!eq) { toast('Equipment tidak ditemukan', 'error'); return; }
+  if (!st.needsRepair) { crewQuickStart(unitId, areaId, eqId, true); return; }
+
+  document.getElementById('crewStartBody').innerHTML = `
+    <div class="cw-start-eq">
+      <div class="cw-start-icon">📋</div>
+      <div style="min-width:0">
+        <div class="cw-start-name">${esc(eq.name)}</div>
+        <div class="cw-start-meta">${st.pending.length} temuan belum diperbaiki</div>
+      </div>
+    </div>
+    <div style="margin:10px 0">${st.pending.map(f => `<span class="badge ${f.status === 'ALERT' ? 'b-alert' : 'b-warn'}" style="font-size:11px;margin:2px 4px 2px 0">
+      ${esc(f.parameter)} ${esc(f.value)} ${esc(f.unit_param || '')}</span>`).join('')}</div>
+    <div class="cw-start-label">Monitoring Lagi akan menyimpan temuan ini ke menu <b>WO Monitoring</b> dan melanjutkan pengecekan.
+      WO tertutup otomatis saat parameternya normal kembali.</div>
+    <div class="cw-start-label" style="margin-top:12px">Alasan di-skip <span>(opsional)</span></div>
+    <input class="finput" id="cqSkipReason" placeholder="Contoh: menunggu sparepart, butuh shutdown"/>
+    <button class="cw-cta" style="margin-top:16px" onclick="crewConfirmMonitorAgain(${jsArg(unitId)},${jsArg(areaId)},${jsArg(eqId)})"><span>↻</span> Monitoring Lagi</button>
+    <button class="cw-link" onclick="closeOverlay('crewStartOverlay');openRepairModal(${jsArg(unitId)},${jsArg(areaId)},${jsArg(eqId)})">🔧 Perbaiki dulu</button>
+    <button class="cw-link" onclick="closeOverlay('crewStartOverlay')">Batal</button>`;
+  openOverlay('crewStartOverlay');
+}
+
+function crewConfirmMonitorAgain(unitId, areaId, eqId) {
+  const wo = createMonitoringWo(unitId, areaId, eqId, getVal('cqSkipReason'));
+  if (wo) toast(`📋 ${wo.findings.length} temuan disimpan ke WO Monitoring`, 'info', 4000);
+  closeOverlay('crewStartOverlay');
+  crewQuickStart(unitId, areaId, eqId, true);
+}
+
+function crewQuickStart(unitId, areaId, eqId, skipRepair) {
   const unit = findUnit(unitId);
   const area = findArea(unitId, areaId);
   const eq   = findEquipFlex(unitId, areaId, '', eqId);
   if (!eq) { toast('Equipment tidak ditemukan', 'error'); return; }
   if (!(eq.params || []).length) { toast('Equipment ini belum punya parameter. Hubungi Admin.', 'error'); return; }
   regenerateFindings();
-  const rp = equipRepairState(unitId, areaId, eqId);
-  if (rp.needsRepair) {
-    toast(`🔧 Perbaiki dulu ${rp.pending.length} temuan sebelum cek ulang`, 'info', 5000);
-    openRepairModal(unitId, areaId, eqId);
+  // Temuan yang belum diperbaiki tidak lagi mengunci: crew pilih Perbaiki atau Monitoring Lagi (skip → WO Monitoring)
+  if (!skipRepair && equipRepairState(unitId, areaId, eqId).needsRepair) {
+    crewMonitorAgain(unitId, areaId, eqId);
     return;
   }
   crewNav.screen = crewNav.screen === 'home' ? 'home' : 'equip';
@@ -542,7 +593,8 @@ function crewSelectArea(areaId, areaName) {
     // Tombol utama mengikuti tahap: Perbaiki → Cek Lagi → (selesai)
     const actionBtns = rp.needsRepair
       ? `<button class="cw-btn repair" onclick="openRepairModal(${jsArg(crewNav.unitId)},${jsArg(areaId)},${jsArg(eq.id)})">🔧 Perbaiki</button>
-         <button class="cw-btn locked" disabled title="Perbaiki temuan dulu">🔒 Cek Lagi</button>`
+         <button class="cw-btn primary" title="Lewati perbaikan, simpan temuan ke WO Monitoring"
+           onclick="crewMonitorAgain(${jsArg(crewNav.unitId)},${jsArg(areaId)},${jsArg(eq.id)})">↻ Monitoring Lagi</button>`
       : `<button class="cw-btn ${doneToday && !awaitingRecheck ? 'outline' : 'primary'}"
           onclick="crewStartSession(${jsArg(crewNav.unitId)},${jsArg(areaId)},${jsArg(eq.id)})">
           ${awaitingRecheck ? '↻ Cek Lagi (verifikasi)' : doneToday ? '↻ Cek Lagi' : last ? '▶ Cek Lagi' : '▶ Mulai Cek'}

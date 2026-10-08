@@ -106,6 +106,7 @@
     <div class="sb-label">Analitik</div>
     <div class="sb-item" data-page="findings"><span class="sb-icon">🚨</span>Finding / Alarm <span class="sb-badge alert" id="sbFindingBadge">0</span></div>
     <div class="sb-item" data-page="rca"><span class="sb-icon">🔍</span>Root Cause Analysis <span class="sb-badge" id="sbRcaBadge" hidden>0</span></div>
+    <div class="sb-item" data-page="monwo"><span class="sb-icon">📋</span>WO Monitoring <span class="sb-badge" id="sbMonWoBadge" hidden>0</span></div>
   </div>
   <!-- ADD END -->
   <div class="sb-section" id="sbSyncSection">
@@ -647,6 +648,40 @@
           <th>No. RCA</th><th>Equipment</th><th>Finding</th><th>Kategori</th><th>Akar Masalah</th><th>PIC / Target</th><th>Status</th><th>Aksi</th>
         </tr></thead>
         <tbody id="rcaTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════ WO MONITORING (temuan yang di-skip crew saat Monitoring Lagi) ════ -->
+<div class="page" id="page-monwo">
+  <div class="sec-hdr">
+    <div>
+      <div class="sec-title">📋 WO Monitoring</div>
+      <div class="sec-sub">Temuan yang di-skip crew saat "Monitoring Lagi" — tertutup otomatis saat normal kembali atau ditutup lewat RCA</div>
+    </div>
+    <div class="sec-actions">
+      <input class="fsel" id="monWoSearch" placeholder="Cari equipment, parameter, crew..." oninput="renderMonitoringWoPage()" style="min-width:220px"/>
+      <select class="fsel" id="monWoStatusFilter" onchange="renderMonitoringWoPage()">
+        <option value="">Semua Status</option>
+        <option value="Open" selected>📋 Open</option>
+        <option value="Closed">✅ Closed</option>
+      </select>
+      <button class="btn btn-primary btn-sm" onclick="navigateTo('findings')">🚨 Ke Finding Aktif</button>
+    </div>
+  </div>
+  <div class="rca-stats">
+    <div class="rca-stat"><div class="rca-stat-val" id="monWoStatTotal">0</div><div class="rca-stat-lbl">Total WO</div></div>
+    <div class="rca-stat open"><div class="rca-stat-val" id="monWoStatOpen">0</div><div class="rca-stat-lbl">Open</div></div>
+    <div class="rca-stat closed"><div class="rca-stat-val" id="monWoStatClosed">0</div><div class="rca-stat-lbl">Closed</div></div>
+  </div>
+  <div class="tbl-wrap">
+    <div class="tbl-scroll">
+      <table class="data-table" style="min-width:820px">
+        <thead><tr>
+          <th>No. WO</th><th>Equipment</th><th>Temuan</th><th>Di-skip oleh</th><th>Status</th><th>Aksi</th>
+        </tr></thead>
+        <tbody id="monWoTableBody"></tbody>
       </table>
     </div>
   </div>
@@ -1311,6 +1346,10 @@
         <div class="cni-wrap"><span class="cni">📋</span></div>
         <span>Monitor</span>
       </button>
+      <button class="crew-nav-btn" id="crewNavMonWo" onclick="crewNavTo('monwo')">
+        <div class="cni-wrap" style="position:relative"><span class="cni">📋</span><span class="sb-badge alert" id="crewMonWoBadge" hidden style="position:absolute;top:-4px;right:-6px">0</span></div>
+        <span>WO Monitoring</span>
+      </button>
       <button class="crew-nav-btn" id="crewNavHistory" onclick="crewShowHistory(false)">
         <div class="cni-wrap"><span class="cni">📊</span></div>
         <span>Riwayat</span>
@@ -1665,6 +1704,7 @@
 <script src="assets/js/features/wa-settings.js"></script>
 <script src="assets/js/features/rca.js"></script>
 <script src="assets/js/features/repair.js"></script>
+<script src="assets/js/features/monitoring-wo.js"></script>
 <script src="assets/js/features/crew-portal.js"></script>
 <script src="assets/js/features/report-monthly.js"></script>
 <script src="assets/js/features/report-pptx.js"></script>

@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════
--- Prasad Seeds — Monitoring System v5 · Skema database (versi 6)
+-- Prasad Seeds — Monitoring System v5 · Skema database (versi 7)
 -- Kompatibel dengan SQLite (XAMPP) dan Turso / libSQL (Vercel). BUKAN untuk MySQL/phpMyAdmin.
 -- Di-generate dari api/_lib/Schema.php:  php scripts/dump-schema.php
 --
@@ -336,6 +336,44 @@ CREATE TABLE IF NOT EXISTS repair_findings (
 
 CREATE INDEX IF NOT EXISTS idx_repair_findings_finding ON repair_findings(finding_id);
 
+CREATE TABLE IF NOT EXISTS monitoring_wos (
+  id           TEXT PRIMARY KEY,
+  session_id   TEXT NOT NULL DEFAULT '',
+  unit_id      TEXT NOT NULL DEFAULT '',
+  unit_name    TEXT NOT NULL DEFAULT '',
+  area_id      TEXT NOT NULL DEFAULT '',
+  area_name    TEXT NOT NULL DEFAULT '',
+  equip_id     TEXT NOT NULL DEFAULT '',
+  equip_name   TEXT NOT NULL DEFAULT '',
+  status       TEXT NOT NULL DEFAULT 'Open',
+  reason       TEXT NOT NULL DEFAULT '',
+  skipped_by   TEXT NOT NULL DEFAULT '',
+  skipped_by_name TEXT NOT NULL DEFAULT '',
+  skipped_at   TEXT NOT NULL DEFAULT '',
+  closed_at    TEXT NOT NULL DEFAULT '',
+  close_reason TEXT NOT NULL DEFAULT '',
+  updated_at   TEXT NOT NULL DEFAULT '',
+  extra        TEXT,
+  rev          INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_monitoring_wos_rev ON monitoring_wos(rev);
+
+CREATE INDEX IF NOT EXISTS idx_monitoring_wos_status ON monitoring_wos(status);
+
+CREATE TABLE IF NOT EXISTS monitoring_wo_findings (
+  wo_id       TEXT NOT NULL,
+  finding_id  TEXT NOT NULL,
+  seq         INTEGER NOT NULL DEFAULT 0,
+  session_id  TEXT NOT NULL DEFAULT '',
+  param_id    TEXT NOT NULL DEFAULT '',
+  parameter   TEXT NOT NULL DEFAULT '',
+  value       TEXT NOT NULL DEFAULT '',
+  unit        TEXT NOT NULL DEFAULT '',
+  find_status TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (wo_id, finding_id)
+);
+
 CREATE TABLE IF NOT EXISTS notifications (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   username   TEXT NOT NULL,
@@ -387,7 +425,7 @@ CREATE VIEW v_findings AS
 INSERT OR IGNORE INTO counters (name, value) VALUES
   ('rev', 0), ('hierarchy_rev', 0), ('pics_rev', 0), ('wo_seq', 0);
 
-INSERT OR IGNORE INTO app_meta (key, value) VALUES ('schema_version', '6');
+INSERT OR IGNORE INTO app_meta (key, value) VALUES ('schema_version', '7');
 
 INSERT INTO users (username, name, role, password_hash, active, created_at, updated_at)
   SELECT 'admin', 'Administrator (default)', 'admin', '$2y$10$NuYmx98uq4RJm.QVxITepe6lh8TTTppcBpEZmnpf2fj6ShHCdDrqG', 1,

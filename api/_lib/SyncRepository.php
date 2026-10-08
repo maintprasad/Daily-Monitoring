@@ -89,6 +89,8 @@ final class SyncRepository
                 'rcaItems'   => ['SELECT * FROM rca_findings WHERE rca_id IN (SELECT id FROM rca_reports WHERE rev > ?) ORDER BY rca_id, seq', [$since]],
                 'repairs'    => ['SELECT * FROM repairs WHERE rev > ? ORDER BY rev, id', [$since]],
                 'repairItems'=> ['SELECT * FROM repair_findings WHERE repair_id IN (SELECT id FROM repairs WHERE rev > ?) ORDER BY repair_id, seq', [$since]],
+                'monWos'     => ['SELECT * FROM monitoring_wos WHERE rev > ? ORDER BY rev, id', [$since]],
+                'monWoItems' => ['SELECT * FROM monitoring_wo_findings WHERE wo_id IN (SELECT id FROM monitoring_wos WHERE rev > ?) ORDER BY wo_id, seq', [$since]],
             ];
         }
 
@@ -142,6 +144,11 @@ final class SyncRepository
                 $repItems[$r['repair_id']][] = self::rcaFindingOut($r);
             }
             $out['repairs'] = array_map(fn ($r) => self::repairOut($r, $repItems[$r['id']] ?? []), $res['repairs']);
+            $monItems = [];
+            foreach ($res['monWoItems'] as $r) {
+                $monItems[$r['wo_id']][] = self::rcaFindingOut($r);
+            }
+            $out['monitoringWos'] = array_map(fn ($r) => self::monitoringWoOut($r, $monItems[$r['id']] ?? []), $res['monWos']);
         }
         return $out;
     }
@@ -204,6 +211,11 @@ final class SyncRepository
         $repairList = array_values(array_filter(is_array($in['repairs'] ?? null) ? $in['repairs'] : [], 'is_array'));
         foreach ($repairList as $rep) {
             array_push($stmts, ...self::repairStatements($rep, $user));
+        }
+
+        // WO Monitoring (temuan yang di-skip saat Monitoring Lagi) — semua role
+        foreach (array_filter(is_array($in['monitoringWos'] ?? null) ? $in['monitoringWos'] : [], 'is_array') as $mw) {
+            array_push($stmts, ...self::monitoringWoStatements($mw));
         }
 
         // RCA / penutupan finding — hanya leader ke atas
@@ -623,6 +635,66 @@ final class SyncRepository
         $rep['findings'] = $findings;
         $rep['updatedAt'] = (string) $r['updated_at'];
         return $rep + self::extraOut($r['extra']);
+    }
+
+    // ── WO Monitoring (temuan yang di-skip crew) ─────────
+
+    public const MONITORING_WO_STATUS = ['Open', 'Closed'];
+    private const MONITORING_WO_FIELDS = [
+        'sessId' => 'session_id', 'unitId' => 'unit_id', 'unitName' => 'unit_name',
+        'areaId' => 'area_id', 'areaName' => 'area_name', 'equipId' => 'equip_id', 'equipName' => 'equip_name',
+        'status' => 'status', 'reason' => 'reason',
+        'skippedBy' => 'skipped_by', 'skippedByName' => 'skipped_by_name', 'skippedAt' => 'skipped_at',
+        'closedAt' => 'closed_at', 'closeReason' => 'close_reason',
+    ];
+
+    private static function monitoringWoStatements(array $mw): array
+    {
+        $id = self::id($mw['id'] ?? '', 'ID WO Monitoring');
+        $findings = array_values(array_filter(is_array($mw['findings'] ?? null) ? $mw['findings'] : [], 'is_array'));
+        if (!$findings) {
+            throw new HttpError("WO Monitoring $id belum berisi finding");
+        }
+        $mw['status'] = in_array($mw['status'] ?? '', self::MONITORING_WO_STATUS, true) ? $mw['status'] : 'Open';
+
+        $cols = ['id'];
+        $vals = [$id];
+        foreach (self::MONITORING_WO_FIELDS as $key => $col) {
+            $cols[] = $col;
+            $vals[] = self::str($mw[$key] ?? '');
+        }
+        array_push($cols, 'extra', 'updated_at');
+        array_push($vals, self::extra($mw, array_merge(array_keys(self::MONITORING_WO_FIELDS), ['id', 'findings', 'updatedAt'])), gmdate('c'));
+
+        // Pencatat skip tidak berubah oleh update berikutnya (mis. penutupan otomatis oleh user lain)
+        $updates = implode(', ', array_map(fn ($c) => "$c = excluded.$c",
+            array_diff($cols, ['id', 'skipped_by', 'skipped_by_name', 'skipped_at', 'reason'])));
+        $stmts = [
+            ['INSERT INTO monitoring_wos (' . implode(', ', $cols) . ', rev) VALUES (' . str_repeat('?, ', count($cols)) . self::REV . ')
+              ON CONFLICT(id) DO UPDATE SET ' . $updates . ', rev = excluded.rev', $vals],
+            ['DELETE FROM monitoring_wo_findings WHERE wo_id = ?', [$id]],
+        ];
+        $rows = [];
+        foreach ($findings as $i => $f) {
+            $row = [$id, $i];
+            foreach (self::RCA_FINDING_FIELDS as $key => $_) {
+                $row[] = $key === 'findingId' ? self::id($f['findingId'] ?? '', 'ID finding') : self::str($f[$key] ?? '');
+            }
+            $rows[] = $row;
+        }
+        return array_merge($stmts, Db::insertRows('monitoring_wo_findings',
+            array_merge(['wo_id', 'seq'], array_values(self::RCA_FINDING_FIELDS)), $rows));
+    }
+
+    private static function monitoringWoOut(array $r, array $findings): array
+    {
+        $mw = ['id' => (string) $r['id']];
+        foreach (self::MONITORING_WO_FIELDS as $key => $col) {
+            $mw[$key] = (string) $r[$col];
+        }
+        $mw['findings'] = $findings;
+        $mw['updatedAt'] = (string) $r['updated_at'];
+        return $mw + self::extraOut($r['extra']);
     }
 
     // ── RCA (penutupan finding) ──────────────────────────

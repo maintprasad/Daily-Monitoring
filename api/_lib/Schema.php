@@ -11,7 +11,7 @@ declare(strict_types=1);
  */
 final class Schema
 {
-    public const VERSION = 6;
+    public const VERSION = 7;
 
     // Kolom users yang ditambahkan sejak v3 (untuk upgrade database lama lewat ALTER TABLE).
     // Atasan (bagan organisasi) mulai v4 disimpan di tabel user_reports — bisa lebih dari satu.
@@ -317,6 +317,43 @@ final class Schema
                 PRIMARY KEY (repair_id, finding_id)
             )',
             'CREATE INDEX IF NOT EXISTS idx_repair_findings_finding ON repair_findings(finding_id)',
+
+            // ── WO Monitoring: temuan yang di-skip crew saat "Monitoring Lagi" tanpa diperbaiki ──
+            // Satu baris per equipment per skip; status Open sampai semua parameternya normal kembali / ditutup RCA.
+            'CREATE TABLE IF NOT EXISTS monitoring_wos (
+                id           TEXT PRIMARY KEY,
+                session_id   TEXT NOT NULL DEFAULT \'\',
+                unit_id      TEXT NOT NULL DEFAULT \'\',
+                unit_name    TEXT NOT NULL DEFAULT \'\',
+                area_id      TEXT NOT NULL DEFAULT \'\',
+                area_name    TEXT NOT NULL DEFAULT \'\',
+                equip_id     TEXT NOT NULL DEFAULT \'\',
+                equip_name   TEXT NOT NULL DEFAULT \'\',
+                status       TEXT NOT NULL DEFAULT \'Open\',
+                reason       TEXT NOT NULL DEFAULT \'\',
+                skipped_by   TEXT NOT NULL DEFAULT \'\',
+                skipped_by_name TEXT NOT NULL DEFAULT \'\',
+                skipped_at   TEXT NOT NULL DEFAULT \'\',
+                closed_at    TEXT NOT NULL DEFAULT \'\',
+                close_reason TEXT NOT NULL DEFAULT \'\',
+                updated_at   TEXT NOT NULL DEFAULT \'\',
+                extra        TEXT,
+                rev          INTEGER NOT NULL DEFAULT 0
+            )',
+            'CREATE INDEX IF NOT EXISTS idx_monitoring_wos_rev ON monitoring_wos(rev)',
+            'CREATE INDEX IF NOT EXISTS idx_monitoring_wos_status ON monitoring_wos(status)',
+            'CREATE TABLE IF NOT EXISTS monitoring_wo_findings (
+                wo_id       TEXT NOT NULL,
+                finding_id  TEXT NOT NULL,
+                seq         INTEGER NOT NULL DEFAULT 0,
+                session_id  TEXT NOT NULL DEFAULT \'\',
+                param_id    TEXT NOT NULL DEFAULT \'\',
+                parameter   TEXT NOT NULL DEFAULT \'\',
+                value       TEXT NOT NULL DEFAULT \'\',
+                unit        TEXT NOT NULL DEFAULT \'\',
+                find_status TEXT NOT NULL DEFAULT \'\',
+                PRIMARY KEY (wo_id, finding_id)
+            )',
 
             // ── Notifikasi & pengaturan ──
             // Notifikasi in-app per penerima (popup + lonceng di kanan atas)

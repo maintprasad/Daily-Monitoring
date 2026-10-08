@@ -104,6 +104,10 @@ function regenerateFindings() {
     rcaBadge.hidden = openRca === 0;
     rcaBadge.textContent = openRca;
   }
+
+  // WO Monitoring: tutup otomatis yang sudah selesai + badge menu
+  syncMonitoringWoStatus();
+  updateMonWoBadge();
 }
 function renderFindingsPage() {
   regenerateFindings();

@@ -29,3 +29,20 @@ Data lama di `dbm.xlsx` (ekspor Google Sheets: SESSIONS, SESSION_ITEMS, HIERARCH
 **Nomor versi terbaru:** 6.1
 
 **Lanjutan 2026-10-08 — Turso (Vercel):** `import-xlsx.php --env=.env.turso` dijalankan dengan hasil sama seperti lokal: 69 sesi dipulihkan, 396 tanggal diperbaiki, +3 equipment/+22 parameter. Turso kini 466 sesi (465 dari Sheets + 1 sesi yang hanya ada di Turso, tidak disentuh), 79 equipment, 738 parameter, deleted_sessions 0 dan tidak ada sesi tanpa equipment. User (13) tidak diubah. Jalan ulang = "465 sama" (idempoten).
+
+## 2026-10-08 (2)
+
+**Version:** 7.0
+
+**Penyebab revisi:**
+Aturan lama mengunci crew: equipment yang pengecekan terakhirnya masih punya temuan belum bisa dimonitor lagi sebelum temuan dilaporkan perbaikannya. Di lapangan perbaikan tidak selalu bisa langsung dilakukan (menunggu sparepart / shutdown), sehingga monitoring ikut terhenti.
+
+**Metode revisi:**
+- Crew tetap bisa lanjut monitoring lewat tombol **↻ Monitoring Lagi**; temuan yang belum diperbaiki disimpan ke menu baru **WO Monitoring** (Crew Portal + sidebar admin/supervisor/leader).
+- Skema v7: tabel `monitoring_wos` + `monitoring_wo_findings` (otomatis dibuat saat API dipakai / `php scripts/migrate.php`). Sinkronisasi delta lewat `sync`/`push` (kunci `monitoringWos`), semua role boleh menulis.
+- WO tertutup otomatis saat parameter normal kembali atau ditutup RCA; pencatat skip & alasan tidak bisa ditimpa update berikutnya.
+
+**Hasil revisi:**
+- Diuji di salinan database: migrasi v6→v7, push oleh crew, penutupan oleh leader, pull (pencatat skip tetap), dan logika penutupan otomatis (belum dicek → Open, masih ALERT → Open, OK → Closed).
+
+**Nomor versi terbaru:** 7.0

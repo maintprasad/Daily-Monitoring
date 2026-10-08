@@ -16,7 +16,7 @@ assets/js/features/     Checklist, sesi, Work Order, laporan PDF/PPTX, crew port
 assets/js/tools/        Tool admin (Data Recovery, Scan Big Error)
 api/index.php           Satu-satunya endpoint API (?r=route)
 api/_lib/               Driver SQLite/Turso, skema, auth, repository
-scripts/                CLI: migrate.php, import-sheets.php, copy-to-turso.php
+scripts/                CLI: migrate.php, import-sheets.php, import-xlsx.php, copy-to-turso.php
 database/schema.sql     Skema SQL lengkap (SQLite & Turso) — generate ulang: php scripts/dump-schema.php
 database/*.db           File SQLite lokal (tidak ikut git)
 legacy/                 Backup index.html monolith lama (boleh dihapus)
@@ -41,6 +41,11 @@ handler `onclick="..."` di HTML tetap berfungsi. Urutan pemuatan diatur di `inde
    D:\Xampp\php\php.exe scripts\import-sheets.php
    ```
    User lama ikut terimport dan password-nya otomatis di-hash.
+   Atau dari ekspor `.xlsx` Google Sheets (menggabung tanpa menimpa data yang ada, backup otomatis):
+   ```
+   D:\Xampp\php\php.exe scripts\import-xlsx.php --file=dbm.xlsx --dry-run   # lihat laporan dulu
+   D:\Xampp\php\php.exe scripts\import-xlsx.php --file=dbm.xlsx
+   ```
 5. Buka `http://localhost/dailymonitoring/`
 
 File database ada di `database/dailymonitoring.db` — bisa dibuka langsung dengan
@@ -115,14 +120,27 @@ Cek koneksi: `https://<project>.vercel.app/api/index.php?r=health`
 Alur di Crew Portal: **cek → ada temuan → 🔧 Perbaiki → atasan diberi tahu → ↻ Cek Lagi (verifikasi) → Leader menutup via RCA**.
 
 - Jika pengecekan terakhir equipment masih punya temuan aktif yang **belum dilaporkan perbaikannya**,
-  tombol utama menjadi **🔧 Perbaiki** dan **Cek Lagi terkunci**. Beranda crew menampilkan bagian
-  **"Perlu diperbaiki"** paling atas.
+  tombol utama menjadi **🔧 Perbaiki** dan **↻ Monitoring Lagi** (crew tidak lagi terkunci, lihat
+  "WO Monitoring" di bawah). Beranda crew menampilkan bagian **"Perlu diperbaiki"** paling atas.
 - Laporan perbaikan: temuan yang diperbaiki, tindakan (wajib), hasil (**✅ Sudah diperbaiki /
   ⏳ Sementara / 🆘 Perlu bantuan**), dugaan penyebab, material, catatan.
 - Laporan dikirim sebagai notifikasi ke atasan sesuai aturan wilayah & bagan organisasi;
   hasil **🆘 Perlu bantuan** juga dikirim via WhatsApp.
 - Laporan tidak menutup finding. Finding selesai saat cek ulang normal ("Normal kembali")
   atau ditutup Leader lewat RCA — tindakan korektif RCA otomatis terisi dari laporan crew.
+
+## WO Monitoring (temuan yang di-skip)
+
+Crew boleh melanjutkan monitoring walau hasil monitoring sebelumnya belum diperbaiki:
+
+- Tombol **↻ Monitoring Lagi** (di daftar equipment, bagian "Perlu diperbaiki" di beranda, dan menu
+  **WO Monitoring**) menyimpan temuan yang belum diperbaiki ke **WO Monitoring** (opsional: alasan di-skip),
+  lalu langsung membuka checklist baru.
+- WO berstatus **Open** dan **tertutup otomatis** saat setiap parameternya normal kembali di pengecekan
+  berikutnya atau ditutup lewat RCA. Pengecekan yang masih WARNING/ALERT membuat WO tetap Open.
+- Crew: menu **📋 WO Monitoring** di bottom nav (badge jumlah WO terbuka). Admin/Supervisor/Leader:
+  menu **WO Monitoring** di sidebar (grup Analitik) — tabel semua WO + filter status.
+- Disimpan di tabel `monitoring_wos` + `monitoring_wo_findings` (skema v7), ikut sinkronisasi delta.
 
 ## Penutupan finding — Root Cause Analysis (RCA)
 
@@ -141,7 +159,7 @@ PM & daily monitoring diarahkan ke WO).
 
 Hanya Leader ke atas yang bisa membuat/menutup RCA (crew ditolak di server).
 
-## Tabel database (skema v6)
+## Tabel database (skema v7)
 
 | Tabel | Isi |
 |---|---|
@@ -154,6 +172,7 @@ Hanya Leader ke atas yang bisa membuat/menutup RCA (crew ditolak di server).
 | `pics` | Daftar PIC / teknisi |
 | `rca_reports`, `rca_findings` | Root Cause Analysis & daftar finding yang ditutup tiap RCA |
 | `repairs`, `repair_findings` | Laporan perbaikan crew & finding yang diperbaiki |
+| `monitoring_wos`, `monitoring_wo_findings` | WO Monitoring: temuan yang di-skip crew saat "Monitoring Lagi" + statusnya |
 | `work_orders`, `work_order_items`, `work_order_logs` | Work order, item checklist temuan, riwayat catatan |
 | `counters`, `app_meta` | Nomor revisi, nomor urut WO, versi skema |
 | `v_findings` (view) | Semua temuan WARNING/ALERT siap dibaca, beserta No. & status RCA-nya |

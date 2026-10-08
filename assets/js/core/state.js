@@ -59,6 +59,7 @@ let findings    = [];
 let workOrders  = [];
 let rcaReports  = [];   // Root Cause Analysis — penutupan finding (lihat features/rca.js)
 let repairs     = [];   // Laporan perbaikan oleh crew sebelum cek ulang (lihat features/repair.js)
+let monitoringWos = []; // WO Monitoring: temuan yang di-skip crew saat "Monitoring Lagi" (lihat features/monitoring-wo.js)
 
 // Param editor temp
 let _editingEquipPath = null; // { unitId, areaId, subAreaId, equipId }

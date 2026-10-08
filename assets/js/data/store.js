@@ -19,7 +19,7 @@ const PUSH_CHUNK = 60;
 
 const _sync = {
   rev: 0,
-  snap: { hierarchy: null, picList: null, sessions: {}, workOrders: {}, rcaReports: {}, repairs: {} },
+  snap: { hierarchy: null, picList: null, sessions: {}, workOrders: {}, rcaReports: {}, repairs: {}, monitoringWos: {} },
   pushing: false,
   pushAgain: false,
   pulling: false,
@@ -59,9 +59,11 @@ function loadAll() {
       workOrders = Array.isArray(c.workOrders) ? c.workOrders : [];
       rcaReports = Array.isArray(c.rcaReports) ? c.rcaReports : [];
       repairs    = Array.isArray(c.repairs)    ? c.repairs    : [];
+      monitoringWos = Array.isArray(c.monitoringWos) ? c.monitoringWos : [];
       _sync.rev  = c.rev || 0;
-      _sync.snap = Object.assign({ hierarchy: null, picList: null, sessions: {}, workOrders: {}, rcaReports: {}, repairs: {} }, c.snap || {});
+      _sync.snap = Object.assign({ hierarchy: null, picList: null, sessions: {}, workOrders: {}, rcaReports: {}, repairs: {}, monitoringWos: {} }, c.snap || {});
       if (!_sync.snap.repairs) _sync.snap.repairs = {};
+      if (!_sync.snap.monitoringWos) _sync.snap.monitoringWos = {};
     }
   } catch (e) {
     console.warn('[Store] Cache lokal rusak, diabaikan:', e.message);
@@ -74,7 +76,7 @@ function writeCache() {
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify({
       rev: _sync.rev, snap: _sync.snap,
-      hierarchy, sessions, picList: PIC_LIST, workOrders, rcaReports, repairs,
+      hierarchy, sessions, picList: PIC_LIST, workOrders, rcaReports, repairs, monitoringWos,
     }));
   } catch (e) {
     // Cache hanya pelengkap — data utama ada di database
@@ -88,7 +90,7 @@ function writeCache() {
 function clearLocalCache() {
   try { localStorage.removeItem(CACHE_KEY); } catch (e) {}
   _sync.rev = 0;
-  _sync.snap = { hierarchy: null, picList: null, sessions: {}, workOrders: {}, rcaReports: {}, repairs: {} };
+  _sync.snap = { hierarchy: null, picList: null, sessions: {}, workOrders: {}, rcaReports: {}, repairs: {}, monitoringWos: {} };
 }
 
 /** Panggil setelah mengubah hierarchy / sessions / PIC_LIST / workOrders / rcaReports / repairs. */
@@ -104,7 +106,7 @@ function schedulePush(delay = PUSH_DEBOUNCE_MS) {
 }
 
 function collectChanges() {
-  const ch = { sessions: [], deletedSessions: [], workOrders: [], rcaReports: [], repairs: [], hierarchy: null, picList: null };
+  const ch = { sessions: [], deletedSessions: [], workOrders: [], rcaReports: [], repairs: [], monitoringWos: [], hierarchy: null, picList: null };
   // Hierarki & PIC dikirim utuh (menimpa server), jadi hanya boleh dikirim setelah
   // versi server pernah diterima (snap !== null). Ini mencegah perangkat baru dengan
   // cache kosong menghapus hierarki di database.
@@ -139,6 +141,13 @@ function collectChanges() {
     if (h !== _sync.snap.repairs[r.id]) ch.repairs.push({ data: r, hash: h });
   });
 
+  // WO Monitoring juga boleh dikirim semua role
+  monitoringWos.forEach(m => {
+    if (!m || !m.id) return;
+    const h = hashOf(m);
+    if (h !== _sync.snap.monitoringWos[m.id]) ch.monitoringWos.push({ data: m, hash: h });
+  });
+
   // RCA hanya boleh dikirim role leader ke atas (crew ditolak server)
   if (canEditMasterData()) {
     rcaReports.forEach(r => {
@@ -152,7 +161,7 @@ function collectChanges() {
 
 function hasPendingChanges() {
   const ch = collectChanges();
-  return !!(ch.hierarchy || ch.picList || ch.sessions.length || ch.deletedSessions.length || ch.workOrders.length || ch.rcaReports.length || ch.repairs.length);
+  return !!(ch.hierarchy || ch.picList || ch.sessions.length || ch.deletedSessions.length || ch.workOrders.length || ch.rcaReports.length || ch.repairs.length || ch.monitoringWos.length);
 }
 
 async function flushChanges() {
@@ -161,7 +170,7 @@ async function flushChanges() {
   if (_sync.pushing) { _sync.pushAgain = true; return false; }
 
   const ch = collectChanges();
-  if (!ch.hierarchy && !ch.picList && !ch.sessions.length && !ch.deletedSessions.length && !ch.workOrders.length && !ch.rcaReports.length && !ch.repairs.length) {
+  if (!ch.hierarchy && !ch.picList && !ch.sessions.length && !ch.deletedSessions.length && !ch.workOrders.length && !ch.rcaReports.length && !ch.repairs.length && !ch.monitoringWos.length) {
     return true;
   }
 
@@ -181,6 +190,7 @@ async function flushChanges() {
         body.workOrders = ch.workOrders.map(x => x.data);
         body.rcaReports = ch.rcaReports.map(x => x.data);
         body.repairs = ch.repairs.map(x => x.data);
+        body.monitoringWos = ch.monitoringWos.map(x => x.data);
       }
       await apiRequest('push', { method: 'POST', body });
 
@@ -192,6 +202,7 @@ async function flushChanges() {
         ch.workOrders.forEach(x => { _sync.snap.workOrders[x.data.id] = x.hash; });
         ch.rcaReports.forEach(x => { _sync.snap.rcaReports[x.data.id] = x.hash; });
         ch.repairs.forEach(x => { _sync.snap.repairs[x.data.id] = x.hash; });
+        ch.monitoringWos.forEach(x => { _sync.snap.monitoringWos[x.data.id] = x.hash; });
       }
       writeCache();
     }
@@ -311,6 +322,16 @@ function _applyMasterData(res) {
     else if (hashOf(local) !== h) { repairs[idx] = r; changed = true; }
     _sync.snap.repairs[r.id] = h;
   });
+  (res.monitoringWos || []).forEach(m => {
+    if (!m || !m.id) return;
+    const idx = monitoringWos.findIndex(x => x.id === m.id);
+    const local = idx !== -1 ? monitoringWos[idx] : null;
+    if (local && hashOf(local) !== _sync.snap.monitoringWos[m.id]) return; // perubahan lokal belum terkirim
+    const h = hashOf(m);
+    if (!local) { monitoringWos.push(m); changed = true; }
+    else if (hashOf(local) !== h) { monitoringWos[idx] = m; changed = true; }
+    _sync.snap.monitoringWos[m.id] = h;
+  });
   (res.rcaReports || []).forEach(r => {
     if (!r || !r.id) return;
     const idx = rcaReports.findIndex(x => x.id === r.id);
@@ -377,6 +398,7 @@ function _refreshCrewPortal() {
   if (!document.getElementById('crewPortal')?.classList.contains('active')) return;
   if (document.querySelector('.overlay.open')) return; // jangan ganggu user yang sedang mengisi form
   if (crewNav.screen === 'history') _renderCrewHistory();
+  else if (crewNav.screen === 'monwo') crewShowMonWo();
   else if (crewNav.screen === 'equip' && crewNav.areaId) crewSelectArea(crewNav.areaId, crewNav.areaName);
   else if (crewNav.screen === 'home') crewShowHome();
 }
@@ -393,7 +415,7 @@ async function resyncFromServer() {
   if (hasPendingChanges() &&
       !confirm('Ada perubahan yang belum tersimpan ke database dan akan hilang. Lanjutkan?')) return;
   clearLocalCache();
-  hierarchy = { units: [] }; sessions = []; PIC_LIST = []; workOrders = []; rcaReports = []; repairs = [];
+  hierarchy = { units: [] }; sessions = []; PIC_LIST = []; workOrders = []; rcaReports = []; repairs = []; monitoringWos = [];
   renderAll();
   await pullFromServer({ silent: false });
 }
