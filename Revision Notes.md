@@ -27,3 +27,5 @@ Data lama di `dbm.xlsx` (ekspor Google Sheets: SESSIONS, SESSION_ITEMS, HIERARCH
 - Diuji di salinan database dengan data acak end-to-end: klien baru menarik 465 sesi + hierarki lengkap → sesi acak dibuat → klien lama menerima delta 1 sesi → hapus tersinkron. Lalu dijalankan ke database asli dan diverifikasi ulang.
 
 **Nomor versi terbaru:** 6.1
+
+**Lanjutan 2026-10-08 — Turso (Vercel):** `import-xlsx.php --env=.env.turso` dijalankan dengan hasil sama seperti lokal: 69 sesi dipulihkan, 396 tanggal diperbaiki, +3 equipment/+22 parameter. Turso kini 466 sesi (465 dari Sheets + 1 sesi yang hanya ada di Turso, tidak disentuh), 79 equipment, 738 parameter, deleted_sessions 0 dan tidak ada sesi tanpa equipment. User (13) tidak diubah. Jalan ulang = "465 sama" (idempoten).
