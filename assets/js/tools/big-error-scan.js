@@ -362,7 +362,7 @@ function applySingleBigErrorFix(gi) {
     targetItem.status = '';
   } else {
     targetItem.value  = newVal;
-    targetItem.status = recalcItemStatus(parseFloat(newVal), item.param);
+    targetItem.status = recalcItemStatus(parseFloat(newVal), item.param, targetItem.status);
   }
 
   sess.updatedAt = new Date().toISOString();
@@ -398,7 +398,7 @@ function applySelectedBigErrorFix() {
       targetItem.status = '';
     } else {
       targetItem.value  = newVal;
-      targetItem.status = recalcItemStatus(parseFloat(newVal), item.param);
+      targetItem.status = recalcItemStatus(parseFloat(newVal), item.param, targetItem.status);
     }
     sess.updatedAt = new Date().toISOString();
     beLog(`✅ ${item.label} @ ${item.sessId}: ${item.rawValue} → ${newVal} [${targetItem.status}]`);

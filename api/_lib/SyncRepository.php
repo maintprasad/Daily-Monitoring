@@ -404,6 +404,15 @@ final class SyncRepository
             if (!is_array($item)) {
                 continue;
             }
+            // Nilai berbentuk tanggal / angka kepanjangan tidak boleh masuk database
+            [$value, $guardNote] = ValueGuard::sanitize(self::str($item['value'] ?? ''));
+            if ($guardNote !== null) {
+                $item['note'] = trim(self::str($item['note'] ?? '') . ' ' . $guardNote);
+                if ($value === '') {
+                    $item['status'] = '';
+                }
+            }
+            $item['value'] = $value;
             $row = [$id, $i];
             foreach (self::ITEM_FIELDS as $key => $_) {
                 $row[] = self::str($item[$key] ?? '');

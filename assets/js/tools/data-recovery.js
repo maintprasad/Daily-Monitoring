@@ -60,9 +60,53 @@ function isCorruptDateValue(val) {
  * Konversi nilai corrupt → kandidat angka
  * Return array kandidat: [ { value, method, confidence } ]
  */
+/**
+ * Hitung balik nilai asli dari teks tanggal (sama dengan ValueGuard::recoverDate di server).
+ *   tahun 1899–1910 → nomor seri tanggal Sheets (hari sejak 30 Des 1899), mis. 3 Feb 1900 → 35
+ *   tahun 2000–2100 → desimal hari.bulan yang diketik crew, mis. 12 Feb 2026 → 12.2
+ * null = tidak bisa dipastikan.
+ */
+function recoverDateValue(val) {
+  const s = String(val).trim();
+  const MONTHS = { Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12 };
+  let y, m, d, secs = 0, mt;
+  if ((mt = s.match(/^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})\s+(\d{4})(?:\s+(\d{2}):(\d{2}):(\d{2}))?/))) {
+    y = +mt[3]; m = MONTHS[mt[1]]; d = +mt[2];
+    if (mt[4] !== undefined) secs = (+mt[4]) * 3600 + (+mt[5]) * 60 + (+mt[6]);
+  } else if (/^\d{4}-\d{2}-\d{2}T.*(Z|[+-]\d{2}:?\d{2})$/.test(s)) {
+    // ISO UTC → tanggal & jam versi WIB (UTC+7)
+    const t = Date.parse(s);
+    if (isNaN(t)) return null;
+    const w = new Date(t + 7 * 3600000);
+    y = w.getUTCFullYear(); m = w.getUTCMonth() + 1; d = w.getUTCDate();
+    secs = w.getUTCHours() * 3600 + w.getUTCMinutes() * 60 + w.getUTCSeconds();
+  } else if ((mt = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) {
+    y = +mt[1]; m = +mt[2]; d = +mt[3];
+  } else if ((mt = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/))) {
+    y = +mt[3]; m = +mt[2]; d = +mt[1]; // DD/MM/YYYY (locale Indonesia)
+  } else {
+    return null;
+  }
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return null;
+  if (y >= 1899 && y <= 1910) {
+    const serial = (dt - Date.UTC(1899, 11, 30)) / 86400000 + secs / 86400;
+    return String(Math.round(serial * 10000) / 10000);
+  }
+  if (y >= 2000 && y <= 2100) return d + '.' + m;
+  return null;
+}
+
 function extractCandidates(val, param) {
   const s   = String(val).trim();
   const candidates = [];
+
+  // ── Method utama: hitung balik pasti (pola kerusakan Google Sheets) ─────────
+  const exact = recoverDateValue(s);
+  if (exact !== null) {
+    candidates.push({ value: parseFloat(exact), method: `Dihitung balik dari tanggal (${s.slice(0, 24)})`, confidence: 1.2 });
+    return candidates;
+  }
 
   // ── Method 0: Parse format DD/MM/YYYY → konversi balik ke serial Sheets ────
   // Ini kasus PALING UMUM: Sheets format ulang kolom jadi tanggal, lalu kirim
@@ -255,12 +299,18 @@ function runDataRecoveryScan() {
       // Cari equipment → params
       const eq = findEquipFlex(sess.unitId, sess.areaId, '', sess.equipId);
       const paramMap = {};
-      (eq?.params || []).forEach(p => { paramMap[p.id] = p; });
+      const labelMap = {};
+      (eq?.params || []).forEach(p => {
+        paramMap[p.id] = p;
+        labelMap[String(p.label || '').trim().toLowerCase()] = p;
+      });
 
       (sess.items || []).forEach((item, itemIdx) => {
         if (!isCorruptDateValue(item.value)) return;
 
-        const param      = paramMap[item.paramId] || null;
+        // Sesi lama bisa memakai ID parameter versi hierarki sebelumnya → cocokkan lewat label.
+        // Tanpa batas parameter, status hasil perbaikan akan kosong.
+        const param      = paramMap[item.paramId] || labelMap[String(item.label || '').trim().toLowerCase()] || null;
         const candidates = extractCandidates(item.value, param);
         const prediction = scoreCandidate(candidates, param);
 
@@ -462,7 +512,7 @@ function applySingleRecovery(gi) {
   } else {
     targetItem.value = newVal;
     // Recalculate status
-    targetItem.status = recalcItemStatus(parseFloat(newVal), item.param);
+    targetItem.status = recalcItemStatus(parseFloat(newVal), item.param, targetItem.status);
   }
 
   sess.updatedAt = new Date().toISOString();
@@ -502,7 +552,7 @@ function applySelectedRecovery() {
       targetItem.status = '';
     } else {
       targetItem.value  = newVal;
-      targetItem.status = recalcItemStatus(parseFloat(newVal), item.param);
+      targetItem.status = recalcItemStatus(parseFloat(newVal), item.param, targetItem.status);
     }
     sess.updatedAt = new Date().toISOString();
     drLog(`✅ ${item.label} @ ${item.sessId}: ${item.rawValue} → ${newVal} [${targetItem.status}]`);
@@ -570,11 +620,16 @@ function findRecoveryTarget(sess, item) {
 /**
  * Recalculate status dari nilai baru berdasarkan parameter
  */
-function recalcItemStatus(v, param) {
-  if (isNaN(v) || !param) return '';
-  const { normalMin: nMin, normalMax: nMax, warnMin, warnMax } = param;
+function recalcItemStatus(v, param, fallback = '') {
+  // Batas parameter tidak diketahui → status lama dipertahankan, jangan dikosongkan
+  if (isNaN(v) || !param) return fallback || '';
+  const { normalMin: nMin, normalMax: nMax } = param;
+  let { warnMin, warnMax } = param;
   // Batas kosong bisa tersimpan sebagai null — Number(null) = 0, jadi wajib dicek != null
   const has = x => x !== undefined && x !== null && x !== '' && !isNaN(x);
+  // Batas warning yang lebih sempit dari batas normal (salah input) diabaikan
+  if (has(warnMin) && has(nMin) && +warnMin > +nMin) warnMin = null;
+  if (has(warnMax) && has(nMax) && +warnMax < +nMax) warnMax = null;
 
   const overWarn  = has(warnMax) && v > warnMax;
   const underWarn = has(warnMin) && v < warnMin;

@@ -18,6 +18,7 @@ require __DIR__ . '/TursoDriver.php';
 require __DIR__ . '/Schema.php';
 require __DIR__ . '/Auth.php';
 require __DIR__ . '/UserRepository.php';
+require __DIR__ . '/ValueGuard.php';
 require __DIR__ . '/SyncRepository.php';
 require __DIR__ . '/NotificationService.php';
 
